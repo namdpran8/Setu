@@ -83,9 +83,22 @@ bool AxmlParser::parse(const std::vector<uint8_t>& axmlBuffer) {
                 if (attr->rawValue != 0xFFFFFFFF) {
                     cout << "    " << attrName << "=\"" << m_stringPool[attr->rawValue] << "\"" << endl;
                 } else {
-                    // It's a typed value (like an integer, a boolean, or a resource reference like @string/app_name)
-                    // For now, we'll just print its raw hex data.
-                    cout << "    " << attrName << "=(TypedData: 0x" << std::hex << attr->typedValue_data << std::dec << ")" << endl;
+                    // AXML uses a typed value system (Res_value struct). We can inspect dataType to format it!
+                    switch (attr->typedValue_dataType) {
+                        case 0x12: // TYPE_INT_BOOLEAN
+                            cout << "    " << attrName << "=" << (attr->typedValue_data == 0xFFFFFFFF ? "true" : "false") << endl;
+                            break;
+                        case 0x10: // TYPE_INT_DEC
+                            cout << "    " << attrName << "=" << std::dec << attr->typedValue_data << endl;
+                            break;
+                        case 0x01: // TYPE_REFERENCE
+                            cout << "    " << attrName << "=@0x" << std::hex << attr->typedValue_data << std::dec << endl;
+                            break;
+                        default:   // Unknown or unhandled types (Hex dump)
+                            cout << "    " << attrName << "=(Type: 0x" << std::hex << (int)attr->typedValue_dataType 
+                                 << " Data: 0x" << attr->typedValue_data << std::dec << ")" << endl;
+                            break;
+                    }
                 }
                 
                 // Move to the next attribute struct

@@ -1,6 +1,7 @@
 #include <iostream>
 #include "apk_extractor/apkextractor.h"
 #include "AxmlPraserer/AxmlParser.h"
+#include "dex/DexParser.h"
 
 int main(int argc, char* argv[]) {
     std::cout << "Windroid Runtime - APK Inspector" << std::endl;
@@ -32,6 +33,15 @@ int main(int argc, char* argv[]) {
     }
     else {
         std::cerr << "Could not find AndroidManifest.xml in the APK!" << std::endl;
+    }
+
+    // --- Phase 1.3: DEX Parsing ---
+    std::vector<uint8_t> dexBuffer;
+    if (extractor.ExtractEntryToMemory("classes.dex", dexBuffer)) {
+        DexParser dexParser;
+        dexParser.parse(dexBuffer);
+    } else {
+        std::cerr << "Could not find classes.dex in the APK!" << std::endl;
     }
 
     return 0;
