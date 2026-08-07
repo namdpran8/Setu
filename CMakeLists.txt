@@ -10,6 +10,8 @@ add_executable(winandroid_runtime
 
     src/main.cpp
     "src/apk_extractor/ApkExtractor.cpp"
+ "src/AxmlPraserer/AxmlParser.cpp"
 )
 
 target_include_directories(winandroid_runtime PRIVATE include)
+target_link_libraries(winandroid_runtime PRIVATE miniz)
