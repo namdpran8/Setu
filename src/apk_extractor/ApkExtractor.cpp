@@ -133,9 +133,11 @@ bool ApkExtractor::ExtractEntry(const std::string& entryName, const std::string&
     return mz_zip_reader_extract_file_to_file(m_zipArchive, entryName.c_str(), outputPath.c_str(), 0);
 }
 
+#include "../utils/Logger.h"
+
 // -----------------------------------------------------------------------------
 // Dummy test function
 // -----------------------------------------------------------------------------
 void ApkExtractor::extractor() {
-    cout << "This extractor class is working " << endl;
+    Logger::i("ApkExtractor", "This extractor class is working");
 }

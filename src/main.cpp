@@ -1,10 +1,13 @@
 #include <iostream>
+#include <string>
 #include "apk_extractor/apkextractor.h"
 #include "AxmlPraserer/AxmlParser.h"
 #include "dex/DexParser.h"
+#include "utils/Logger.h"
+#include "interpreter/Interpreter.h"
 
 int main(int argc, char* argv[]) {
-    std::cout << "Windroid Runtime - APK Inspector" << std::endl;
+    Logger::i("Main", "Windroid Runtime - APK Inspector Started");
 
     std::string apkPath = "C:\\Users\\namde\\Documents\\Windroid\\testapk\\hellp.apk"; // Default path
     
@@ -16,15 +19,15 @@ int main(int argc, char* argv[]) {
     ApkExtractor extractor;
 
     if (!extractor.OpenApk(apkPath)) {
-        std::cerr << "Failed to open APK: " << apkPath << std::endl;
+        Logger::e("Main", "Failed to open APK: " + apkPath);
         return 1;
     }
 
-    std::cout << "Successfully opened APK. Listing contents:" << std::endl;
+    Logger::i("Main", "Successfully opened APK.");
     
     auto entries = extractor.listEntries();
     
-    std::cout << "Found " << entries.size() << " files:" << std::endl;
+    Logger::d("Main", "Found " + std::to_string(entries.size()) + " files in APK");
     
     std::vector<uint8_t> axmlBuffer;
     if (extractor.ExtractEntryToMemory("AndroidManifest.xml", axmlBuffer)) {
@@ -32,16 +35,33 @@ int main(int argc, char* argv[]) {
         axmlParser.parse(axmlBuffer);
     }
     else {
-        std::cerr << "Could not find AndroidManifest.xml in the APK!" << std::endl;
+        Logger::e("Main", "Could not find AndroidManifest.xml in the APK!");
     }
 
     // --- Phase 1.3: DEX Parsing ---
     std::vector<uint8_t> dexBuffer;
-    if (extractor.ExtractEntryToMemory("classes.dex", dexBuffer)) {
-        DexParser dexParser;
+    DexParser dexParser; // Declare outside so it stays alive for the Interpreter!
+    
+    // TEMPORARY: MainActivity is physically inside classes3.dex due to multidex!
+    if (extractor.ExtractEntryToMemory("classes3.dex", dexBuffer)) {
         dexParser.parse(dexBuffer);
     } else {
-        std::cerr << "Could not find classes.dex in the APK!" << std::endl;
+        Logger::e("Main", "Could not find classes3.dex in the APK!");
+        return 1;
+    }
+
+    // ---------------------------------------------------------
+    // PHASE 2.5: DYNAMIC BYTECODE EXTRACTION & INTERPRETATION
+    // ---------------------------------------------------------
+    Logger::i("Main", "Testing Interpreter Skeleton on real extracted bytecode...");
+    Interpreter vm;
+    
+    std::vector<uint8_t> realBytecode = dexParser.getMethodBytecode("Lcom/pranshu/test1/MainActivity;", "onCreate");
+    
+    if (!realBytecode.empty()) {
+        vm.executeMethod(realBytecode, &dexParser);
+    } else {
+        Logger::e("Main", "Failed to extract bytecode for MainActivity.onCreate!");
     }
 
     return 0;

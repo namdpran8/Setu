@@ -1,5 +1,7 @@
 #include "AxmlParser.h"
 #include <iostream>
+#include <string>
+#include "../utils/Logger.h"
 
 using namespace std;
 
@@ -16,7 +18,7 @@ AxmlParser::~AxmlParser() {
 // -----------------------------------------------------------------------------
 bool AxmlParser::parse(const std::vector<uint8_t>& axmlBuffer) {
     if (axmlBuffer.empty()) {
-        cerr << "AXML buffer is empty!" << endl;
+        Logger::e("AxmlParser", "AXML buffer is empty!");
         return false;
     }
 
@@ -26,11 +28,11 @@ bool AxmlParser::parse(const std::vector<uint8_t>& axmlBuffer) {
 
     // 0x0003 is the magic number for RES_XML_TYPE (AXML file type)
     if (header->type != 0x0003) {
-        cerr << "Invalid AXML file (bad magic number)!" << endl;
+        Logger::e("AxmlParser", "Invalid AXML file (bad magic number)!");
         return false;
     }
 
-    cout << "Valid AXML file detected. Total size: " << header->size << " bytes." << endl;
+    Logger::i("AxmlParser", "Valid AXML file detected. Total size: " + std::to_string(header->size) + " bytes.");
 
     // TODO: In the next step, we will loop through the chunks that come after this header
     // and parse the String Pool!
@@ -123,11 +125,11 @@ bool AxmlParser::parseStringPool(const uint8_t* chunkStart) {
 
     // 0x0001 is the magic number for RES_STRING_POOL_TYPE
     if (header->header.type != 0x0001) {
-        cerr << "Expected String Pool chunk, but got type: " << header->header.type << endl;
+        Logger::e("AxmlParser", "Expected String Pool chunk, but got type: " + std::to_string(header->header.type));
         return false;
     }
 
-    cout << "Found String Pool! It contains " << header->stringCount << " strings." << endl;
+    Logger::d("AxmlParser", "Found String Pool! It contains " + std::to_string(header->stringCount) + " strings.");
 
     // Is the UTF-8 flag set? (1 << 8 is 256)
     bool isUTF8 = (header->flags & 256) != 0;

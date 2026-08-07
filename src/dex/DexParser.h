@@ -53,6 +53,26 @@ struct method_id_item {
     uint32_t name_idx;       // Index into string_ids (the actual method name)
 };
 
+struct class_def_item {
+    uint32_t class_idx;
+    uint32_t access_flags;
+    uint32_t superclass_idx;
+    uint32_t interfaces_off;
+    uint32_t source_file_idx;
+    uint32_t annotations_off;
+    uint32_t class_data_off;
+    uint32_t static_values_off;
+};
+
+struct code_item_header {
+    uint16_t registers_size;
+    uint16_t ins_size;
+    uint16_t outs_size;
+    uint16_t tries_size;
+    uint32_t debug_info_off;
+    uint32_t insns_size;
+};
+
 #pragma pack(pop)
 
 class DexParser {
@@ -62,9 +82,23 @@ public:
 
     bool parse(const std::vector<uint8_t>& dexBuffer);
 
+    // Look up a method's full signature by its ID (e.g. "com.pranshu.test1.MainActivity -> setContentView")
+    std::string getMethodSignature(uint32_t methodIdx) const;
+
+    // Dynamically extracts the Dalvik bytecode for a specific class and method
+    std::vector<uint8_t> getMethodBytecode(const std::string& className, const std::string& methodName) const;
+
 private:
     std::vector<std::string> m_strings;
+    
+    // Pointers to DEX structures in memory
+    const uint8_t* m_dexBufferStart = nullptr;
+    const type_id_item* m_typeIds = nullptr;
+    const method_id_item* m_methodIds = nullptr;
+    uint32_t m_methodIdsSize = 0;
+    const class_def_item* m_classDefs = nullptr;
+    uint32_t m_classDefsSize = 0;
 
     // Helper to read Android's custom variable-length integers
-    uint32_t readUnsignedLeb128(const uint8_t** pStream);
+    uint32_t readUnsignedLeb128(const uint8_t** pStream) const;
 };
