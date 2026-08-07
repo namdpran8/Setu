@@ -327,7 +327,7 @@ Value DexParser::readEncodedValue(const uint8_t** pStream) const {
 
 Value DexParser::getStaticFieldValue(uint32_t fieldIdx) const {
     if (fieldIdx >= m_fieldIdsSize || !m_classDefs || !m_dexBufferStart) {
-        return Value::MakeNull();
+        return Value::MakeUninitialized();
     }
     
     const field_id_item& field = m_fieldIds[fieldIdx];
@@ -398,7 +398,7 @@ Value DexParser::getStaticFieldValue(uint32_t fieldIdx) const {
     }
     
     Logger::w("DexParser", "Class " + className + " not found in this DEX (cross-DEX field access?) Cannot resolve " + fieldName);
-    return Value::MakeNull();
+    return Value::MakeUninitialized();
 }
 
 Value DexParser::getStaticFieldValueByName(const std::string& className, const std::string& fieldName) const {
