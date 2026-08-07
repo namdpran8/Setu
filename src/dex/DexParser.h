@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <vector>
 #include <string>
+#include "../interpreter/Value.h"
 
 // Ensure 1-byte alignment just like AXML!
 #pragma pack(push, 1)
@@ -53,6 +54,18 @@ struct method_id_item {
     uint32_t name_idx;       // Index into string_ids (the actual method name)
 };
 
+struct proto_id_item {
+    uint32_t shorty_idx;
+    uint32_t return_type_idx;
+    uint32_t parameters_off;
+};
+
+// Note: type_list is variable size, so we don't define the array here
+struct type_list {
+    uint32_t size;
+    // type_item list[size]; (where type_item is just a uint16_t type_idx)
+};
+
 struct class_def_item {
     uint32_t class_idx;
     uint32_t access_flags;
@@ -73,6 +86,12 @@ struct code_item_header {
     uint32_t insns_size;
 };
 
+struct field_id_item {
+    uint16_t class_idx;
+    uint16_t type_idx;
+    uint32_t name_idx;
+};
+
 #pragma pack(pop)
 
 class DexParser {
@@ -88,12 +107,25 @@ public:
     // Dynamically extracts the Dalvik bytecode for a specific class and method
     std::vector<uint8_t> getMethodBytecode(const std::string& className, const std::string& methodName) const;
 
+    // Looks up the initial value of a static field
+    Value getStaticFieldValue(uint32_t fieldIdx) const;
+    
+    // Looks up the initial value of a static field by string name
+    Value getStaticFieldValueByName(const std::string& className, const std::string& fieldName) const;
+    
+    // String resolution helpers for fields
+    std::string getClassNameFromFieldIdx(uint32_t fieldIdx) const;
+    std::string getFieldNameFromFieldIdx(uint32_t fieldIdx) const;
+
 private:
     std::vector<std::string> m_strings;
     
     // Pointers to DEX structures in memory
     const uint8_t* m_dexBufferStart = nullptr;
     const type_id_item* m_typeIds = nullptr;
+    const proto_id_item* m_protoIds = nullptr;
+    const field_id_item* m_fieldIds = nullptr;
+    uint32_t m_fieldIdsSize = 0;
     const method_id_item* m_methodIds = nullptr;
     uint32_t m_methodIdsSize = 0;
     const class_def_item* m_classDefs = nullptr;
@@ -101,4 +133,5 @@ private:
 
     // Helper to read Android's custom variable-length integers
     uint32_t readUnsignedLeb128(const uint8_t** pStream) const;
+    Value readEncodedValue(const uint8_t** pStream) const;
 };

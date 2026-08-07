@@ -63,6 +63,8 @@ bool DexParser::parse(const std::vector<uint8_t>& dexBuffer) {
         m_strings.push_back(s);
     }
     
+    // Cleaned up the method dump that used to be here
+    
     Logger::i("DexParser", "Successfully loaded " + std::to_string(m_strings.size()) + " strings from DEX!");
     if (m_strings.size() > 0) {
         cout << "String[0]: " << m_strings[0] << endl;
@@ -71,6 +73,13 @@ bool DexParser::parse(const std::vector<uint8_t>& dexBuffer) {
 
     // --- 3. Parse Type IDs ---
     m_typeIds = reinterpret_cast<const type_id_item*>(dexBuffer.data() + header->type_ids_off);
+    
+    // --- Parse Proto IDs ---
+    m_protoIds = reinterpret_cast<const proto_id_item*>(dexBuffer.data() + header->proto_ids_off);
+    
+    // --- Parse Field IDs ---
+    m_fieldIdsSize = header->field_ids_size;
+    m_fieldIds = reinterpret_cast<const field_id_item*>(dexBuffer.data() + header->field_ids_off);
     
     // --- 4. Parse Method IDs ---
     m_methodIdsSize = header->method_ids_size;
@@ -100,7 +109,7 @@ bool DexParser::parse(const std::vector<uint8_t>& dexBuffer) {
 }
 
 std::string DexParser::getMethodSignature(uint32_t methodIdx) const {
-    if (methodIdx >= m_methodIdsSize || !m_typeIds || !m_methodIds) {
+    if (methodIdx >= m_methodIdsSize || !m_typeIds || !m_methodIds || !m_protoIds) {
         return "<unknown_method>";
     }
     
@@ -109,7 +118,22 @@ std::string DexParser::getMethodSignature(uint32_t methodIdx) const {
     std::string className = m_strings[classNameStringIdx];
     std::string methodName = m_strings[method.name_idx];
     
-    return className + " -> " + methodName + "()";
+    // 3. Look up proto
+    const proto_id_item& proto = m_protoIds[method.proto_idx];
+    std::string returnType = m_strings[m_typeIds[proto.return_type_idx].descriptor_idx];
+    
+    std::string params = "";
+    if (proto.parameters_off != 0 && m_dexBufferStart != nullptr) {
+        const type_list* typeList = reinterpret_cast<const type_list*>(m_dexBufferStart + proto.parameters_off);
+        const uint16_t* listStart = reinterpret_cast<const uint16_t*>(reinterpret_cast<const uint8_t*>(typeList) + 4);
+        for (uint32_t i = 0; i < typeList->size; ++i) {
+            uint16_t typeIdx = listStart[i];
+            params += m_strings[m_typeIds[typeIdx].descriptor_idx];
+        }
+    }
+    
+    // Format: Lclass;->method(Lparams;)V
+    return className + "->" + methodName + "(" + params + ")" + returnType;
 }
 
 std::vector<uint8_t> DexParser::getMethodBytecode(const std::string& className, const std::string& methodName) const {
@@ -235,4 +259,218 @@ uint32_t DexParser::readUnsignedLeb128(const uint8_t** pStream) const {
     }
     *pStream = ptr;
     return result;
+}
+
+Value DexParser::readEncodedValue(const uint8_t** pStream) const {
+    const uint8_t* ptr = *pStream;
+    uint8_t header = *(ptr++);
+    
+    // value_type is the low 5 bits, value_arg is the high 3 bits
+    uint8_t value_type = header & 0x1f;
+    uint8_t value_arg = header >> 5;
+    
+    // The size of the payload (number of bytes - 1)
+    uint32_t size = value_arg + 1;
+    
+    Value result = Value::MakeNull();
+    
+    switch (value_type) {
+        case 0x00: // VALUE_BYTE
+        case 0x02: // VALUE_SHORT
+        case 0x03: // VALUE_CHAR
+        case 0x04: // VALUE_INT
+        {
+            int32_t val = 0;
+            // Decode variable-length signed integer
+            for (uint32_t i = 0; i < size; ++i) {
+                val |= (static_cast<int32_t>(*(ptr++)) << (i * 8));
+            }
+            // Sign-extend if necessary
+            if (size < 4 && (val & (1 << ((size * 8) - 1)))) {
+                val |= -1 << (size * 8);
+            }
+            result = Value::MakeInt(val);
+            break;
+        }
+        case 0x1d: // VALUE_ANNOTATION (Not implemented yet, skip it)
+        case 0x1c: // VALUE_ARRAY
+        case 0x17: // VALUE_STRING
+        case 0x18: // VALUE_TYPE
+        case 0x19: // VALUE_FIELD
+        case 0x1a: // VALUE_METHOD
+        case 0x1b: // VALUE_ENUM
+        {
+            // Just skip it for now
+            ptr += size;
+            break;
+        }
+        case 0x1f: // VALUE_BOOLEAN
+        {
+            // size is exactly the value (0 or 1)
+            result = Value::MakeInt(value_arg); // Booleans are ints in our VM
+            break;
+        }
+        case 0x1e: // VALUE_NULL
+        {
+            result = Value::MakeNull();
+            break;
+        }
+        default:
+            // Skip unknown types
+            ptr += size;
+            break;
+    }
+    
+    *pStream = ptr;
+    return result;
+}
+
+Value DexParser::getStaticFieldValue(uint32_t fieldIdx) const {
+    if (fieldIdx >= m_fieldIdsSize || !m_classDefs || !m_dexBufferStart) {
+        return Value::MakeNull();
+    }
+    
+    const field_id_item& field = m_fieldIds[fieldIdx];
+    uint16_t classIdx = field.class_idx;
+    
+    std::string className = m_strings[m_typeIds[classIdx].descriptor_idx];
+    std::string fieldName = m_strings[field.name_idx];
+    
+    // Find class_def_item
+    for (uint32_t i = 0; i < m_classDefsSize; ++i) {
+        const class_def_item& classDef = m_classDefs[i];
+        if (classDef.class_idx == classIdx) {
+            
+            if (classDef.class_data_off == 0) return Value::MakeNull();
+            
+            const uint8_t* ptr = m_dexBufferStart + classDef.class_data_off;
+            uint32_t staticFieldsSize = readUnsignedLeb128(&ptr);
+            
+            // We don't care about the rest of the class_data_item counts
+            readUnsignedLeb128(&ptr); // instanceFieldsSize
+            readUnsignedLeb128(&ptr); // directMethodsSize
+            readUnsignedLeb128(&ptr); // virtualMethodsSize
+            
+            // Find positional index in static_fields
+            uint32_t positionalIndex = 0;
+            uint32_t currentFieldIdx = 0;
+            bool found = false;
+            
+            for (uint32_t f = 0; f < staticFieldsSize; ++f) {
+                currentFieldIdx += readUnsignedLeb128(&ptr); // field_idx_diff
+                readUnsignedLeb128(&ptr); // access_flags
+                
+                if (currentFieldIdx == fieldIdx) {
+                    positionalIndex = f;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                Logger::w("DexParser", "Field " + className + "->" + fieldName + " is not static or not found in class_data_item");
+                return Value::MakeNull();
+            }
+            
+            // Now resolve the value from static_values_off
+            if (classDef.static_values_off == 0) {
+                Logger::w("DexParser", "Field " + className + "->" + fieldName + " has no static_values_off (defaulting to 0/null)");
+                return Value::MakeNull();
+            }
+            
+            const uint8_t* valPtr = m_dexBufferStart + classDef.static_values_off;
+            uint32_t encodedArraySize = readUnsignedLeb128(&valPtr);
+            
+            if (positionalIndex >= encodedArraySize) {
+                Logger::d("DexParser", "Field " + className + "->" + fieldName + " positional index " + std::to_string(positionalIndex) + " >= encoded_array size " + std::to_string(encodedArraySize) + " (defaulting to 0/null)");
+                return Value::MakeNull(); // Implicit default value (0 or null)
+            }
+            
+            // Fast-forward to the target value
+            for (uint32_t e = 0; e < positionalIndex; ++e) {
+                readEncodedValue(&valPtr);
+            }
+            
+            Value val = readEncodedValue(&valPtr);
+            Logger::d("DexParser", "Successfully read static value for " + className + "->" + fieldName);
+            return val;
+        }
+    }
+    
+    Logger::w("DexParser", "Class " + className + " not found in this DEX (cross-DEX field access?) Cannot resolve " + fieldName);
+    return Value::MakeNull();
+}
+
+Value DexParser::getStaticFieldValueByName(const std::string& className, const std::string& fieldName) const {
+    if (!m_classDefs || !m_dexBufferStart) return Value::MakeUninitialized();
+    
+    // Find class_def_item by name
+    for (uint32_t i = 0; i < m_classDefsSize; ++i) {
+        const class_def_item& classDef = m_classDefs[i];
+        std::string currentClassName = m_strings[m_typeIds[classDef.class_idx].descriptor_idx];
+        
+        if (currentClassName == className) {
+            
+            if (classDef.class_data_off == 0) return Value::MakeNull();
+            
+            const uint8_t* ptr = m_dexBufferStart + classDef.class_data_off;
+            uint32_t staticFieldsSize = readUnsignedLeb128(&ptr);
+            
+            // Skip instance fields and methods
+            readUnsignedLeb128(&ptr);
+            readUnsignedLeb128(&ptr);
+            readUnsignedLeb128(&ptr);
+            
+            uint32_t positionalIndex = 0;
+            uint32_t currentFieldIdx = 0;
+            bool found = false;
+            
+            for (uint32_t f = 0; f < staticFieldsSize; ++f) {
+                currentFieldIdx += readUnsignedLeb128(&ptr); // field_idx_diff
+                readUnsignedLeb128(&ptr); // access_flags
+                
+                const field_id_item& field = m_fieldIds[currentFieldIdx];
+                std::string currentFieldName = m_strings[field.name_idx];
+                
+                if (currentFieldName == fieldName) {
+                    positionalIndex = f;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) return Value::MakeNull();
+            
+            // Resolve from static_values_off
+            if (classDef.static_values_off == 0) return Value::MakeNull();
+            
+            const uint8_t* valPtr = m_dexBufferStart + classDef.static_values_off;
+            uint32_t encodedArraySize = readUnsignedLeb128(&valPtr);
+            
+            if (positionalIndex >= encodedArraySize) {
+                return Value::MakeNull(); // Implicit default
+            }
+            
+            for (uint32_t e = 0; e < positionalIndex; ++e) {
+                readEncodedValue(&valPtr);
+            }
+            
+            return readEncodedValue(&valPtr);
+        }
+    }
+    
+    // Return UNINITIALIZED so MultiDexManager knows to keep looking
+    return Value::MakeUninitialized();
+}
+
+std::string DexParser::getClassNameFromFieldIdx(uint32_t fieldIdx) const {
+    if (fieldIdx >= m_fieldIdsSize) return "";
+    const field_id_item& field = m_fieldIds[fieldIdx];
+    return m_strings[m_typeIds[field.class_idx].descriptor_idx];
+}
+
+std::string DexParser::getFieldNameFromFieldIdx(uint32_t fieldIdx) const {
+    if (fieldIdx >= m_fieldIdsSize) return "";
+    const field_id_item& field = m_fieldIds[fieldIdx];
+    return m_strings[field.name_idx];
 }
