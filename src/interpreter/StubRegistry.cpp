@@ -25,6 +25,18 @@ bool StubRegistry::isStubbed(const std::string& methodSignature) {
     if (methodSignature.find("->findViewById(I)Landroid/view/View;") != std::string::npos) return true;
     if (methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter") != std::string::npos ||
         methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue") != std::string::npos) return true;
+        
+    // Common basic SDK classes we don't want to fail on yet
+    if (methodSignature.find("Ljava/lang/Object;") != std::string::npos) return true;
+    if (methodSignature.find("Ljava/lang/Class;") != std::string::npos) return true;
+    if (methodSignature.find("Ljava/lang/Thread;") != std::string::npos) return true;
+    if (methodSignature.find("Ljava/lang/StringBuilder;") != std::string::npos) return true;
+    if (methodSignature.find("Ljava/util/") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/content/Context;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/content/SharedPreferences") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/app/Activity;->getWindow") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/view/Window;") != std::string::npos) return true;
+    
     return false;
 }
 
@@ -68,7 +80,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                             Interpreter vm;
                             
                             // Execute <init>
-                            auto [initBc, initDex] = m_multiDexManager->getMethodBytecode(targetClassName, "<init>");
+                            auto [initBc, initDex] = m_multiDexManager->getMethodBytecode(targetClassName + "-><init>()V");
                             if (!initBc.bytecode.empty() && initDex) {
                                 InterpreterObject* newActivity = new InterpreterObject();
                                 newActivity->className = targetClassName;
@@ -76,7 +88,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                                 vm.executeMethod(initBc.bytecode, initDex, m_multiDexManager, initArgs, initBc.registers_size, initBc.ins_size);
                                 
                                 // Execute onCreate
-                                auto [onCreateBc, onCreateDex] = m_multiDexManager->getMethodBytecode(targetClassName, "onCreate");
+                                auto [onCreateBc, onCreateDex] = m_multiDexManager->getMethodBytecode(targetClassName + "->onCreate(Landroid/os/Bundle;)V");
                                 if (!onCreateBc.bytecode.empty() && onCreateDex) {
                                     // this, Bundle (null)
                                     std::vector<Value> createArgs = { Value::MakeObject(newActivity), Value::MakeNull() }; 
@@ -134,6 +146,57 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
         if (methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter") != std::string::npos ||
             methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue") != std::string::npos) {
             return false; // Return false means NO exception thrown
+        }
+        
+        // Handle common standard stubs returning null or simple values so it doesn't crash
+        if (methodSignature.find("Ljava/lang/Object;->getClass") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+        if (methodSignature.find("Ljava/lang/Class;->getName") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+        if (methodSignature.find("Ljava/lang/Object;-><init>") != std::string::npos) {
+            return false;
+        }
+        if (methodSignature.find("Ljava/lang/StringBuilder;->") != std::string::npos) {
+            if (outReturn) {
+                if (methodSignature.find("->toString") != std::string::npos) *outReturn = Value::MakeNull();
+                else *outReturn = args.size() > 0 ? args[0] : Value::MakeNull();
+            }
+            return false;
+        }
+        if (methodSignature.find("Landroid/content/Context;->getPackageName") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+        if (methodSignature.find("Landroid/content/Context;->getSharedPreferences") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+        if (methodSignature.find("Landroid/content/SharedPreferences;->getInt") != std::string::npos) {
+            if (outReturn) *outReturn = args.size() > 2 ? args[2] : Value::MakeInt(0);
+            return false;
+        }
+        if (methodSignature.find("Ljava/lang/Thread;->") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+        if (methodSignature.find("Landroid/app/Activity;->getWindow") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+        if (methodSignature.find("Landroid/view/Window;->") != std::string::npos) {
+            return false;
+        }
+        if (methodSignature.find("Ljava/util/") != std::string::npos) {
+            if (methodSignature.find("hasNext") != std::string::npos) {
+                if (outReturn) *outReturn = Value::MakeInt(0);
+            } else {
+                if (outReturn) *outReturn = Value::MakeNull();
+            }
+            return false;
         }
 
         Logger::w("StubRegistry", "Unimplemented stub: " + methodSignature);

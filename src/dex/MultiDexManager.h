@@ -16,9 +16,9 @@ public:
     // Global lookup for a static field by name
     Value getStaticFieldValue(const std::string& className, const std::string& fieldName) const;
 
-    // Retrieves bytecode for a specific class and method across all DEX files.
+    // Retrieves bytecode for a specific method signature across all DEX files.
     // Returns { MethodBytecodeResult, DexParser* } where DexParser* is the one that contained it.
-    std::pair<DexParser::MethodBytecodeResult, const DexParser*> getMethodBytecode(const std::string& className, const std::string& methodName) const;
+    std::pair<DexParser::MethodBytecodeResult, const DexParser*> getMethodBytecode(const std::string& methodSignature) const;
 
 private:
     std::vector<std::unique_ptr<std::vector<uint8_t>>> m_buffers;

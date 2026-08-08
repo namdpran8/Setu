@@ -186,7 +186,7 @@ int main(int argc, char* argv[]) {
     Interpreter vm;
     
     // We can now ask the MultiDexManager for the method bytecode!
-    auto [realBytecodeResult, currentDex] = multiDexManager.getMethodBytecode(mainActivityClass, "onCreate");
+    auto [realBytecodeResult, currentDex] = multiDexManager.getMethodBytecode(mainActivityClass + "->onCreate(Landroid/os/Bundle;)V");
     
     if (!realBytecodeResult.bytecode.empty() && currentDex) {
         vm.executeMethod(realBytecodeResult.bytecode, currentDex, &multiDexManager, {}, realBytecodeResult.registers_size, realBytecodeResult.ins_size);
@@ -198,7 +198,7 @@ int main(int argc, char* argv[]) {
     WindowManager::setClickCallback([&](int controlId) {
         InterpreterObject* listener = StubRegistry::getClickListener(controlId);
         if (listener) {
-            auto [clickBytecodeResult, clickDex] = multiDexManager.getMethodBytecode(listener->className, "onClick");
+            auto [clickBytecodeResult, clickDex] = multiDexManager.getMethodBytecode(listener->className + "->onClick(Landroid/view/View;)V");
             if (!clickBytecodeResult.bytecode.empty() && clickDex) {
                 Logger::i("Main", "Executing click callback for " + listener->className);
                 std::vector<Value> clickArgs;

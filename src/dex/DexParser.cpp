@@ -148,7 +148,11 @@ std::string DexParser::getTypeString(uint32_t typeIdx) const {
     return "";
 }
 
-DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& className, const std::string& methodName) const {
+DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& methodSignature) const {
+    size_t arrowPos = methodSignature.find("->");
+    if (arrowPos == std::string::npos) return {};
+    
+    std::string className = methodSignature.substr(0, arrowPos);
     if (!m_classDefs || !m_dexBufferStart) {
         return {};
     }
@@ -199,11 +203,11 @@ DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& 
 
                 methodIdx += methodIdxDiff; // Add diff to running total
 
-                std::string currentMethodName = m_strings[m_methodIds[methodIdx].name_idx];
-                if (currentMethodName == methodName) {
+                std::string currentMethodSig = getMethodSignature(methodIdx);
+                if (currentMethodSig == methodSignature) {
                     // Found the method!
                     if (codeOff == 0) {
-                        Logger::w("DexParser", "Method " + methodName + " has code_off == 0 (abstract or native)");
+                        Logger::w("DexParser", "Method " + methodSignature + " has code_off == 0 (abstract or native)");
                         return {};
                     }
 
@@ -223,7 +227,7 @@ DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& 
                         bytecode.push_back(rawInsns[b]);
                     }
                     
-                    Logger::i("DexParser", "Dynamically extracted " + std::to_string(bytecodeBytes) + " bytes of bytecode for " + className + "." + methodName);
+                    Logger::i("DexParser", "Dynamically extracted " + std::to_string(bytecodeBytes) + " bytes of bytecode for " + methodSignature);
                     return {bytecode, codeHeader->registers_size, codeHeader->ins_size};
                 }
             }
@@ -238,7 +242,7 @@ DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& 
         result = searchMethodList(virtualMethodsSize);
         if (!result.bytecode.empty()) return result;
 
-        Logger::w("DexParser", "Method " + methodName + " not found in class " + className);
+        Logger::w("DexParser", "Method " + methodSignature + " not found in class " + className);
         return {};
     }
 

@@ -24,4 +24,6 @@ public:
 private:
     // Helper to fetch the next byte and increment the PC
     uint8_t fetchOpcode(const std::vector<uint8_t>& bytecode, uint32_t& pc);
+    uint8_t safe8(const std::vector<uint8_t>& bytecode, uint32_t offset);
+    uint16_t safe16(const std::vector<uint8_t>& bytecode, uint32_t offset);
 };

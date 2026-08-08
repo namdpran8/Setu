@@ -110,8 +110,8 @@ public:
         uint16_t ins_size;
     };
 
-    // Dynamically extracts the Dalvik bytecode for a specific class and method
-    MethodBytecodeResult getMethodBytecode(const std::string& className, const std::string& methodName) const;
+    // Dynamically extracts the Dalvik bytecode for a specific method signature
+    MethodBytecodeResult getMethodBytecode(const std::string& methodSignature) const;
 
     // Get type string by type_idx
     std::string getTypeString(uint32_t typeIdx) const;

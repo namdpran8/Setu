@@ -32,9 +32,9 @@ Value MultiDexManager::getStaticFieldValue(const std::string& className, const s
     return Value::MakeNull();
 }
 
-std::pair<DexParser::MethodBytecodeResult, const DexParser*> MultiDexManager::getMethodBytecode(const std::string& className, const std::string& methodName) const {
+std::pair<DexParser::MethodBytecodeResult, const DexParser*> MultiDexManager::getMethodBytecode(const std::string& methodSignature) const {
     for (const auto& dex : m_dexFiles) {
-        auto result = dex->getMethodBytecode(className, methodName);
+        auto result = dex->getMethodBytecode(methodSignature);
         if (!result.bytecode.empty()) {
             return {result, dex.get()};
         }
