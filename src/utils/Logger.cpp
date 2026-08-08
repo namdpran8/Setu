@@ -1,8 +1,24 @@
 #include "Logger.h"
 #include <iostream>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
+#include <sstream>
+#include <filesystem>
 
 // Default log level is DEBUG so we see everything by default
 LogLevel Logger::s_currentLevel = LogLevel::DEBUG;
+std::ofstream Logger::s_logFile;
+
+void Logger::initLogFile() {
+    std::error_code ec;
+    std::filesystem::create_directory("logs", ec);
+    auto now = std::chrono::system_clock::now();
+    auto time = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << "logs/log_" << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S") << ".txt";
+    s_logFile.open(ss.str(), std::ios::out | std::ios::app);
+}
 
 void Logger::setLevel(LogLevel level) {
     s_currentLevel = level;
@@ -44,5 +60,18 @@ void Logger::log(LogLevel level, const std::string& tag, const std::string& mess
     }
 
     // Format: [INFO] ApkExtractor: Successfully opened APK.
-    *stream << levelStr << " " << tag << ": " << message << std::endl;
+    std::string fullMessage = levelStr + " " + tag + ": " + message;
+    *stream << fullMessage << std::endl;
+    
+    static bool s_logInitFailed = false;
+    if (!s_logFile.is_open() && !s_logInitFailed) {
+        initLogFile();
+        if (!s_logFile.is_open()) {
+            s_logInitFailed = true; // Don't keep retrying if we can't create the file
+        }
+    }
+    if (s_logFile.is_open()) {
+        s_logFile << fullMessage << std::endl;
+        s_logFile.flush();
+    }
 }

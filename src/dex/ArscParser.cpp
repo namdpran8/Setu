@@ -1,0 +1,140 @@
+#include "ArscParser.h"
+#include "../utils/Logger.h"
+
+ArscParser::ArscParser() {
+}
+
+ArscParser::~ArscParser() {
+}
+
+void ArscParser::parseStringPool(const uint8_t* ptr, std::vector<std::string>& outStrings) {
+    const ResStringPool_header* header = reinterpret_cast<const ResStringPool_header*>(ptr);
+    
+    bool isUTF8 = (header->flags & 256) != 0;
+    const uint32_t* stringOffsets = reinterpret_cast<const uint32_t*>(ptr + header->header.headerSize);
+    const uint8_t* stringData = ptr + header->stringsStart;
+    
+    for (uint32_t i = 0; i < header->stringCount; ++i) {
+        if (isUTF8) {
+            const uint8_t* strPtr = stringData + stringOffsets[i];
+            
+            // Skip length bytes for UTF-8
+            if (*strPtr & 0x80) strPtr += 2;
+            else strPtr += 1;
+            
+            if (*strPtr & 0x80) strPtr += 2;
+            else strPtr += 1;
+            
+            std::string parsedString;
+            while (*strPtr != '\0') {
+                parsedString += (char)*strPtr++;
+            }
+            outStrings.push_back(parsedString);
+        } else {
+            const uint16_t* strPtr = reinterpret_cast<const uint16_t*>(stringData + stringOffsets[i]);
+            
+            uint32_t length = *strPtr++;
+            if ((length & 0x8000) != 0) {
+                length = ((length & 0x7FFF) << 16) | (*strPtr++);
+            }
+            
+            const char16_t* chars = reinterpret_cast<const char16_t*>(strPtr);
+            std::string parsedString;
+            
+            for (uint32_t c = 0; c < length; ++c) {
+                char16_t ch = chars[c];
+                if (ch < 0x80) {
+                    parsedString += (char)ch;
+                } else {
+                    parsedString += '?';
+                }
+            }
+            outStrings.push_back(parsedString);
+        }
+    }
+}
+
+bool ArscParser::parse(const std::vector<uint8_t>& buffer) {
+    if (buffer.size() < sizeof(ResTable_header)) return false;
+    
+    const uint8_t* ptr = buffer.data();
+    const ResTable_header* header = reinterpret_cast<const ResTable_header*>(ptr);
+    
+    if (header->header.type != 0x0002) {
+        Logger::e("ArscParser", "Invalid resources.arsc type");
+        return false;
+    }
+    
+    ptr += header->header.headerSize;
+    uint32_t bytesRemaining = header->header.size - header->header.headerSize;
+    
+    while (bytesRemaining > sizeof(ResChunk_header)) {
+        const ResChunk_header* chunkHeader = reinterpret_cast<const ResChunk_header*>(ptr);
+        
+        if (chunkHeader->type == 0x0001) { // String Pool
+            parseStringPool(ptr, m_globalStrings);
+            Logger::d("ArscParser", "Parsed global string pool: " + std::to_string(m_globalStrings.size()) + " strings");
+        } else if (chunkHeader->type == 0x0200) { // Package
+            parsePackage(ptr);
+        }
+        
+        ptr += chunkHeader->size;
+        bytesRemaining -= chunkHeader->size;
+    }
+    
+    return true;
+}
+
+void ArscParser::parsePackage(const uint8_t* ptr) {
+    const ResTable_package* pkgHeader = reinterpret_cast<const ResTable_package*>(ptr);
+    uint32_t packageId = pkgHeader->id;
+    
+    Logger::d("ArscParser", "Parsing package ID: " + std::to_string(packageId));
+    
+    const uint8_t* chunkPtr = ptr + pkgHeader->header.headerSize;
+    uint32_t bytesRemaining = pkgHeader->header.size - pkgHeader->header.headerSize;
+    
+    while (bytesRemaining > sizeof(ResChunk_header)) {
+        const ResChunk_header* chunkHeader = reinterpret_cast<const ResChunk_header*>(chunkPtr);
+        
+        if (chunkHeader->type == 0x0201) { // Type Chunk
+            const ResTable_type* typeHeader = reinterpret_cast<const ResTable_type*>(chunkPtr);
+            uint32_t typeId = typeHeader->id;
+            
+            const uint32_t* offsets = reinterpret_cast<const uint32_t*>(chunkPtr + typeHeader->header.headerSize);
+            const uint8_t* entriesStart = chunkPtr + typeHeader->entriesStart;
+            
+            for (uint32_t entryIndex = 0; entryIndex < typeHeader->entryCount; ++entryIndex) {
+                if (offsets[entryIndex] != 0xFFFFFFFF) {
+                    const uint8_t* entryPtr = entriesStart + offsets[entryIndex];
+                    const ResTable_entry* entryHeader = reinterpret_cast<const ResTable_entry*>(entryPtr);
+                    
+                    // Simple entry (no FLAG_COMPLEX)
+                    if ((entryHeader->flags & 0x0001) == 0) {
+                        const Res_value* value = reinterpret_cast<const Res_value*>(entryPtr + entryHeader->size);
+                        
+                        // If it's a string reference
+                        if (value->dataType == 0x03) {
+                            uint32_t resId = (packageId << 24) | (typeId << 16) | entryIndex;
+                            m_resourceStringPoolIndices[resId] = value->data;
+                        }
+                    }
+                }
+            }
+        }
+        
+        chunkPtr += chunkHeader->size;
+        bytesRemaining -= chunkHeader->size;
+    }
+}
+
+std::string ArscParser::resolveStringValue(uint32_t resId) const {
+    auto it = m_resourceStringPoolIndices.find(resId);
+    if (it != m_resourceStringPoolIndices.end()) {
+        uint32_t stringIndex = it->second;
+        if (stringIndex < m_globalStrings.size()) {
+            return m_globalStrings[stringIndex];
+        }
+    }
+    return "";
+}

@@ -2,9 +2,38 @@
 #include "../utils/Logger.h"
 
 HWND WindowManager::s_mainWindow = nullptr;
+std::function<void(int)> WindowManager::s_clickCallback = nullptr;
+
+void WindowManager::setClickCallback(std::function<void(int)> cb) {
+    s_clickCallback = cb;
+}
+
+void WindowManager::clearWindow() {
+    if (s_mainWindow) {
+        EnumChildWindows(s_mainWindow, [](HWND hwnd, LPARAM lParam) -> BOOL {
+            DestroyWindow(hwnd);
+            return TRUE;
+        }, 0);
+        InvalidateRect(s_mainWindow, nullptr, TRUE);
+        UpdateWindow(s_mainWindow);
+        Logger::i("WindowManager", "Cleared all child controls from main window.");
+    }
+}
 
 LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
+        case WM_COMMAND:
+            if (HIWORD(wParam) == BN_CLICKED) {
+                HWND controlHwnd = (HWND)lParam;
+                // LOWORD(wParam) truncates 32-bit Android IDs to 16 bits!
+                // We MUST get the full 32-bit ID from the HWND itself.
+                int controlId = (int)GetWindowLongPtr(controlHwnd, GWLP_ID);
+                Logger::d("WindowManager", "Button clicked with ID: " + std::to_string(controlId));
+                if (s_clickCallback) {
+                    s_clickCallback(controlId);
+                }
+            }
+            return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;

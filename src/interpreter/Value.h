@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
 enum class ValueType {
     NULL_TYPE,
@@ -23,8 +24,7 @@ struct Value {
         void* obj; 
     };
 
-    // Private constructor so we force use of static factories to prevent ambiguity
-private:
+    // Constructor is public to allow arrays, defaults to NULL
     Value() : type(ValueType::NULL_TYPE), i(0) {}
 
 public:
@@ -56,4 +56,10 @@ public:
         v.obj = val; 
         return v; 
     }
+};
+
+// Represents a real Java object (e.g. for click listeners)
+struct InterpreterObject {
+    std::string className;
+    std::unordered_map<std::string, Value> fields;
 };

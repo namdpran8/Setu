@@ -103,9 +103,18 @@ public:
 
     // Look up a method's full signature by its ID (e.g. "com.pranshu.test1.MainActivity -> setContentView")
     std::string getMethodSignature(uint32_t methodIdx) const;
+    
+    struct MethodBytecodeResult {
+        std::vector<uint8_t> bytecode;
+        uint16_t registers_size;
+        uint16_t ins_size;
+    };
 
     // Dynamically extracts the Dalvik bytecode for a specific class and method
-    std::vector<uint8_t> getMethodBytecode(const std::string& className, const std::string& methodName) const;
+    MethodBytecodeResult getMethodBytecode(const std::string& className, const std::string& methodName) const;
+
+    // Get type string by type_idx
+    std::string getTypeString(uint32_t typeIdx) const;
 
     // Looks up the initial value of a static field
     Value getStaticFieldValue(uint32_t fieldIdx) const;

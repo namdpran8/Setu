@@ -51,6 +51,8 @@ bool AxmlParser::parse(const std::vector<uint8_t>& axmlBuffer) {
 
     cout << "\n--- XML TREE DUMP ---" << endl;
 
+    std::vector<AxmlNode*> nodeStack;
+
     // Loop through all remaining chunks until the end of the file
     while (currentPtr < endPtr) {
         const ResChunk_header* chunk = reinterpret_cast<const ResChunk_header*>(currentPtr);
@@ -70,8 +72,16 @@ bool AxmlParser::parse(const std::vector<uint8_t>& axmlBuffer) {
             // Look up the tag name from our string pool using the index (0xFFFFFFFF means it has no name)
             string tagName = (attrExt->name != 0xFFFFFFFF) ? m_stringPool[attrExt->name] : "UNKNOWN";
             
-            cout << "Found Tag: <" << tagName << ">" << endl;
-
+            auto newNodePtr = std::make_unique<AxmlNode>();
+            AxmlNode* newNode = newNodePtr.get();
+            newNode->tag = tagName;
+            
+            if (nodeStack.empty()) {
+                m_root = std::move(newNodePtr);
+            } else {
+                nodeStack.back()->children.push_back(std::move(newNodePtr));
+            }
+            
             // Now loop through its attributes!
             // The attributes array starts at an offset specified in attrExt
             const uint8_t* attrPtr = currentPtr + sizeof(ResXMLTree_node) + attrExt->attributeStart;
@@ -81,30 +91,30 @@ bool AxmlParser::parse(const std::vector<uint8_t>& axmlBuffer) {
                 
                 string attrName = (attr->name != 0xFFFFFFFF) ? m_stringPool[attr->name] : "UNKNOWN";
                 
+                AxmlAttribute a;
+                a.name = attrName;
+                a.rawValue = (attr->rawValue != 0xFFFFFFFF) ? m_stringPool[attr->rawValue] : "";
+                a.typedValueType = attr->typedValue_dataType;
+                a.typedValueData = attr->typedValue_data;
+                
+                newNode->attributes.push_back(a);
+                
                 // If it's a normal string attribute, rawValue is a valid index into the string pool
                 if (attr->rawValue != 0xFFFFFFFF) {
-                    cout << "    " << attrName << "=\"" << m_stringPool[attr->rawValue] << "\"" << endl;
+                    // cout << "    " << attrName << "=\"" << m_stringPool[attr->rawValue] << "\"" << endl;
                 } else {
                     // AXML uses a typed value system (Res_value struct). We can inspect dataType to format it!
-                    switch (attr->typedValue_dataType) {
-                        case 0x12: // TYPE_INT_BOOLEAN
-                            cout << "    " << attrName << "=" << (attr->typedValue_data == 0xFFFFFFFF ? "true" : "false") << endl;
-                            break;
-                        case 0x10: // TYPE_INT_DEC
-                            cout << "    " << attrName << "=" << std::dec << attr->typedValue_data << endl;
-                            break;
-                        case 0x01: // TYPE_REFERENCE
-                            cout << "    " << attrName << "=@0x" << std::hex << attr->typedValue_data << std::dec << endl;
-                            break;
-                        default:   // Unknown or unhandled types (Hex dump)
-                            cout << "    " << attrName << "=(Type: 0x" << std::hex << (int)attr->typedValue_dataType 
-                                 << " Data: 0x" << attr->typedValue_data << std::dec << ")" << endl;
-                            break;
-                    }
                 }
                 
                 // Move to the next attribute struct
                 attrPtr += attrExt->attributeSize;
+            }
+            
+            nodeStack.push_back(newNode);
+        }
+        else if (chunk->type == 0x0103) { // RES_XML_END_ELEMENT_TYPE
+            if (!nodeStack.empty()) {
+                nodeStack.pop_back();
             }
         }
         
@@ -145,39 +155,53 @@ bool AxmlParser::parseStringPool(const uint8_t* chunkStart) {
 
     // 3. Loop through every string index
     for (uint32_t i = 0; i < header->stringCount; ++i) {
-        
-        // Jump to the offset for this specific string
-        const uint16_t* strPtr = reinterpret_cast<const uint16_t*>(stringData + stringOffsets[i]);
-        
-        // Read the length (Android strings can do a weird 2-word length if they are huge)
-        uint32_t length = *strPtr++;
-        if ((length & 0x8000) != 0) {
-            length = ((length & 0x7FFF) << 16) | (*strPtr++);
-        }
-
-        // Convert the 16-bit characters into a normal std::string (Manual UTF-16 to UTF-8)
-        const char16_t* chars = reinterpret_cast<const char16_t*>(strPtr);
-        std::string parsedString;
-        
-        for (uint32_t c = 0; c < length; ++c) {
-            char16_t ch = chars[c];
-            // For standard AndroidManifest ASCII characters (like 'android', 'name')
-            if (ch < 0x80) {
-                parsedString.push_back(static_cast<char>(ch));
-            } else {
-                // If you encounter foreign languages or emojis, you'd add multi-byte 
-                // UTF-8 encoding here. For our Phase 1 milestone, simply stripping 
-                // to ASCII is perfectly fine!
-                parsedString.push_back('?'); 
+        if (isUTF8) {
+            const uint8_t* strPtr = stringData + stringOffsets[i];
+            
+            // Skip length bytes for UTF-8
+            if (*strPtr & 0x80) strPtr += 2;
+            else strPtr += 1;
+            
+            if (*strPtr & 0x80) strPtr += 2;
+            else strPtr += 1;
+            
+            std::string parsedString;
+            while (*strPtr != '\0') {
+                parsedString += (char)*strPtr++;
             }
-        }
+            m_stringPool.push_back(parsedString);
+        } else {
+            // Jump to the offset for this specific string
+            const uint16_t* strPtr = reinterpret_cast<const uint16_t*>(stringData + stringOffsets[i]);
+            
+            // Read the length (Android strings can do a weird 2-word length if they are huge)
+            uint32_t length = *strPtr++;
+            if ((length & 0x8000) != 0) {
+                length = ((length & 0x7FFF) << 16) | (*strPtr++);
+            }
 
-        // Save it in our class vector!
-        m_stringPool.push_back(parsedString);
+            // Convert the 16-bit characters into a normal std::string (Manual UTF-16 to UTF-8)
+            const char16_t* chars = reinterpret_cast<const char16_t*>(strPtr);
+            std::string parsedString;
+            
+            for (uint32_t c = 0; c < length; ++c) {
+                char16_t ch = chars[c];
+                // For standard AndroidManifest ASCII characters (like 'android', 'name')
+                if (ch < 0x80) {
+                    parsedString.push_back(static_cast<char>(ch));
+                } else {
+                    // If you encounter foreign languages or emojis, you'd add multi-byte 
+                    // UTF-8 encoding here. For our Phase 1 milestone, simply stripping 
+                    // to ASCII is perfectly fine!
+                    parsedString.push_back('?'); 
+                }
+            }
+            m_stringPool.push_back(parsedString);
+        }
 
         // Print the first 15 strings just to prove it works!
         if (i < 15) {
-            cout << "String [" << i << "]: " << parsedString << endl;
+            cout << "String [" << i << "]: " << m_stringPool.back() << endl;
         }
     }
 

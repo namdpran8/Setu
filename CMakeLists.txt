@@ -13,10 +13,13 @@ add_executable(winandroid_runtime
     "src/AxmlPraserer/AxmlParser.cpp"
     "src/dex/DexParser.h" "src/dex/DexParser.cpp"
     "src/dex/MultiDexManager.cpp"
+    "src/dex/ArscParser.cpp"
+    "src/dex/ResourceManager.cpp"
     "src/utils/Logger.cpp"
     "src/interpreter/Interpreter.cpp"
     "src/interpreter/StubRegistry.cpp"
-    "src/ui/WindowManager.cpp")
+    "src/ui/WindowManager.cpp"
+    "src/ui/LayoutInflater.cpp")
 
 target_include_directories(winandroid_runtime PRIVATE include)
 target_link_libraries(winandroid_runtime PRIVATE miniz)

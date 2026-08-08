@@ -136,7 +136,19 @@ std::string DexParser::getMethodSignature(uint32_t methodIdx) const {
     return className + "->" + methodName + "(" + params + ")" + returnType;
 }
 
-std::vector<uint8_t> DexParser::getMethodBytecode(const std::string& className, const std::string& methodName) const {
+std::string DexParser::getTypeString(uint32_t typeIdx) const {
+    if (!m_typeIds) {
+        return "";
+    }
+    // I don't have type_ids_size easily available unless I store it. Let me just trust typeIdx.
+    uint32_t descriptorIdx = m_typeIds[typeIdx].descriptor_idx;
+    if (descriptorIdx < m_strings.size()) {
+        return m_strings[descriptorIdx];
+    }
+    return "";
+}
+
+DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& className, const std::string& methodName) const {
     if (!m_classDefs || !m_dexBufferStart) {
         return {};
     }
@@ -178,7 +190,7 @@ std::vector<uint8_t> DexParser::getMethodBytecode(const std::string& className, 
         }
 
         // Helper lambda to search a method list
-        auto searchMethodList = [&](uint32_t methodCount) -> std::vector<uint8_t> {
+        auto searchMethodList = [&](uint32_t methodCount) -> DexParser::MethodBytecodeResult {
             uint32_t methodIdx = 0; // Reset prev_method_idx to 0 for each new list!
             for (uint32_t m = 0; m < methodCount; ++m) {
                 uint32_t methodIdxDiff = readUnsignedLeb128(&ptr);
@@ -212,19 +224,19 @@ std::vector<uint8_t> DexParser::getMethodBytecode(const std::string& className, 
                     }
                     
                     Logger::i("DexParser", "Dynamically extracted " + std::to_string(bytecodeBytes) + " bytes of bytecode for " + className + "." + methodName);
-                    return bytecode;
+                    return {bytecode, codeHeader->registers_size, codeHeader->ins_size};
                 }
             }
             return {}; // Not found in this list
         };
 
         // Search direct methods first
-        std::vector<uint8_t> result = searchMethodList(directMethodsSize);
-        if (!result.empty()) return result;
+        DexParser::MethodBytecodeResult result = searchMethodList(directMethodsSize);
+        if (!result.bytecode.empty()) return result;
 
         // Search virtual methods second
         result = searchMethodList(virtualMethodsSize);
-        if (!result.empty()) return result;
+        if (!result.bytecode.empty()) return result;
 
         Logger::w("DexParser", "Method " + methodName + " not found in class " + className);
         return {};

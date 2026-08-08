@@ -11,6 +11,8 @@ enum class LogLevel {
     ERR
 };
 
+#include <fstream>
+
 class Logger {
 public:
     // Android-style static logging methods
@@ -24,5 +26,7 @@ public:
 
 private:
     static LogLevel s_currentLevel;
+    static std::ofstream s_logFile;
+    static void initLogFile();
     static void log(LogLevel level, const std::string& tag, const std::string& message);
 };

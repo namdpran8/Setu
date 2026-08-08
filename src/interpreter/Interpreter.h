@@ -14,7 +14,12 @@ public:
     // Executes a raw array of Dalvik bytecode instructions
     // dexParser is used to resolve strings and method names for logging/dispatch
     // multiDexManager is used to resolve cross-DEX dependencies
-    void executeMethod(const std::vector<uint8_t>& bytecode, const DexParser* currentDex = nullptr, const MultiDexManager* multiDexManager = nullptr);
+    Value executeMethod(const std::vector<uint8_t>& bytecode, 
+                        const DexParser* currentDex = nullptr, 
+                        const MultiDexManager* multiDexManager = nullptr,
+                        const std::vector<Value>& args = {},
+                        uint16_t registers_size = 0,
+                        uint16_t ins_size = 0);
 
 private:
     // Helper to fetch the next byte and increment the PC
