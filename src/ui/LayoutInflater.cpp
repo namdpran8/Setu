@@ -33,34 +33,42 @@ void LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, Res
     DWORD style = WS_CHILD | WS_VISIBLE;
     DWORD exStyle = 0;
     
-    if (tag == "TextView") {
+    if (tag.find("TextView") != std::string::npos) {
         win32Class = "STATIC";
-    } else if (tag == "Button") {
+    } else if (tag.find("Button") != std::string::npos) {
         win32Class = "BUTTON";
-    } else if (tag == "EditText") {
+    } else if (tag.find("EditText") != std::string::npos) {
         win32Class = "EDIT";
         style |= WS_BORDER;
         exStyle |= WS_EX_CLIENTEDGE;
+    } else if (tag.find("ImageView") != std::string::npos) {
+        win32Class = "STATIC";
     }
+
+    std::string text = "";
+    uint32_t id = 0;
     
-    // If it's a known control, instantiate it
-    if (!win32Class.empty()) {
-        std::string text = "";
-        uint32_t id = 0;
-        
-        // Parse attributes
-        for (const auto& attr : node->attributes) {
-            if (attr.name == "text") {
-                text = resolveString(attr, resManager);
-            } else if (attr.name == "id") {
-                if (attr.typedValueType == 0x01) { // TYPE_REFERENCE
-                    id = attr.typedValueData;
-                }
+    // Parse attributes
+    for (const auto& attr : node->attributes) {
+        if (attr.name == "text") {
+            text = resolveString(attr, resManager);
+        } else if (attr.name == "id") {
+            if (attr.typedValueType == 0x01) { // TYPE_REFERENCE
+                id = attr.typedValueData;
             }
         }
-        
-        int width = 300;
-        int height = 50;
+    }
+
+    bool isDummy = false;
+    if (win32Class.empty()) {
+        win32Class = "STATIC";
+        isDummy = true;
+    }
+    
+    // Instantiate it
+    if (!win32Class.empty()) {
+        int width = isDummy ? 0 : 300;
+        int height = isDummy ? 0 : 50;
         
         HWND hwnd = CreateWindowExA(
             exStyle,
@@ -79,8 +87,10 @@ void LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, Res
             SendMessage(hwnd, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE);
         }
         
-        // Advance Y for the next control
-        currentY += height + 20; // 20px padding
+        // Advance Y for the next control if it's visible
+        if (!isDummy) {
+            currentY += height + 20; // 20px padding
+        }
     }
     
     // Recurse into children (flattening containers naturally)

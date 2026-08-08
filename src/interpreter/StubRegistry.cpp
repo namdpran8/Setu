@@ -132,13 +132,26 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                 
                 HWND childHwnd = GetDlgItem(WindowManager::getMainWindow(), id);
                 if (childHwnd) {
-                    if (outReturn) *outReturn = Value::MakeObject(childHwnd);
+                    InterpreterObject* viewObj = new InterpreterObject();
+                    viewObj->className = "Landroid/view/View;";
+                    viewObj->nativeHandle = childHwnd;
+                    if (outReturn) *outReturn = Value::MakeObject(viewObj);
                     Logger::d("StubRegistry", "findViewById found matching HWND!");
                 } else {
                     if (outReturn) *outReturn = Value::MakeNull();
                     Logger::w("StubRegistry", "findViewById could not find HWND for id " + std::to_string(id));
                 }
             }
+            return false;
+        }
+
+        if (methodSignature.find("Landroid/view/ViewGroup;->getChildCount()I") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeInt(1);
+            return false;
+        }
+        
+        if (methodSignature.find("Landroid/view/ViewGroup;->getChildAt(I)Landroid/view/View;") != std::string::npos) {
+            if (outReturn) *outReturn = args.size() > 0 ? args[0] : Value::MakeNull();
             return false;
         }
         
@@ -179,6 +192,21 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             if (outReturn) *outReturn = args.size() > 2 ? args[2] : Value::MakeInt(0);
             return false;
         }
+        if (methodSignature.find("Landroid/content/SharedPreferences;->getBoolean") != std::string::npos) {
+            if (outReturn) *outReturn = args.size() > 2 ? args[2] : Value::MakeInt(0);
+            return false;
+        }
+        if (methodSignature.find("Landroid/content/SharedPreferences;->getString") != std::string::npos) {
+            if (outReturn) *outReturn = args.size() > 2 ? args[2] : Value::MakeNull();
+            return false;
+        }
+        if (methodSignature.find("Landroid/content/SharedPreferences$Editor;->") != std::string::npos) {
+            if (outReturn && methodSignature.find("->commit") == std::string::npos && methodSignature.find("->apply") == std::string::npos) {
+                *outReturn = args.size() > 0 ? args[0] : Value::MakeNull();
+            }
+            return false;
+        }
+
         if (methodSignature.find("Ljava/lang/Thread;->") != std::string::npos) {
             if (outReturn) *outReturn = Value::MakeNull();
             return false;
@@ -196,6 +224,18 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             } else {
                 if (outReturn) *outReturn = Value::MakeNull();
             }
+            return false;
+        }
+
+        if (methodSignature.find("Landroid/app/FragmentTransaction;->") != std::string::npos) {
+            if (outReturn && methodSignature.find("->commit") == std::string::npos) {
+                *outReturn = args.size() > 0 ? args[0] : Value::MakeNull();
+            }
+            return false;
+        }
+
+        if (methodSignature.find("Landroid/content/res/Resources;->getResourceName") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
             return false;
         }
 
@@ -226,6 +266,14 @@ void StubRegistry::registerActivityStubs() {
             }
             return false;
         };
+        
+    // 2. Activity::getLayoutInflater
+    stubs["Landroid/app/Activity;->getLayoutInflater()Landroid/view/LayoutInflater;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            Logger::d("StubRegistry", "Executed: Activity.getLayoutInflater()");
+            if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
+            return false;
+        };
 }
 
 void StubRegistry::registerViewStubs() {
@@ -243,10 +291,38 @@ void StubRegistry::registerViewStubs() {
             return false;
         };
         
+    // 2.5 LayoutInflater::inflate
+    stubs["Landroid/view/LayoutInflater;->inflate(ILandroid/view/ViewGroup;Z)Landroid/view/View;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 2 && args[1].type == ValueType::INT) {
+                int layoutId = args[1].i;
+                Logger::d("StubRegistry", "Executed: LayoutInflater.inflate(layoutId=" + std::to_string(layoutId) + ")");
+                if (m_resManager) {
+                    auto layoutParser = m_resManager->getLayout(layoutId);
+                    if (layoutParser) {
+                        const AxmlNode* root = layoutParser->getRootNode();
+                        if (root) {
+                            Logger::i("StubRegistry", "Inflating layout with root tag: " + root->tag);
+                            LayoutInflater::inflate(root, WindowManager::getMainWindow(), m_resManager);
+                            
+                            InterpreterObject* viewObj = new InterpreterObject();
+                            viewObj->className = "Landroid/view/View;";
+                            viewObj->nativeHandle = WindowManager::getMainWindow();
+                            if (outReturn) *outReturn = Value::MakeObject(viewObj);
+                        }
+                    }
+                }
+            } else {
+                if (outReturn) *outReturn = Value::MakeNull();
+            }
+            return false;
+        };
+        
     // 3. View::setOnClickListener
     auto setOnClickListenerStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
-            HWND hwnd = (HWND)args[0].obj;
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            HWND hwnd = viewObj ? (HWND)viewObj->nativeHandle : nullptr;
             InterpreterObject* listener = (InterpreterObject*)args[1].obj;
             
             int controlId = GetDlgCtrlID(hwnd);
@@ -264,4 +340,26 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/view/View;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
     stubs["Landroid/widget/Button;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
     stubs["Landroid/widget/TextView;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
+
+    auto emptyStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeNull();
+        return false;
+    };
+
+    // Added missing stubs
+    stubs["Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V"] = emptyStub;
+    stubs["Landroid/app/Activity;->setTheme(I)V"] = emptyStub;
+    stubs["Landroid/app/Fragment;-><init>()V"] = emptyStub;
+    stubs["Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V"] = emptyStub;
+    stubs["Landroid/view/View;->setTag(ILjava/lang/Object;)V"] = emptyStub;
+    stubs["Lz1/g;->e(Ljava/lang/Object;Ljava/lang/String;)V"] = emptyStub;
+    
+    stubs["Ljava/lang/Enum;->compareTo(Ljava/lang/Enum;)I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeInt(1);
+        return false;
+    };
+    stubs["Ljava/lang/Object;->toString()Ljava/lang/String;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeNull();
+        return false;
+    };
 }

@@ -189,7 +189,12 @@ int main(int argc, char* argv[]) {
     auto [realBytecodeResult, currentDex] = multiDexManager.getMethodBytecode(mainActivityClass + "->onCreate(Landroid/os/Bundle;)V");
     
     if (!realBytecodeResult.bytecode.empty() && currentDex) {
-        vm.executeMethod(realBytecodeResult.bytecode, currentDex, &multiDexManager, {}, realBytecodeResult.registers_size, realBytecodeResult.ins_size);
+        InterpreterObject* mainActivityObj = new InterpreterObject(mainActivityClass);
+        std::vector<Value> args;
+        args.push_back(Value::MakeObject(mainActivityObj));
+        args.push_back(Value::MakeNull()); // Bundle (null for now)
+        
+        vm.executeMethod(realBytecodeResult.bytecode, currentDex, &multiDexManager, args, realBytecodeResult.registers_size, realBytecodeResult.ins_size);
     } else {
         Logger::e("Main", "Failed to extract bytecode for " + mainActivityClass + ".onCreate!");
     }

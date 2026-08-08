@@ -2,12 +2,14 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 enum class ValueType {
     NULL_TYPE,
     INT,
     FLOAT,
     OBJECT, // Pointer to a simulated Java Object instance (e.g. a View)
+    ARRAY,  // Pointer to an ArrayObject instance
     UNINITIALIZED
 };
 
@@ -15,6 +17,9 @@ enum class ValueType {
 struct MockView {
     std::string debugTag; // e.g. "view_id_0x7f0a001a"
 };
+
+// Forward declare ArrayObject
+struct ArrayObject;
 
 struct Value {
     ValueType type;
@@ -56,10 +61,24 @@ public:
         v.obj = val; 
         return v; 
     }
+
+    static Value MakeArray(ArrayObject* val) {
+        Value v;
+        v.type = ValueType::ARRAY;
+        v.obj = val;
+        return v;
+    }
+};
+
+// Represents an array in our VM
+struct ArrayObject {
+    uint16_t elementTypeIndex;
+    std::vector<Value> elements;
 };
 
 // Represents a real Java object (e.g. for click listeners)
 struct InterpreterObject {
     std::string className;
     std::unordered_map<std::string, Value> fields;
+    void* nativeHandle = nullptr;
 };
