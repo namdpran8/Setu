@@ -9,14 +9,106 @@
 #include "interpreter/Interpreter.h"
 #include "interpreter/StubRegistry.h"
 #include "ui/WindowManager.h"
+#include <windows.h>
+#include <commdlg.h>
+#include <functional>
+
+std::string getApkPathWithDialog() {
+    char filename[MAX_PATH];
+    ZeroMemory(filename, sizeof(filename));
+    
+    OPENFILENAMEA ofn;
+    ZeroMemory(&ofn, sizeof(ofn));
+    ofn.lStructSize = sizeof(ofn);
+    ofn.hwndOwner = NULL;
+    ofn.lpstrFilter = "APK Files\0*.apk\0All Files\0*.*\0";
+    ofn.lpstrFile = filename;
+    ofn.nMaxFile = MAX_PATH;
+    ofn.lpstrTitle = "Select an APK to run with Windroid";
+    ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
+    
+    if (GetOpenFileNameA(&ofn)) {
+        return std::string(filename);
+    }
+    return "";
+}
+
+std::string resolveMainActivity(const AxmlNode* root) {
+    if (!root || root->tag != "manifest") return "";
+    
+    std::string packageName = "";
+    for (const auto& attr : root->attributes) {
+        if (attr.name == "package") {
+            packageName = attr.rawValue;
+            break;
+        }
+    }
+    
+    if (packageName.empty()) return "";
+
+    std::string mainActivityName = "";
+
+    std::function<void(const AxmlNode*)> searchNode = [&](const AxmlNode* node) {
+        if (node->tag == "activity") {
+            bool isMain = false;
+            for (const auto& child : node->children) {
+                if (child->tag == "intent-filter") {
+                    for (const auto& intentChild : child->children) {
+                        if (intentChild->tag == "action") {
+                            for (const auto& attr : intentChild->attributes) {
+                                if ((attr.name == "name" || attr.name == "android:name") && 
+                                    attr.rawValue == "android.intent.action.MAIN") {
+                                    isMain = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (isMain) {
+                for (const auto& attr : node->attributes) {
+                    if (attr.name == "name" || attr.name == "android:name") {
+                        mainActivityName = attr.rawValue;
+                        break;
+                    }
+                }
+            }
+        }
+        for (const auto& child : node->children) {
+            searchNode(child.get());
+        }
+    };
+    
+    searchNode(root);
+
+    if (mainActivityName.empty()) return "";
+
+    if (mainActivityName[0] == '.') {
+        mainActivityName = packageName + mainActivityName;
+    } else if (mainActivityName.find('.') == std::string::npos) {
+        mainActivityName = packageName + "." + mainActivityName;
+    }
+
+    for (char& c : mainActivityName) {
+        if (c == '.') c = '/';
+    }
+    
+    return "L" + mainActivityName + ";";
+}
 
 int main(int argc, char* argv[]) {
     Logger::i("Main", "Windroid Runtime - APK Inspector Started");
 
-    std::string apkPath = "C:\\Users\\namde\\Documents\\Windroid\\testapk\\hellp1.apk";
+    std::string apkPath = "";
     
     if (argc > 1) {
         apkPath = argv[1];
+    } else {
+        apkPath = getApkPathWithDialog();
+        if (apkPath.empty()) {
+            Logger::e("Main", "No APK selected. Exiting.");
+            return 1;
+        }
     }
 
     ApkExtractor extractor;
@@ -28,11 +120,24 @@ int main(int argc, char* argv[]) {
     Logger::i("Main", "Successfully opened APK.");
     
     std::vector<uint8_t> axmlBuffer;
+    std::string mainActivityClass = "";
     if (extractor.ExtractEntryToMemory("AndroidManifest.xml", axmlBuffer)) {
         AxmlParser axmlParser;
         axmlParser.parse(axmlBuffer);
+        
+        mainActivityClass = resolveMainActivity(axmlParser.getRootNode());
+        if (!mainActivityClass.empty()) {
+            Logger::i("Main", "Resolved Main Activity: " + mainActivityClass);
+        } else {
+            Logger::w("Main", "Failed to resolve Main Activity from AndroidManifest.xml");
+        }
     } else {
         Logger::e("Main", "Could not find AndroidManifest.xml in the APK!");
+    }
+    
+    if (mainActivityClass.empty()) {
+        Logger::w("Main", "Falling back to hardcoded MainActivity...");
+        mainActivityClass = "Lcom/pranshu/test1/MainActivity;";
     }
 
     // --- Phase 4: Multi-DEX Extraction ---
@@ -81,12 +186,12 @@ int main(int argc, char* argv[]) {
     Interpreter vm;
     
     // We can now ask the MultiDexManager for the method bytecode!
-    auto [realBytecodeResult, currentDex] = multiDexManager.getMethodBytecode("Lcom/pranshu/test1/MainActivity;", "onCreate");
+    auto [realBytecodeResult, currentDex] = multiDexManager.getMethodBytecode(mainActivityClass, "onCreate");
     
     if (!realBytecodeResult.bytecode.empty() && currentDex) {
         vm.executeMethod(realBytecodeResult.bytecode, currentDex, &multiDexManager, {}, realBytecodeResult.registers_size, realBytecodeResult.ins_size);
     } else {
-        Logger::e("Main", "Failed to extract bytecode for MainActivity.onCreate!");
+        Logger::e("Main", "Failed to extract bytecode for " + mainActivityClass + ".onCreate!");
     }
 
     // Set up click routing to the interpreter
