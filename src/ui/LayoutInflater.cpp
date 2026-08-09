@@ -6,6 +6,49 @@ void LayoutInflater::inflate(const AxmlNode* node, HWND parentHwnd, ResourceMana
     inflateRecursive(node, parentHwnd, resManager, currentY);
 }
 
+HWND LayoutInflater::createDynamicView(const std::string& className, HWND parentHwnd) {
+    std::string win32Class = "";
+    DWORD style = WS_CHILD | WS_VISIBLE; // Note: Child windows MUST have a parent
+    DWORD exStyle = 0;
+    
+    if (className.find("TextView") != std::string::npos) {
+        win32Class = "STATIC";
+    } else if (className.find("Button") != std::string::npos) {
+        win32Class = "BUTTON";
+    } else if (className.find("EditText") != std::string::npos) {
+        win32Class = "EDIT";
+        style |= WS_BORDER;
+        exStyle |= WS_EX_CLIENTEDGE;
+    } else if (className.find("HorizontalScrollView") != std::string::npos ||
+               className.find("ScrollView") != std::string::npos) {
+        // Simple container mapping
+        win32Class = "STATIC"; 
+    } else if (className.find("ImageView") != std::string::npos) {
+        win32Class = "STATIC";
+    } else {
+        win32Class = "STATIC"; // Default fallback
+    }
+
+    // Give it a generic starting bounds, layout will reposition it later via setLayoutParams/addView
+    HWND hwnd = CreateWindowExA(
+        exStyle,
+        win32Class.c_str(),
+        "",
+        style,
+        0, 0, 100, 100, 
+        parentHwnd, // A valid HWND is usually required for WS_CHILD
+        nullptr,
+        GetModuleHandle(nullptr),
+        nullptr
+    );
+    
+    if (hwnd) {
+        SendMessage(hwnd, WM_SETFONT, (WPARAM)GetStockObject(DEFAULT_GUI_FONT), TRUE);
+    }
+    
+    return hwnd;
+}
+
 std::string LayoutInflater::resolveString(const AxmlAttribute& attr, ResourceManager* resManager) {
     if (!attr.rawValue.empty()) {
         return attr.rawValue; // Raw string literal

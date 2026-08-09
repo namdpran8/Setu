@@ -277,6 +277,96 @@ void StubRegistry::registerActivityStubs() {
 }
 
 void StubRegistry::registerViewStubs() {
+    // Basic dynamic view creation helper
+    auto dynamicViewInit = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn, const std::string& className) -> bool {
+        if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            // Create a Win32 HWND as a child of the main window for now
+            HWND hwnd = LayoutInflater::createDynamicView(className, WindowManager::getMainWindow());
+            viewObj->nativeHandle = hwnd;
+            Logger::d("StubRegistry", "Created dynamic view: " + className + " -> HWND: " + std::to_string((uintptr_t)hwnd));
+        }
+        return false;
+    };
+
+    stubs["Landroid/widget/HorizontalScrollView;-><init>(Landroid/content/Context;)V"] = 
+        [dynamicViewInit](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            return dynamicViewInit(state, args, outReturn, "Landroid/widget/HorizontalScrollView;");
+        };
+    stubs["Landroid/widget/HorizontalScrollView;-><init>(Landroid/content/Context;Landroid/util/AttributeSet;)V"] = 
+        [dynamicViewInit](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            return dynamicViewInit(state, args, outReturn, "Landroid/widget/HorizontalScrollView;");
+        };
+    stubs["Landroid/view/View;-><init>(Landroid/content/Context;)V"] = 
+        [dynamicViewInit](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            return dynamicViewInit(state, args, outReturn, "Landroid/view/View;");
+        };
+        
+    stubs["Landroid/widget/HorizontalScrollView;->setFillViewport(Z)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool { return false; };
+
+    stubs["Landroid/view/View;->setId(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            HWND hwnd = (HWND)viewObj->nativeHandle;
+            int id = args[1].i;
+            if (hwnd) {
+                SetWindowLongPtrA(hwnd, GWLP_ID, id);
+                Logger::d("StubRegistry", "Executed View.setId(" + std::to_string(id) + ")");
+            }
+        }
+        return false;
+    };
+    
+    stubs["Landroid/view/View;->setVisibility(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            HWND hwnd = (HWND)viewObj->nativeHandle;
+            int visibility = args[1].i;
+            if (hwnd) {
+                ShowWindow(hwnd, (visibility == 0) ? SW_SHOW : SW_HIDE);
+                Logger::d("StubRegistry", "Executed View.setVisibility(" + std::to_string(visibility) + ")");
+            }
+        }
+        return false;
+    };
+
+    stubs["Landroid/view/ViewGroup;->addView(Landroid/view/View;II)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
+            InterpreterObject* parentObj = (InterpreterObject*)args[0].obj;
+            InterpreterObject* childObj = (InterpreterObject*)args[1].obj;
+            if (parentObj && childObj) {
+                HWND parentHwnd = (HWND)parentObj->nativeHandle;
+                HWND childHwnd = (HWND)childObj->nativeHandle;
+                if (parentHwnd && childHwnd) {
+                    SetParent(childHwnd, parentHwnd);
+                    Logger::d("StubRegistry", "Executed ViewGroup.addView(child, width, height)");
+                    // A simple layout fix for dynamic addition to parent
+                    SetWindowPos(childHwnd, nullptr, 0, 500, 300, 50, SWP_NOZORDER | SWP_SHOWWINDOW);
+                }
+            }
+        }
+        return false;
+    };
+
+    stubs["Landroid/view/ViewGroup;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V"] = 
+        stubs["Landroid/view/ViewGroup;->addView(Landroid/view/View;II)V"];
+
+    stubs["Landroid/view/ViewGroup;->removeView(Landroid/view/View;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[1].type == ValueType::OBJECT && args[1].obj) {
+            InterpreterObject* childObj = (InterpreterObject*)args[1].obj;
+            HWND childHwnd = (HWND)childObj->nativeHandle;
+            if (childHwnd) {
+                ShowWindow(childHwnd, SW_HIDE);
+                SetParent(childHwnd, nullptr);
+                Logger::d("StubRegistry", "Executed ViewGroup.removeView()");
+            }
+        }
+        return false;
+    };
+
+    stubs["Landroid/widget/RelativeLayout$LayoutParams;-><init>(II)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool { return false; };
+    stubs["Landroid/widget/RelativeLayout$LayoutParams;->addRule(II)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool { return false; };
+
     // 1. EdgeToEdge::enable(Landroidx/activity/ComponentActivity;)V
     stubs["Landroidx/activity/EdgeToEdge;->enable(Landroidx/activity/ComponentActivity;)V"] = 
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
@@ -347,11 +437,40 @@ void StubRegistry::registerViewStubs() {
     };
 
     // Added missing stubs
-    stubs["Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V"] = emptyStub;
+    stubs["Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            Logger::d("StubRegistry", "Executed: Activity.onCreate() -> Showing Window");
+            HWND mainWnd = WindowManager::getMainWindow();
+            if (mainWnd) {
+                ShowWindow(mainWnd, SW_SHOW);
+                UpdateWindow(mainWnd);
+            }
+            return false;
+        };
+        
     stubs["Landroid/app/Activity;->setTheme(I)V"] = emptyStub;
     stubs["Landroid/app/Fragment;-><init>()V"] = emptyStub;
     stubs["Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V"] = emptyStub;
     stubs["Landroid/view/View;->setTag(ILjava/lang/Object;)V"] = emptyStub;
+    stubs["Landroid/content/Context;->getString(I)Ljava/lang/String;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 2 && args[1].type == ValueType::INT && m_resManager) {
+                int resId = args[1].i;
+                std::string strVal = m_resManager->getString(resId);
+                
+                InterpreterObject* strObj = new InterpreterObject();
+                strObj->className = "Ljava/lang/String;";
+                InterpreterObject* inner = new InterpreterObject();
+                inner->className = strVal;
+                strObj->fields["string_value"] = Value::MakeObject(inner);
+                *outReturn = Value::MakeObject(strObj);
+                Logger::d("StubRegistry", "Executed: Context.getString(id=" + std::to_string(resId) + ") -> '" + strVal + "'");
+            } else {
+                *outReturn = Value::MakeNull();
+                Logger::w("StubRegistry", "Executed: Context.getString() without valid arguments or ResourceManager");
+            }
+            return false;
+        };
     stubs["Lz1/g;->e(Ljava/lang/Object;Ljava/lang/String;)V"] = emptyStub;
     
     stubs["Ljava/lang/Enum;->compareTo(Ljava/lang/Enum;)I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
@@ -429,6 +548,48 @@ void StubRegistry::registerViewStubs() {
             inner->className = std::to_string(val);
             strObj->fields["string_value"] = Value::MakeObject(inner);
             *outReturn = Value::MakeObject(strObj);
+        }
+        return false;
+    };
+
+    stubs["Ljava/lang/String;->equals(Ljava/lang/Object;)Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            bool isEqual = false;
+            if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
+                InterpreterObject* str1 = (InterpreterObject*)args[0].obj;
+                InterpreterObject* str2 = (InterpreterObject*)args[1].obj;
+                if (str1 && str2) {
+                    std::string text1, text2;
+                    auto it1 = str1->fields.find("string_value");
+                    auto it2 = str2->fields.find("string_value");
+                    if (it1 != str1->fields.end() && it1->second.type == ValueType::OBJECT)
+                        text1 = ((InterpreterObject*)it1->second.obj)->className;
+                    if (it2 != str2->fields.end() && it2->second.type == ValueType::OBJECT)
+                        text2 = ((InterpreterObject*)it2->second.obj)->className;
+                    
+                    isEqual = (text1 == text2);
+                }
+            }
+            *outReturn = Value::MakeInt(isEqual ? 1 : 0);
+        }
+        return false;
+    };
+
+    stubs["Landroid/content/Intent;->getAction()Ljava/lang/String;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeNull(); // Null means MAIN/LAUNCHER usually
+        return false;
+    };
+
+    stubs["Landroid/content/Intent;->getData()Landroid/net/Uri;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeNull();
+        return false;
+    };
+
+    stubs["Landroid/app/Activity;->getIntent()Landroid/content/Intent;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            InterpreterObject* intentObj = new InterpreterObject();
+            intentObj->className = "Landroid/content/Intent;";
+            *outReturn = Value::MakeObject(intentObj);
         }
         return false;
     };

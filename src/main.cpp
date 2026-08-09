@@ -49,7 +49,7 @@ std::string resolveMainActivity(const AxmlNode* root) {
     std::string mainActivityName = "";
 
     std::function<void(const AxmlNode*)> searchNode = [&](const AxmlNode* node) {
-        if (node->tag == "activity") {
+        if (node->tag == "activity" || node->tag == "activity-alias") {
             bool isMain = false;
             for (const auto& child : node->children) {
                 if (child->tag == "intent-filter") {
@@ -67,11 +67,16 @@ std::string resolveMainActivity(const AxmlNode* root) {
             }
             if (isMain) {
                 for (const auto& attr : node->attributes) {
-                    if (attr.name == "name" || attr.name == "android:name") {
+                    if (node->tag == "activity-alias" && (attr.name == "targetActivity" || attr.name == "android:targetActivity")) {
+                        mainActivityName = attr.rawValue;
+                        break;
+                    }
+                    if (node->tag == "activity" && (attr.name == "name" || attr.name == "android:name")) {
                         mainActivityName = attr.rawValue;
                         break;
                     }
                 }
+                Logger::d("Main", "Found MAIN activity/alias candidate: " + mainActivityName);
             }
         }
         for (const auto& child : node->children) {

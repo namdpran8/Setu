@@ -28,6 +28,10 @@ std::string ResourceManager::getResourcePath(uint32_t resId) const {
     return m_arscParser.resolveStringValue(resId);
 }
 
+std::string ResourceManager::getString(uint32_t resId) const {
+    return m_arscParser.resolveStringValue(resId);
+}
+
 std::unique_ptr<AxmlParser> ResourceManager::getLayout(uint32_t layoutId) const {
     std::string path = getResourcePath(layoutId);
     if (path.empty()) {

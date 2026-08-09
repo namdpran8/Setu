@@ -19,6 +19,9 @@ public:
     // Extracts and parses an AXML file given its resource ID
     std::unique_ptr<AxmlParser> getLayout(uint32_t layoutId) const;
 
+    // Gets a string value by resource ID (same as getResourcePath, but named appropriately)
+    std::string getString(uint32_t resId) const;
+
 private:
     ApkExtractor* m_extractor;
     ArscParser m_arscParser;
