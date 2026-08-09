@@ -21,22 +21,20 @@ void LayoutInflater::inflate(const AxmlNode* node, HWND parentHwnd, ResourceMana
                             DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
     }
 
-    int currentX = 20; // Default margin
-    int currentY = 20; 
-    int outW = 0;
-    int outH = 0;
+    ConstraintNode root = inflateRecursive(node, parentHwnd, resManager, hFont);
     
-    std::vector<ConstraintNode> constraintNodes;
+    RECT rect;
+    GetClientRect(parentHwnd, &rect);
+    int pW = rect.right > 0 ? rect.right : 400;
+    int pH = rect.bottom > 0 ? rect.bottom : 800;
     
-    inflateRecursive(node, parentHwnd, resManager, currentX, currentY, false, hFont, outW, outH, &constraintNodes);
-    
-    if (!constraintNodes.empty()) {
-        RECT rect;
-        GetClientRect(parentHwnd, &rect);
-        int pW = rect.right > 0 ? rect.right : 400;
-        int pH = rect.bottom > 0 ? rect.bottom : 800;
-        resolveConstraints(constraintNodes, pW, pH);
+    // Set root node dimensions
+    root.x = 0; root.y = 0; root.w = pW; root.h = pH;
+    if (root.hwnd) {
+        SetWindowPos(root.hwnd, nullptr, root.x, root.y, root.w, root.h, SWP_NOZORDER | SWP_NOACTIVATE);
     }
+    
+    layoutNode(root, pW, pH);
 }
 
 HWND LayoutInflater::createDynamicView(const std::string& className, HWND parentHwnd) {
@@ -80,12 +78,9 @@ std::string LayoutInflater::resolveString(const AxmlAttribute& attr, ResourceMan
     return "";
 }
 
-void LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, ResourceManager* resManager, int& currentX, int& currentY, bool isParentHorizontal, HFONT hFont, int& outWidth, int& outHeight, std::vector<ConstraintNode>* constraintNodes) {
-    if (!node) {
-        outWidth = 0;
-        outHeight = 0;
-        return;
-    }
+ConstraintNode LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, ResourceManager* resManager, HFONT hFont) {
+    ConstraintNode cnode;
+    if (!node) return cnode;
     
     std::string tag = node->tag;
     std::string win32Class = "";
@@ -97,7 +92,6 @@ void LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, Res
     else if (tag.find("EditText") != std::string::npos) { win32Class = "EDIT"; style |= WS_BORDER; exStyle |= WS_EX_CLIENTEDGE; }
     else if (tag.find("ImageView") != std::string::npos) win32Class = "STATIC";
 
-    ConstraintNode cnode;
     cnode.width = 80;
     cnode.height = 70;
     
@@ -107,30 +101,48 @@ void LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, Res
     }
 
     std::string text = "";
-    bool isHorizontal = false; 
     
-    if (tag.find("LinearLayout") != std::string::npos) isHorizontal = true; 
+    if (tag.find("ConstraintLayout") != std::string::npos) cnode.isConstraintLayout = true;
+    if (tag.find("LinearLayout") != std::string::npos) {
+        cnode.isLinearLayout = true;
+        cnode.isHorizontal = true; // Default Android behavior
+    }
+    if (tag.find("Guideline") != std::string::npos) cnode.isGuideline = true;
 
     for (const auto& attr : node->attributes) {
         if (attr.name == "text") text = resolveString(attr, resManager);
         else if (attr.name == "id" && attr.typedValueType == 0x01) cnode.id = attr.typedValueData;
         else if (attr.name == "orientation") {
-            if (attr.typedValueData == 0) isHorizontal = true;
-            else if (attr.typedValueData == 1) isHorizontal = false;
+            if (attr.typedValueData == 0) { cnode.isHorizontal = true; cnode.isHorizontalGuide = true; }
+            else if (attr.typedValueData == 1) { cnode.isHorizontal = false; cnode.isHorizontalGuide = false; }
         }
         else if (attr.name == "layout_width") {
             int32_t val = (int32_t)attr.typedValueData;
-            if (val == -1) cnode.widthMode = 1;
-            else if (val == -2) cnode.widthMode = 0;
-            else if (val == 0) cnode.widthMode = 2;
-            else { cnode.widthMode = 0; cnode.width = val; }
+            if (attr.typedValueType == 0x10 || attr.typedValueType == 0x11) {
+                if (val == -1) cnode.widthMode = 1; // MATCH_PARENT
+                else if (val == -2) cnode.widthMode = 0; // WRAP_CONTENT
+            } else if (attr.typedValueType == 0x05) { // DIMENSION
+                int unit = val & 0xF;
+                int actualVal = val >> 8;
+                if (actualVal == 0) cnode.widthMode = 2; // MATCH_CONSTRAINT (0dp)
+                else { cnode.widthMode = 0; cnode.width = actualVal; }
+            } else {
+                cnode.widthMode = 0; cnode.width = val; // Fallback
+            }
         }
         else if (attr.name == "layout_height") {
             int32_t val = (int32_t)attr.typedValueData;
-            if (val == -1) cnode.heightMode = 1;
-            else if (val == -2) cnode.heightMode = 0;
-            else if (val == 0) cnode.heightMode = 2;
-            else { cnode.heightMode = 0; cnode.height = val; }
+            if (attr.typedValueType == 0x10 || attr.typedValueType == 0x11) {
+                if (val == -1) cnode.heightMode = 1; // MATCH_PARENT
+                else if (val == -2) cnode.heightMode = 0; // WRAP_CONTENT
+            } else if (attr.typedValueType == 0x05) { // DIMENSION
+                int unit = val & 0xF;
+                int actualVal = val >> 8;
+                if (actualVal == 0) cnode.heightMode = 2; // MATCH_CONSTRAINT (0dp)
+                else { cnode.heightMode = 0; cnode.height = actualVal; }
+            } else {
+                cnode.heightMode = 0; cnode.height = val; // Fallback
+            }
         }
         else if (attr.name == "layout_constraintTop_toTopOf") cnode.topToTop = attr.typedValueData;
         else if (attr.name == "layout_constraintTop_toBottomOf") cnode.topToBottom = attr.typedValueData;
@@ -146,46 +158,84 @@ void LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, Res
         else if (attr.name == "layout_constraintVertical_bias") {
             if (attr.typedValueType == 0x04) cnode.verticalBias = *(float*)&attr.typedValueData;
         }
+        else if (attr.name == "layout_constraintGuide_percent") {
+            if (attr.typedValueType == 0x04) cnode.guidePercent = *(float*)&attr.typedValueData;
+        }
+        else if (attr.name == "layout_constraintGuide_begin") cnode.guideBegin = attr.typedValueData;
+        else if (attr.name == "layout_constraintGuide_end") cnode.guideEnd = attr.typedValueData;
     }
 
-    bool isDummy = win32Class.empty();
-    if (isDummy) win32Class = "STATIC";
-
-    if (!win32Class.empty() && !isDummy) {
-        std::wstring wWin32Class = utf8_to_utf16(win32Class);
-        std::wstring wText = utf8_to_utf16(text);
-        
-        cnode.hwnd = CreateWindowExW(exStyle, wWin32Class.c_str(), wText.c_str(), style, 
-            0, 0, cnode.width, cnode.height, parentHwnd, (HMENU)(INT_PTR)cnode.id, GetModuleHandle(nullptr), nullptr);
-        
-        if (cnode.hwnd) SendMessage(cnode.hwnd, WM_SETFONT, (WPARAM)hFont, TRUE);
-        
-        if (constraintNodes) constraintNodes->push_back(cnode);
+    bool isDummy = win32Class.empty() || cnode.isGuideline || tag.find("Group") != std::string::npos;
+    if (isDummy) {
+        win32Class = "WindroidViewGroup";
+        // WS_CLIPCHILDREN ensures children are painted correctly
+        style |= WS_CLIPCHILDREN; 
     }
 
-    int childStartX = currentX;
-    int childStartY = currentY;
-    int childrenMaxWidth = 0, childrenMaxHeight = 0;
+    std::wstring wWin32Class = utf8_to_utf16(win32Class);
+    std::wstring wText = utf8_to_utf16(text);
+    
+    if (isDummy && !cnode.isConstraintLayout && !cnode.isLinearLayout) {
+        style &= ~WS_VISIBLE; // Hide Guidelines and Groups completely
+    }
+
+    cnode.hwnd = CreateWindowExW(exStyle, wWin32Class.c_str(), wText.c_str(), style, 
+        0, 0, cnode.width, cnode.height, parentHwnd, (HMENU)(INT_PTR)cnode.id, GetModuleHandle(nullptr), nullptr);
+    
+    if (cnode.hwnd && !isDummy) SendMessage(cnode.hwnd, WM_SETFONT, (WPARAM)hFont, TRUE);
     
     for (const auto& child : node->children) {
-        int childW = 0, childH = 0;
-        inflateRecursive(child.get(), parentHwnd, resManager, childStartX, childStartY, isHorizontal, hFont, childW, childH, constraintNodes);
-        
-        if (!constraintNodes) { // fallback flow if no constraint solver requested (though we always pass it now)
-            if (isHorizontal) {
-                childStartX += childW + 5;
-                childrenMaxHeight = max(childrenMaxHeight, childH);
-                childrenMaxWidth += childW + 5;
-            } else {
-                childStartY += childH + 5;
-                childrenMaxWidth = max(childrenMaxWidth, childW);
-                childrenMaxHeight += childH + 5;
-            }
+        ConstraintNode childNode = inflateRecursive(child.get(), cnode.hwnd ? cnode.hwnd : parentHwnd, resManager, hFont);
+        if (childNode.hwnd || childNode.isGuideline) {
+            cnode.children.push_back(childNode);
         }
     }
     
-    outWidth = childrenMaxWidth;
-    outHeight = childrenMaxHeight;
+    return cnode;
+}
+
+void LayoutInflater::layoutNode(ConstraintNode& node, int parentWidth, int parentHeight) {
+    if (node.isConstraintLayout) {
+        resolveConstraints(node.children, parentWidth, parentHeight);
+        for (auto& child : node.children) {
+            layoutNode(child, child.w, child.h);
+        }
+    } else if (node.isLinearLayout) {
+        int currentX = 0, currentY = 0;
+        int maxChildHeight = 0, maxChildWidth = 0;
+        for (auto& child : node.children) {
+            child.x = currentX;
+            child.y = currentY;
+            child.w = child.width; 
+            child.h = child.height;
+            if (child.widthMode == 1) child.w = parentWidth;
+            if (child.heightMode == 1) child.h = parentHeight;
+            
+            if (node.isHorizontal) {
+                currentX += child.w + 5; 
+                maxChildHeight = max(maxChildHeight, child.h);
+            } else {
+                currentY += child.h + 5;
+                maxChildWidth = max(maxChildWidth, child.w);
+            }
+            if (child.hwnd) {
+                SetWindowPos(child.hwnd, nullptr, child.x, child.y, child.w, child.h, SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            layoutNode(child, child.w, child.h);
+        }
+    } else {
+        // Fallback for Generic ViewGroups
+        for (auto& child : node.children) {
+            child.x = 0; child.y = 0;
+            child.w = child.width; child.h = child.height;
+            if (child.widthMode == 1) child.w = parentWidth;
+            if (child.heightMode == 1) child.h = parentHeight;
+            if (child.hwnd) {
+                SetWindowPos(child.hwnd, nullptr, child.x, child.y, child.w, child.h, SWP_NOZORDER | SWP_NOACTIVATE);
+            }
+            layoutNode(child, child.w, child.h);
+        }
+    }
 }
 
 void LayoutInflater::resolveConstraints(std::vector<ConstraintNode>& nodes, int parentWidth, int parentHeight) {
@@ -201,11 +251,34 @@ void LayoutInflater::resolveConstraints(std::vector<ConstraintNode>& nodes, int 
         bool changed = false;
         
         for (auto& node : nodes) {
+            // Guideline Resolution
+            if (node.isGuideline) {
+                if (!node.resolvedX || !node.resolvedY) {
+                    if (node.isHorizontalGuide) {
+                        if (node.guidePercent >= 0) node.y = (int)(parentHeight * node.guidePercent);
+                        else if (node.guideBegin >= 0) node.y = node.guideBegin;
+                        else if (node.guideEnd >= 0) node.y = parentHeight - node.guideEnd;
+                        else node.y = 0;
+                        node.x = 0; node.w = parentWidth; node.h = 0;
+                    } else {
+                        if (node.guidePercent >= 0) node.x = (int)(parentWidth * node.guidePercent);
+                        else if (node.guideBegin >= 0) node.x = node.guideBegin;
+                        else if (node.guideEnd >= 0) node.x = parentWidth - node.guideEnd;
+                        else node.x = 0;
+                        node.y = 0; node.w = 0; node.h = parentHeight;
+                    }
+                    node.resolvedX = true; 
+                    node.resolvedY = true;
+                    changed = true;
+                }
+                continue;
+            }
+            
             // X Resolution
             if (!node.resolvedX) {
-                bool startReady = (node.startToStart == 0 || node.startToStart == 0xFFFFFFFF || (getNode(node.startToStart) && getNode(node.startToStart)->resolvedX)) ||
+                bool startReady = (node.startToStart == 0 || node.startToStart == 0xFFFFFFFF || (getNode(node.startToStart) && getNode(node.startToStart)->resolvedX)) &&
                                   (node.startToEnd == 0 || node.startToEnd == 0xFFFFFFFF || (getNode(node.startToEnd) && getNode(node.startToEnd)->resolvedX));
-                bool endReady = (node.endToStart == 0 || node.endToStart == 0xFFFFFFFF || (getNode(node.endToStart) && getNode(node.endToStart)->resolvedX)) ||
+                bool endReady = (node.endToStart == 0 || node.endToStart == 0xFFFFFFFF || (getNode(node.endToStart) && getNode(node.endToStart)->resolvedX)) &&
                                 (node.endToEnd == 0 || node.endToEnd == 0xFFFFFFFF || (getNode(node.endToEnd) && getNode(node.endToEnd)->resolvedX));
                                 
                 if (startReady && endReady) {
@@ -253,9 +326,9 @@ void LayoutInflater::resolveConstraints(std::vector<ConstraintNode>& nodes, int 
             
             // Y Resolution
             if (!node.resolvedY) {
-                bool topReady = (node.topToTop == 0 || node.topToTop == 0xFFFFFFFF || (getNode(node.topToTop) && getNode(node.topToTop)->resolvedY)) ||
+                bool topReady = (node.topToTop == 0 || node.topToTop == 0xFFFFFFFF || (getNode(node.topToTop) && getNode(node.topToTop)->resolvedY)) &&
                                 (node.topToBottom == 0 || node.topToBottom == 0xFFFFFFFF || (getNode(node.topToBottom) && getNode(node.topToBottom)->resolvedY));
-                bool bottomReady = (node.bottomToTop == 0 || node.bottomToTop == 0xFFFFFFFF || (getNode(node.bottomToTop) && getNode(node.bottomToTop)->resolvedY)) ||
+                bool bottomReady = (node.bottomToTop == 0 || node.bottomToTop == 0xFFFFFFFF || (getNode(node.bottomToTop) && getNode(node.bottomToTop)->resolvedY)) &&
                                    (node.bottomToBottom == 0 || node.bottomToBottom == 0xFFFFFFFF || (getNode(node.bottomToBottom) && getNode(node.bottomToBottom)->resolvedY));
                                 
                 if (topReady && bottomReady) {
@@ -313,6 +386,7 @@ void LayoutInflater::resolveConstraints(std::vector<ConstraintNode>& nodes, int 
         }
         
         if (node.hwnd) {
+            Logger::d("LayoutInflater", "Layout ID " + std::to_string(node.id) + " -> x: " + std::to_string(node.x) + ", y: " + std::to_string(node.y) + ", w: " + std::to_string(node.w) + ", h: " + std::to_string(node.h));
             SetWindowPos(node.hwnd, nullptr, node.x, node.y, node.w, node.h, SWP_NOZORDER | SWP_NOACTIVATE);
         }
     }

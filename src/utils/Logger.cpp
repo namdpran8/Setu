@@ -18,6 +18,18 @@ void Logger::initLogFile() {
     std::stringstream ss;
     ss << "logs/log_" << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S") << ".txt";
     s_logFile.open(ss.str(), std::ios::out | std::ios::app);
+
+    if (!s_logFile.is_open()) {
+        // Fallback to current directory
+        std::stringstream ssFallback;
+        ssFallback << "log_" << std::put_time(std::localtime(&time), "%Y%m%d_%H%M%S") << ".txt";
+        s_logFile.open(ssFallback.str(), std::ios::out | std::ios::app);
+    }
+    
+    if (!s_logFile.is_open()) {
+        // Absolute fallback
+        s_logFile.open("run_log.txt", std::ios::out | std::ios::app);
+    }
 }
 
 void Logger::setLevel(LogLevel level) {

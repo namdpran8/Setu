@@ -44,7 +44,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
     
     // Seed parameters into the highest registers
     if (ins_size > 0 && registers_size >= ins_size) {
-        int firstParamRegister = registers_size - ins_size;
+        int firstParamRegister = registers_size - ins_size; 
         for (size_t i = 0; i < args.size() && i < ins_size; ++i) {
             state.registers[firstParamRegister + i] = args[i];
         }

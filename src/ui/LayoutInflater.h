@@ -26,6 +26,21 @@ struct ConstraintNode {
     float horizontalBias = 0.5f;
     float verticalBias = 0.5f;
 
+    // Guideline support
+    bool isGuideline = false;
+    bool isHorizontalGuide = false;
+    float guidePercent = -1.0f;
+    int guideBegin = -1;
+    int guideEnd = -1;
+    
+    // Layout types
+    bool isConstraintLayout = false;
+    bool isLinearLayout = false;
+    bool isHorizontal = false;
+    
+    // Child nodes
+    std::vector<ConstraintNode> children;
+
     // Computed absolute bounds
     int x = 0, y = 0, w = 0, h = 0;
     bool resolvedX = false;
@@ -40,8 +55,8 @@ public:
     static HWND createDynamicView(const std::string& className, HWND parentHwnd);
 
 private:
-    static void inflateRecursive(const AxmlNode* node, HWND parentHwnd, ResourceManager* resManager, int& currentX, int& currentY, bool isParentHorizontal, HFONT hFont, int& outWidth, int& outHeight, std::vector<ConstraintNode>* constraintNodes);
+    static ConstraintNode inflateRecursive(const AxmlNode* node, HWND parentHwnd, ResourceManager* resManager, HFONT hFont);
     static std::string resolveString(const AxmlAttribute& attr, ResourceManager* resManager);
     static void resolveConstraints(std::vector<ConstraintNode>& nodes, int parentWidth, int parentHeight);
+    static void layoutNode(ConstraintNode& node, int parentWidth, int parentHeight);
 };
-

@@ -42,6 +42,14 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
     }
 }
 
+LRESULT CALLBACK ViewGroupProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    if (msg == WM_COMMAND) {
+        // Forward button clicks and commands from children to the main window
+        return SendMessage(GetParent(hwnd), msg, wParam, lParam);
+    }
+    return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
 bool WindowManager::init() {
     HINSTANCE hInstance = GetModuleHandle(nullptr);
     
@@ -54,7 +62,20 @@ bool WindowManager::init() {
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     
     if (!RegisterClassEx(&wc)) {
-        Logger::e("WindowManager", "Failed to register window class!");
+        Logger::e("WindowManager", "Failed to register main window class!");
+        return false;
+    }
+    
+    WNDCLASSEX wcGroup = {0};
+    wcGroup.cbSize = sizeof(WNDCLASSEX);
+    wcGroup.lpfnWndProc = ViewGroupProc;
+    wcGroup.hInstance = hInstance;
+    wcGroup.lpszClassName = "WindroidViewGroup";
+    wcGroup.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH); // Transparent
+    wcGroup.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    
+    if (!RegisterClassEx(&wcGroup)) {
+        Logger::e("WindowManager", "Failed to register view group window class!");
         return false;
     }
     

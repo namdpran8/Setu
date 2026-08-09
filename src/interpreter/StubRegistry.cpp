@@ -130,7 +130,23 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                 int id = args[1].i;
                 Logger::d("StubRegistry", "Executed: findViewById(id=" + std::to_string(id) + ")");
                 
-                HWND childHwnd = GetDlgItem(WindowManager::getMainWindow(), id);
+                HWND childHwnd = nullptr;
+                // Recursive search since layouts are now hierarchical
+                std::function<HWND(HWND, int)> findHwndRecursive = [&](HWND parent, int searchId) -> HWND {
+                    HWND found = GetDlgItem(parent, searchId);
+                    if (found) return found;
+                    
+                    HWND child = GetWindow(parent, GW_CHILD);
+                    while (child) {
+                        found = findHwndRecursive(child, searchId);
+                        if (found) return found;
+                        child = GetWindow(child, GW_HWNDNEXT);
+                    }
+                    return nullptr;
+                };
+                
+                childHwnd = findHwndRecursive(WindowManager::getMainWindow(), id);
+                
                 if (childHwnd) {
                     InterpreterObject* viewObj = new InterpreterObject();
                     viewObj->className = "Landroid/view/View;";
