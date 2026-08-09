@@ -19,7 +19,15 @@ add_executable(winandroid_runtime
     "src/interpreter/Interpreter.cpp"
     "src/interpreter/StubRegistry.cpp"
     "src/ui/WindowManager.cpp"
-    "src/ui/LayoutInflater.cpp")
+    "src/ui/LayoutInflater.cpp"
+    "src/graphics/Paint.cpp"
+    "src/graphics/Direct2DCanvas.cpp"
+    "src/graphics/RecordingCanvas.cpp"
+    "src/view/View.cpp"
+    "src/view/ViewGroup.cpp"
+    "src/view/Choreographer.cpp"
+    "src/widget/TextView.cpp"
+    "src/widget/Button.cpp")
 
 target_include_directories(winandroid_runtime PRIVATE include)
-target_link_libraries(winandroid_runtime PRIVATE miniz)
+target_link_libraries(winandroid_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi)

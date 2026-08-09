@@ -13,58 +13,18 @@ static std::wstring utf8_to_utf16(const std::string& utf8) {
     return wstrTo;
 }
 
-void LayoutInflater::inflate(const AxmlNode* node, HWND parentHwnd, ResourceManager* resManager) {
-    static HFONT hFont = nullptr;
-    if (!hFont) {
-        hFont = CreateFontW(24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, 
-                            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, 
-                            DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-    }
+#include "../widget/TextView.h"
+#include "../widget/Button.h"
+#include "../view/ViewGroup.h"
 
-    ConstraintNode root = inflateRecursive(node, parentHwnd, resManager, hFont);
-    
-    RECT rect;
-    GetClientRect(parentHwnd, &rect);
-    int pW = rect.right > 0 ? rect.right : 400;
-    int pH = rect.bottom > 0 ? rect.bottom : 800;
+std::shared_ptr<windroid::view::View> LayoutInflater::inflate(const AxmlNode* node, ResourceManager* resManager, int parentWidth, int parentHeight) {
+    ConstraintNode root = inflateRecursive(node, resManager);
     
     // Set root node dimensions
-    root.x = 0; root.y = 0; root.w = pW; root.h = pH;
-    if (root.hwnd) {
-        SetWindowPos(root.hwnd, nullptr, root.x, root.y, root.w, root.h, SWP_NOZORDER | SWP_NOACTIVATE);
-    }
+    root.x = 0; root.y = 0; root.w = parentWidth; root.h = parentHeight;
     
-    layoutNode(root, pW, pH);
-}
-
-HWND LayoutInflater::createDynamicView(const std::string& className, HWND parentHwnd) {
-    std::string win32Class = "";
-    DWORD style = WS_CHILD | WS_VISIBLE; 
-    DWORD exStyle = 0;
-    
-    if (className.find("TextView") != std::string::npos) {
-        win32Class = "STATIC";
-    } else if (className.find("Button") != std::string::npos) {
-        win32Class = "BUTTON";
-    } else if (className.find("EditText") != std::string::npos) {
-        win32Class = "EDIT";
-        style |= WS_BORDER;
-        exStyle |= WS_EX_CLIENTEDGE;
-    } else {
-        win32Class = "STATIC"; 
-    }
-
-    std::wstring wWin32Class = utf8_to_utf16(win32Class);
-    HWND hwnd = CreateWindowExW(exStyle, wWin32Class.c_str(), L"", style, 0, 0, 100, 100, parentHwnd, nullptr, GetModuleHandle(nullptr), nullptr);
-    
-    if (hwnd) {
-        static HFONT hFont = nullptr;
-        if (!hFont) {
-            hFont = CreateFontW(24, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
-        }
-        SendMessage(hwnd, WM_SETFONT, (WPARAM)hFont, TRUE);
-    }
-    return hwnd;
+    layoutNode(root, parentWidth, parentHeight);
+    return root.view;
 }
 
 std::string LayoutInflater::resolveString(const AxmlAttribute& attr, ResourceManager* resManager) {
@@ -78,27 +38,14 @@ std::string LayoutInflater::resolveString(const AxmlAttribute& attr, ResourceMan
     return "";
 }
 
-ConstraintNode LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, ResourceManager* resManager, HFONT hFont) {
+ConstraintNode LayoutInflater::inflateRecursive(const AxmlNode* node, ResourceManager* resManager) {
     ConstraintNode cnode;
     if (!node) return cnode;
     
     std::string tag = node->tag;
-    std::string win32Class = "";
-    DWORD style = WS_CHILD | WS_VISIBLE;
-    DWORD exStyle = 0;
     
-    if (tag.find("TextView") != std::string::npos) win32Class = "STATIC";
-    else if (tag.find("Button") != std::string::npos) win32Class = "BUTTON";
-    else if (tag.find("EditText") != std::string::npos) { win32Class = "EDIT"; style |= WS_BORDER; exStyle |= WS_EX_CLIENTEDGE; }
-    else if (tag.find("ImageView") != std::string::npos) win32Class = "STATIC";
-
     cnode.width = 80;
     cnode.height = 70;
-    
-    if (win32Class == "STATIC" || win32Class == "EDIT") {
-        cnode.width = 300;
-        cnode.height = 60;
-    }
 
     std::string text = "";
     
@@ -165,29 +112,35 @@ ConstraintNode LayoutInflater::inflateRecursive(const AxmlNode* node, HWND paren
         else if (attr.name == "layout_constraintGuide_end") cnode.guideEnd = attr.typedValueData;
     }
 
-    bool isDummy = win32Class.empty() || cnode.isGuideline || tag.find("Group") != std::string::npos;
-    if (isDummy) {
-        win32Class = "WindroidViewGroup";
-        // WS_CLIPCHILDREN ensures children are painted correctly
-        style |= WS_CLIPCHILDREN; 
+    if (!cnode.isGuideline) {
+        if (tag.find("TextView") != std::string::npos) {
+            auto tv = std::make_shared<windroid::widget::TextView>();
+            tv->setText(utf8_to_utf16(text));
+            cnode.view = tv;
+            cnode.width = 300; cnode.height = 60;
+        } else if (tag.find("Button") != std::string::npos) {
+            auto btn = std::make_shared<windroid::widget::Button>();
+            btn->setText(utf8_to_utf16(text));
+            cnode.view = btn;
+        } else {
+            cnode.view = std::make_shared<windroid::view::ViewGroup>();
+        }
+        
+        if (cnode.view) {
+            cnode.view->setId(cnode.id);
+        }
     }
-
-    std::wstring wWin32Class = utf8_to_utf16(win32Class);
-    std::wstring wText = utf8_to_utf16(text);
-    
-    if (isDummy && !cnode.isConstraintLayout && !cnode.isLinearLayout) {
-        style &= ~WS_VISIBLE; // Hide Guidelines and Groups completely
-    }
-
-    cnode.hwnd = CreateWindowExW(exStyle, wWin32Class.c_str(), wText.c_str(), style, 
-        0, 0, cnode.width, cnode.height, parentHwnd, (HMENU)(INT_PTR)cnode.id, GetModuleHandle(nullptr), nullptr);
-    
-    if (cnode.hwnd && !isDummy) SendMessage(cnode.hwnd, WM_SETFONT, (WPARAM)hFont, TRUE);
     
     for (const auto& child : node->children) {
-        ConstraintNode childNode = inflateRecursive(child.get(), cnode.hwnd ? cnode.hwnd : parentHwnd, resManager, hFont);
-        if (childNode.hwnd || childNode.isGuideline) {
+        ConstraintNode childNode = inflateRecursive(child.get(), resManager);
+        if (childNode.view || childNode.isGuideline) {
             cnode.children.push_back(childNode);
+            if (cnode.view && childNode.view) {
+                auto viewGroup = std::dynamic_pointer_cast<windroid::view::ViewGroup>(cnode.view);
+                if (viewGroup) {
+                    viewGroup->addView(childNode.view);
+                }
+            }
         }
     }
     
@@ -218,8 +171,9 @@ void LayoutInflater::layoutNode(ConstraintNode& node, int parentWidth, int paren
                 currentY += child.h + 5;
                 maxChildWidth = max(maxChildWidth, child.w);
             }
-            if (child.hwnd) {
-                SetWindowPos(child.hwnd, nullptr, child.x, child.y, child.w, child.h, SWP_NOZORDER | SWP_NOACTIVATE);
+            if (child.view) {
+                child.view->setMeasuredDimension(child.w, child.h);
+                child.view->layout(child.x, child.y, child.x + child.w, child.y + child.h);
             }
             layoutNode(child, child.w, child.h);
         }
@@ -230,11 +184,16 @@ void LayoutInflater::layoutNode(ConstraintNode& node, int parentWidth, int paren
             child.w = child.width; child.h = child.height;
             if (child.widthMode == 1) child.w = parentWidth;
             if (child.heightMode == 1) child.h = parentHeight;
-            if (child.hwnd) {
-                SetWindowPos(child.hwnd, nullptr, child.x, child.y, child.w, child.h, SWP_NOZORDER | SWP_NOACTIVATE);
+            if (child.view) {
+                child.view->setMeasuredDimension(child.w, child.h);
+                child.view->layout(child.x, child.y, child.x + child.w, child.y + child.h);
             }
             layoutNode(child, child.w, child.h);
         }
+    }
+    if (node.view) {
+        node.view->setMeasuredDimension(node.w, node.h);
+        node.view->layout(node.x, node.y, node.x + node.w, node.y + node.h);
     }
 }
 
@@ -385,9 +344,10 @@ void LayoutInflater::resolveConstraints(std::vector<ConstraintNode>& nodes, int 
             if (!node.resolvedY) { node.y = 0; node.h = node.height; node.resolvedY = true; }
         }
         
-        if (node.hwnd) {
+        if (node.view) {
             Logger::d("LayoutInflater", "Layout ID " + std::to_string(node.id) + " -> x: " + std::to_string(node.x) + ", y: " + std::to_string(node.y) + ", w: " + std::to_string(node.w) + ", h: " + std::to_string(node.h));
-            SetWindowPos(node.hwnd, nullptr, node.x, node.y, node.w, node.h, SWP_NOZORDER | SWP_NOACTIVATE);
+            node.view->setMeasuredDimension(node.w, node.h);
+            node.view->layout(node.x, node.y, node.x + node.w, node.y + node.h);
         }
     }
 }

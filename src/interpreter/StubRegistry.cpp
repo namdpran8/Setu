@@ -3,6 +3,8 @@
 #include "../ui/WindowManager.h"
 #include "../ui/LayoutInflater.h"
 #include "../dex/ResourceManager.h"
+#include "../view/ViewGroup.h"
+#include "../widget/TextView.h"
 #include "Interpreter.h" // For recursive Interpreter execution
 
 std::unordered_map<std::string, StubFunc> StubRegistry::stubs;
@@ -73,7 +75,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                         Logger::i("StubRegistry", "Starting new activity: " + targetClassName);
                         
                         // Clear the old window
-                        WindowManager::clearWindow();
+                        WindowManager::clearWindow(); // Restored temporarily until Phase 2 is complete
                         
                         // Launch the new activity
                         if (m_multiDexManager) {
@@ -117,7 +119,12 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                         const AxmlNode* root = layoutParser->getRootNode();
                         if (root) {
                             Logger::i("StubRegistry", "Inflating layout with root tag: " + root->tag);
-                            LayoutInflater::inflate(root, WindowManager::getMainWindow(), m_resManager);
+                            RECT rect;
+                            GetClientRect(WindowManager::getMainWindow(), &rect);
+                            int pW = rect.right > 0 ? rect.right : 400;
+                            int pH = rect.bottom > 0 ? rect.bottom : 800;
+                            auto rootView = LayoutInflater::inflate(root, m_resManager, pW, pH);
+                            WindowManager::setRootView(rootView);
                         }
                     }
                 }
@@ -130,32 +137,32 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                 int id = args[1].i;
                 Logger::d("StubRegistry", "Executed: findViewById(id=" + std::to_string(id) + ")");
                 
-                HWND childHwnd = nullptr;
-                // Recursive search since layouts are now hierarchical
-                std::function<HWND(HWND, int)> findHwndRecursive = [&](HWND parent, int searchId) -> HWND {
-                    HWND found = GetDlgItem(parent, searchId);
-                    if (found) return found;
+                windroid::view::View* childView = nullptr;
+                std::function<windroid::view::View*(windroid::view::View*, int)> findViewRecursive = [&](windroid::view::View* parent, int searchId) -> windroid::view::View* {
+                    if (!parent) return nullptr;
+                    if (parent->getId() == searchId) return parent;
                     
-                    HWND child = GetWindow(parent, GW_CHILD);
-                    while (child) {
-                        found = findHwndRecursive(child, searchId);
-                        if (found) return found;
-                        child = GetWindow(child, GW_HWNDNEXT);
+                    auto viewGroup = dynamic_cast<windroid::view::ViewGroup*>(parent);
+                    if (viewGroup) {
+                        for (size_t i = 0; i < viewGroup->getChildCount(); ++i) {
+                            auto found = findViewRecursive(viewGroup->getChildAt(i).get(), searchId);
+                            if (found) return found;
+                        }
                     }
                     return nullptr;
                 };
                 
-                childHwnd = findHwndRecursive(WindowManager::getMainWindow(), id);
+                childView = findViewRecursive(WindowManager::getRootView().get(), id);
                 
-                if (childHwnd) {
+                if (childView) {
                     InterpreterObject* viewObj = new InterpreterObject();
                     viewObj->className = "Landroid/view/View;";
-                    viewObj->nativeHandle = childHwnd;
+                    viewObj->nativeHandle = childView;
                     if (outReturn) *outReturn = Value::MakeObject(viewObj);
-                    Logger::d("StubRegistry", "findViewById found matching HWND!");
+                    Logger::d("StubRegistry", "findViewById found matching View!");
                 } else {
                     if (outReturn) *outReturn = Value::MakeNull();
-                    Logger::w("StubRegistry", "findViewById could not find HWND for id " + std::to_string(id));
+                    Logger::w("StubRegistry", "findViewById could not find View for id " + std::to_string(id));
                 }
             }
             return false;
@@ -293,14 +300,16 @@ void StubRegistry::registerActivityStubs() {
 }
 
 void StubRegistry::registerViewStubs() {
+    static std::vector<std::shared_ptr<windroid::view::View>> s_dynamicViews;
+    
     // Basic dynamic view creation helper
     auto dynamicViewInit = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn, const std::string& className) -> bool {
         if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            // Create a Win32 HWND as a child of the main window for now
-            HWND hwnd = LayoutInflater::createDynamicView(className, WindowManager::getMainWindow());
-            viewObj->nativeHandle = hwnd;
-            Logger::d("StubRegistry", "Created dynamic view: " + className + " -> HWND: " + std::to_string((uintptr_t)hwnd));
+            auto view = std::make_shared<windroid::view::ViewGroup>(); // generic for now
+            s_dynamicViews.push_back(view);
+            viewObj->nativeHandle = view.get();
+            Logger::d("StubRegistry", "Created dynamic view: " + className);
         }
         return false;
     };
@@ -323,10 +332,10 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/view/View;->setId(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            HWND hwnd = (HWND)viewObj->nativeHandle;
+            windroid::view::View* view = (windroid::view::View*)viewObj->nativeHandle;
             int id = args[1].i;
-            if (hwnd) {
-                SetWindowLongPtrA(hwnd, GWLP_ID, id);
+            if (view) {
+                view->setId(id);
                 Logger::d("StubRegistry", "Executed View.setId(" + std::to_string(id) + ")");
             }
         }
@@ -334,49 +343,21 @@ void StubRegistry::registerViewStubs() {
     };
     
     stubs["Landroid/view/View;->setVisibility(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
-            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            HWND hwnd = (HWND)viewObj->nativeHandle;
-            int visibility = args[1].i;
-            if (hwnd) {
-                ShowWindow(hwnd, (visibility == 0) ? SW_SHOW : SW_HIDE);
-                Logger::d("StubRegistry", "Executed View.setVisibility(" + std::to_string(visibility) + ")");
-            }
-        }
-        return false;
+        return false; // Skip visibility for now
     };
 
     stubs["Landroid/view/ViewGroup;->addView(Landroid/view/View;II)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
-            InterpreterObject* parentObj = (InterpreterObject*)args[0].obj;
-            InterpreterObject* childObj = (InterpreterObject*)args[1].obj;
-            if (parentObj && childObj) {
-                HWND parentHwnd = (HWND)parentObj->nativeHandle;
-                HWND childHwnd = (HWND)childObj->nativeHandle;
-                if (parentHwnd && childHwnd) {
-                    SetParent(childHwnd, parentHwnd);
-                    Logger::d("StubRegistry", "Executed ViewGroup.addView(child, width, height)");
-                    // A simple layout fix for dynamic addition to parent
-                    SetWindowPos(childHwnd, nullptr, 0, 500, 300, 50, SWP_NOZORDER | SWP_SHOWWINDOW);
-                }
-            }
-        }
-        return false;
+        return false; // Dynamic view insertion skipped to prevent crashes for now
     };
 
     stubs["Landroid/view/ViewGroup;->addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V"] = 
         stubs["Landroid/view/ViewGroup;->addView(Landroid/view/View;II)V"];
 
     stubs["Landroid/view/ViewGroup;->removeView(Landroid/view/View;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        if (args.size() >= 2 && args[1].type == ValueType::OBJECT && args[1].obj) {
-            InterpreterObject* childObj = (InterpreterObject*)args[1].obj;
-            HWND childHwnd = (HWND)childObj->nativeHandle;
-            if (childHwnd) {
-                ShowWindow(childHwnd, SW_HIDE);
-                SetParent(childHwnd, nullptr);
-                Logger::d("StubRegistry", "Executed ViewGroup.removeView()");
-            }
-        }
+        return false;
+    };
+
+    stubs["Landroid/view/ViewGroup;->removeAllViews()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         return false;
     };
 
@@ -409,11 +390,16 @@ void StubRegistry::registerViewStubs() {
                         const AxmlNode* root = layoutParser->getRootNode();
                         if (root) {
                             Logger::i("StubRegistry", "Inflating layout with root tag: " + root->tag);
-                            LayoutInflater::inflate(root, WindowManager::getMainWindow(), m_resManager);
+                            RECT rect;
+                            GetClientRect(WindowManager::getMainWindow(), &rect);
+                            int pW = rect.right > 0 ? rect.right : 400;
+                            int pH = rect.bottom > 0 ? rect.bottom : 800;
+                            auto rootView = LayoutInflater::inflate(root, m_resManager, pW, pH);
+                            WindowManager::setRootView(rootView);
                             
                             InterpreterObject* viewObj = new InterpreterObject();
                             viewObj->className = "Landroid/view/View;";
-                            viewObj->nativeHandle = WindowManager::getMainWindow();
+                            viewObj->nativeHandle = rootView.get();
                             if (outReturn) *outReturn = Value::MakeObject(viewObj);
                         }
                     }
@@ -426,12 +412,12 @@ void StubRegistry::registerViewStubs() {
         
     // 3. View::setOnClickListener
     auto setOnClickListenerStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::OBJECT) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            HWND hwnd = viewObj ? (HWND)viewObj->nativeHandle : nullptr;
+            windroid::view::View* view = viewObj ? (windroid::view::View*)viewObj->nativeHandle : nullptr;
             InterpreterObject* listener = (InterpreterObject*)args[1].obj;
             
-            int controlId = GetDlgCtrlID(hwnd);
+            int controlId = view ? view->getId() : 0;
             if (controlId != 0 && listener != nullptr) {
                 clickListeners[controlId] = listener;
                 Logger::i("StubRegistry", "Registered onClickListener for control ID: " + std::to_string(controlId));
@@ -516,15 +502,15 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/widget/EditText;->getText()Landroid/text/Editable;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (args.size() >= 1 && args[0].type == ValueType::OBJECT && args[0].obj) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            HWND hwnd = (HWND)viewObj->nativeHandle;
-            if (hwnd) {
-                char buf[512] = {0};
-                GetWindowTextA(hwnd, buf, sizeof(buf));
+            windroid::view::View* view = (windroid::view::View*)viewObj->nativeHandle;
+            if (view) {
+                // Assuming TextView/EditText base
+                std::string text = "stubbed_text";
                 
                 InterpreterObject* editableObj = new InterpreterObject();
                 editableObj->className = "Landroid/text/Editable;";
                 InterpreterObject* inner = new InterpreterObject();
-                inner->className = std::string(buf);
+                inner->className = text;
                 editableObj->fields["string_value"] = Value::MakeObject(inner);
                 
                 if (outReturn) *outReturn = Value::MakeObject(editableObj);
@@ -611,18 +597,25 @@ void StubRegistry::registerViewStubs() {
     };
 
     stubs["Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::OBJECT && args[1].obj) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
             InterpreterObject* strObj = (InterpreterObject*)args[1].obj;
-            if (viewObj && strObj) {
-                HWND hwnd = (HWND)viewObj->nativeHandle;
-                std::string text = "";
-                auto it = strObj->fields.find("string_value");
-                if (it != strObj->fields.end() && it->second.type == ValueType::OBJECT) {
-                    text = ((InterpreterObject*)it->second.obj)->className;
-                }
-                if (hwnd) {
-                    SetWindowTextA(hwnd, text.c_str());
+            windroid::view::View* view = (windroid::view::View*)viewObj->nativeHandle;
+            
+            std::string text = "stubbed";
+            auto it = strObj->fields.find("string_value");
+            if (it != strObj->fields.end() && it->second.type == ValueType::OBJECT) {
+                text = ((InterpreterObject*)it->second.obj)->className;
+            }
+            
+            if (view) {
+                auto textView = dynamic_cast<windroid::widget::TextView*>(view);
+                if (textView) {
+                    int size_needed = MultiByteToWideChar(CP_UTF8, 0, &text[0], (int)text.size(), NULL, 0);
+                    std::wstring wstrTo(size_needed, 0);
+                    MultiByteToWideChar(CP_UTF8, 0, &text[0], (int)text.size(), &wstrTo[0], size_needed);
+                    
+                    textView->setText(wstrTo);
                     Logger::i("StubRegistry", "Updated TextView text to: " + text);
                 }
             }

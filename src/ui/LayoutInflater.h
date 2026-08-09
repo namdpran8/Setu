@@ -1,11 +1,13 @@
 #pragma once
 #include <windows.h>
 #include <vector>
+#include <memory>
 #include "../AxmlPraserer/AxmlParser.h"
 #include "../dex/ResourceManager.h"
+#include "../view/View.h"
 
 struct ConstraintNode {
-    HWND hwnd = nullptr;
+    std::shared_ptr<windroid::view::View> view = nullptr;
     uint32_t id = 0;
     int width = 0, height = 0; // Intrinsic/requested dimensions
     
@@ -49,13 +51,10 @@ struct ConstraintNode {
 
 class LayoutInflater {
 public:
-    static void inflate(const AxmlNode* node, HWND parentHwnd, ResourceManager* resManager);
+    static std::shared_ptr<windroid::view::View> inflate(const AxmlNode* node, ResourceManager* resManager, int parentWidth, int parentHeight);
     
-    // Creates a Win32 control dynamically mapped from an Android class name (e.g., "Landroid/widget/TextView;")
-    static HWND createDynamicView(const std::string& className, HWND parentHwnd);
-
 private:
-    static ConstraintNode inflateRecursive(const AxmlNode* node, HWND parentHwnd, ResourceManager* resManager, HFONT hFont);
+    static ConstraintNode inflateRecursive(const AxmlNode* node, ResourceManager* resManager);
     static std::string resolveString(const AxmlAttribute& attr, ResourceManager* resManager);
     static void resolveConstraints(std::vector<ConstraintNode>& nodes, int parentWidth, int parentHeight);
     static void layoutNode(ConstraintNode& node, int parentWidth, int parentHeight);
