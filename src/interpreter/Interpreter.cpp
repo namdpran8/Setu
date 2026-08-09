@@ -2,6 +2,7 @@
 #include "../utils/Logger.h"
 #include "../dex/MultiDexManager.h"
 #include "StubRegistry.h"
+#include <cmath>
 
 Interpreter::Interpreter() {
 }
@@ -109,6 +110,13 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 state.pc += 1;
                 break;
             }
+            case 0x0D: { // move-exception
+                uint8_t aa = safe8(bytecode, state.pc);
+                state.registers[aa] = Value::MakeNull(); // exception_register not fully implemented
+                Logger::d("Interpreter", "[0x0D] move-exception -> v" + std::to_string(aa));
+                state.pc += 1;
+                break;
+            }
             case 0x1F: { // check-cast
                 uint8_t aa = safe8(bytecode, state.pc);
                 uint16_t typeIdx = safe16(bytecode, state.pc + 1);
@@ -136,6 +144,20 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 int8_t aa = (int8_t)safe8(bytecode, state.pc);
                 Logger::d("Interpreter", "[0x28] goto " + std::to_string(aa));
                 state.pc = (state.pc - 1) + (aa * 2);
+                break;
+            }
+            case 0x29: { // goto/16
+                // format 20t: ØØ|op AAAA
+                int16_t aaaa = (int16_t)safe16(bytecode, state.pc + 1);
+                Logger::d("Interpreter", "[0x29] goto/16 " + std::to_string(aaaa));
+                state.pc = (state.pc - 1) + (aaaa * 2);
+                break;
+            }
+            case 0x2A: { // goto/32
+                // format 30t: ØØ|op AAAAAAAA
+                int32_t aaaaaaaa = (int32_t)(safe16(bytecode, state.pc + 1) | (safe8(bytecode, state.pc + 3) << 16) | (safe8(bytecode, state.pc + 4) << 24));
+                Logger::d("Interpreter", "[0x2A] goto/32 " + std::to_string(aaaaaaaa));
+                state.pc = (state.pc - 1) + (aaaaaaaa * 2);
                 break;
             }
             case 0x1D: // monitor-enter
@@ -250,11 +272,52 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 state.pc += 3; // Format 23x is 4 bytes
                 break;
             }
-            case 0x2E: case 0x2F: case 0x30: case 0x31: { // cmp-float / cmp-double
+            case 0x2E: case 0x2F: { // cmpl-float, cmpg-float
                 uint8_t aa = safe8(bytecode, state.pc);
                 uint8_t bb = safe8(bytecode, state.pc + 1);
                 uint8_t cc = safe8(bytecode, state.pc + 2);
-                state.registers[aa] = Value::MakeInt(0); // stub
+                
+                float valB = (state.registers[bb].type == ValueType::FLOAT) ? state.registers[bb].f : 0.0f;
+                float valC = (state.registers[cc].type == ValueType::FLOAT) ? state.registers[cc].f : 0.0f;
+                
+                int result = 0;
+                if (std::isnan(valB) || std::isnan(valC)) {
+                    result = (opcode == 0x2E) ? -1 : 1; // 0x2E is cmpl, 0x2F is cmpg
+                } else if (valB == valC) {
+                    result = 0;
+                } else if (valB > valC) {
+                    result = 1;
+                } else {
+                    result = -1;
+                }
+                
+                state.registers[aa] = Value::MakeInt(result);
+                Logger::d("Interpreter", "[0x2E..2F] cmp-float v" + std::to_string(aa) + " = v" + std::to_string(bb) + " vs v" + std::to_string(cc));
+                state.pc += 3;
+                break;
+            }
+            case 0x30: case 0x31: { // cmpl-double, cmpg-double
+                uint8_t aa = safe8(bytecode, state.pc);
+                uint8_t bb = safe8(bytecode, state.pc + 1);
+                uint8_t cc = safe8(bytecode, state.pc + 2);
+                
+                // treating as float for now since double spans 2 registers
+                float valB = (state.registers[bb].type == ValueType::FLOAT) ? state.registers[bb].f : 0.0f;
+                float valC = (state.registers[cc].type == ValueType::FLOAT) ? state.registers[cc].f : 0.0f;
+                
+                int result = 0;
+                if (std::isnan(valB) || std::isnan(valC)) {
+                    result = (opcode == 0x30) ? -1 : 1; // 0x30 is cmpl, 0x31 is cmpg
+                } else if (valB == valC) {
+                    result = 0;
+                } else if (valB > valC) {
+                    result = 1;
+                } else {
+                    result = -1;
+                }
+                
+                state.registers[aa] = Value::MakeInt(result);
+                Logger::d("Interpreter", "[0x30..31] cmp-double v" + std::to_string(aa) + " = v" + std::to_string(bb) + " vs v" + std::to_string(cc));
                 state.pc += 3;
                 break;
             }
@@ -315,10 +378,34 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 if (currentDex) {
                     InterpreterObject* strObj = new InterpreterObject();
                     strObj->className = "java.lang.String";
+                    
+                    std::string text = currentDex->getString(stringIdx);
+                    InterpreterObject* inner = new InterpreterObject();
+                    inner->className = text;
+                    strObj->fields["string_value"] = Value::MakeObject(inner);
+                    
                     state.registers[aa] = Value::MakeObject(strObj);
-                    Logger::d("Interpreter", "[0x1A] const-string v" + std::to_string(aa) + " = string@" + std::to_string(stringIdx));
+                    Logger::d("Interpreter", "[0x1A] const-string v" + std::to_string(aa) + " = string@" + std::to_string(stringIdx) + " (" + text + ")");
                 }
                 state.pc += 3;
+                break;
+            }
+            case 0x1B: { // const-string/jumbo vAA, string@BBBBBBBB
+                uint8_t aa = safe8(bytecode, state.pc);
+                uint32_t stringIdx = safe16(bytecode, state.pc + 1) | (safe8(bytecode, state.pc + 3) << 16) | (safe8(bytecode, state.pc + 4) << 24);
+                if (currentDex) {
+                    InterpreterObject* strObj = new InterpreterObject();
+                    strObj->className = "java.lang.String";
+                    
+                    std::string text = currentDex->getString(stringIdx);
+                    InterpreterObject* inner = new InterpreterObject();
+                    inner->className = text;
+                    strObj->fields["string_value"] = Value::MakeObject(inner);
+                    
+                    state.registers[aa] = Value::MakeObject(strObj);
+                    Logger::d("Interpreter", "[0x1B] const-string/jumbo v" + std::to_string(aa) + " = string@" + std::to_string(stringIdx) + " (" + text + ")");
+                }
+                state.pc += 5;
                 break;
             }
             case 0x20: { // instance-of vA, vB, type@CCCC
@@ -356,6 +443,8 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     targetClassStrObj->className = className; // Use className to store string for now
                     classObj->fields["targetClass"] = Value::MakeObject(targetClassStrObj);
                     
+                    state.registers[aa] = Value::MakeObject(classObj);
+                    
                 Logger::d("Interpreter", "[0x1C] const-class v" + std::to_string(aa) + " = " + className);
                 }
                 state.pc += 3;
@@ -391,6 +480,35 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                   state.registers[a] = Value::MakeArray(arr);
                   Logger::d("Interpreter", "[0x23] new-array v" + std::to_string(a) + ", size v" + std::to_string(b) + "=" + std::to_string(size) + " type@" + std::to_string(typeIdx));
                   state.pc += 3;
+                  break;
+              }
+              case 0x24: { // filled-new-array {vD, vE, vF, vG, vA}, type@CCCC
+                  uint8_t ab = safe8(bytecode, state.pc);
+                  uint16_t typeIdx = safe16(bytecode, state.pc + 1);
+                  // Not fully implementing array payload extraction yet, just stubbing the return register so it doesn't crash
+                  ArrayObject* arr = new ArrayObject();
+                  arr->elementTypeIndex = typeIdx;
+                  state.methodReturnVal = Value::MakeArray(arr); // result goes to special register
+                  Logger::d("Interpreter", "[0x24] filled-new-array type@" + std::to_string(typeIdx));
+                  state.pc += 5;
+                  break;
+              }
+              case 0x25: { // filled-new-array/range
+                  uint8_t aa = safe8(bytecode, state.pc);
+                  uint16_t typeIdx = safe16(bytecode, state.pc + 1);
+                  ArrayObject* arr = new ArrayObject();
+                  arr->elementTypeIndex = typeIdx;
+                  state.methodReturnVal = Value::MakeArray(arr);
+                  Logger::d("Interpreter", "[0x25] filled-new-array/range type@" + std::to_string(typeIdx));
+                  state.pc += 5;
+                  break;
+              }
+              case 0x26: { // fill-array-data vAA, +BBBBBBBB
+                  uint8_t aa = safe8(bytecode, state.pc);
+                  int32_t offset = (int32_t)(safe16(bytecode, state.pc + 1) | (safe8(bytecode, state.pc + 3) << 16) | (safe8(bytecode, state.pc + 4) << 24));
+                  Logger::d("Interpreter", "[0x26] fill-array-data v" + std::to_string(aa) + " offset=" + std::to_string(offset));
+                  // We skip actual population since it requires reading payload table
+                  state.pc += 5;
                   break;
               }
               case 0x44: case 0x45: case 0x46: case 0x47:
@@ -523,32 +641,137 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 state.pc += 3;
                 break;
             }
-            case 0xB0: case 0xB1: case 0xB2: case 0xB3: case 0xB4:
-            case 0xB5: case 0xB6: case 0xB7: case 0xB8: case 0xB9:
-            case 0xBA: { // binop/2addr for int
-                uint8_t a = safe8(bytecode, state.pc) & 0x0F;
-                uint8_t b = (safe8(bytecode, state.pc) >> 4) & 0x0F;
+            case 0x7B: case 0x7C: case 0x7D: case 0x7E: case 0x7F: case 0x80: case 0x81:
+            case 0x82: case 0x83: case 0x84: case 0x85: case 0x86: case 0x87: case 0x88:
+            case 0x89: case 0x8A: case 0x8B: case 0x8C: case 0x8D: case 0x8E: case 0x8F: { // unary ops (12x)
+                uint8_t ab = safe8(bytecode, state.pc);
+                uint8_t a = ab & 0x0F;
+                uint8_t b = (ab >> 4) & 0x0F;
+                
+                if (opcode == 0x7B || opcode == 0x7D) { // neg-int, neg-long
+                    state.registers[a] = Value::MakeInt(-state.registers[b].i);
+                } else if (opcode == 0x7C || opcode == 0x7E) { // not-int, not-long
+                    state.registers[a] = Value::MakeInt(~state.registers[b].i);
+                } else if (opcode == 0x7F || opcode == 0x80) { // neg-float, neg-double
+                    state.registers[a] = Value::MakeFloat(-state.registers[b].f);
+                } else if (opcode == 0x81 || opcode == 0x84) { // int-to-long, long-to-int
+                    state.registers[a] = state.registers[b];
+                } else if (opcode == 0x82 || opcode == 0x85) { // int-to-float, long-to-float
+                    state.registers[a] = Value::MakeFloat((float)state.registers[b].i);
+                } else if (opcode == 0x83 || opcode == 0x86) { // int-to-double, long-to-double
+                    state.registers[a] = Value::MakeFloat((float)state.registers[b].i);
+                } else if (opcode == 0x87 || opcode == 0x88) { // float-to-int, float-to-long
+                    state.registers[a] = Value::MakeInt((int32_t)state.registers[b].f);
+                } else if (opcode == 0x89 || opcode == 0x8C) { // float-to-double, double-to-float
+                    state.registers[a] = state.registers[b];
+                } else if (opcode == 0x8A || opcode == 0x8B) { // double-to-int, double-to-long
+                    state.registers[a] = Value::MakeInt((int32_t)state.registers[b].f);
+                } else if (opcode == 0x8D) { // int-to-byte
+                    state.registers[a] = Value::MakeInt((int32_t)(int8_t)(state.registers[b].i & 0xFF));
+                } else if (opcode == 0x8E) { // int-to-char
+                    state.registers[a] = Value::MakeInt(state.registers[b].i & 0xFFFF);
+                } else if (opcode == 0x8F) { // int-to-short
+                    state.registers[a] = Value::MakeInt((int32_t)(int16_t)(state.registers[b].i & 0xFFFF));
+                }
+                
+                Logger::d("Interpreter", "[0x7B..8F] unary op=" + std::to_string(opcode) + " v" + std::to_string(a) + " = op(v" + std::to_string(b) + ")");
+                state.pc += 1;
+                break;
+            }
+            case 0x90: case 0x91: case 0x92: case 0x93: case 0x94: case 0x95: case 0x96:
+            case 0x97: case 0x98: case 0x99: case 0x9A: case 0x9B: case 0x9C: case 0x9D:
+            case 0x9E: case 0x9F: case 0xA0: case 0xA1: case 0xA2: case 0xA3: case 0xA4:
+            case 0xA5: case 0xA6: case 0xA7: case 0xA8: case 0xA9: case 0xAA: case 0xAB:
+            case 0xAC: case 0xAD: case 0xAE: case 0xAF: { // binop (23x)
+                uint8_t aa = safe8(bytecode, state.pc);
+                uint8_t bb = safe8(bytecode, state.pc + 1);
+                uint8_t cc = safe8(bytecode, state.pc + 2);
+                
+                int valB = (state.registers[bb].type == ValueType::INT) ? state.registers[bb].i : 0;
+                int valC = (state.registers[cc].type == ValueType::INT) ? state.registers[cc].i : 0;
+                
+                if (opcode <= 0xA5) { // int and long ops
+                    int result = 0;
+                    switch (opcode) {
+                        case 0x90: case 0x9B: result = valB + valC; break;
+                        case 0x91: case 0x9C: result = valB - valC; break;
+                        case 0x92: case 0x9D: result = valB * valC; break;
+                        case 0x93: case 0x9E: result = (valC != 0) ? (valB / valC) : 0; break;
+                        case 0x94: case 0x9F: result = (valC != 0) ? (valB % valC) : 0; break;
+                        case 0x95: case 0xA0: result = valB & valC; break;
+                        case 0x96: case 0xA1: result = valB | valC; break;
+                        case 0x97: case 0xA2: result = valB ^ valC; break;
+                        case 0x98: result = valB << (valC & 0x1F); break;
+                        case 0x99: result = valB >> (valC & 0x1F); break;
+                        case 0x9A: result = (uint32_t)valB >> (valC & 0x1F); break;
+                        case 0xA3: result = valB << (valC & 0x3F); break;
+                        case 0xA4: result = valB >> (valC & 0x3F); break;
+                        case 0xA5: result = (uint32_t)valB >> (valC & 0x3F); break;
+                    }
+                    state.registers[aa] = Value::MakeInt(result);
+                } else { // float and double ops
+                    float fvalB = (state.registers[bb].type == ValueType::FLOAT) ? state.registers[bb].f : (float)valB;
+                    float fvalC = (state.registers[cc].type == ValueType::FLOAT) ? state.registers[cc].f : (float)valC;
+                    float fresult = 0.0f;
+                    switch (opcode) {
+                        case 0xA6: case 0xAB: fresult = fvalB + fvalC; break;
+                        case 0xA7: case 0xAC: fresult = fvalB - fvalC; break;
+                        case 0xA8: case 0xAD: fresult = fvalB * fvalC; break;
+                        case 0xA9: case 0xAE: fresult = (fvalC != 0.0f) ? (fvalB / fvalC) : 0.0f; break;
+                        case 0xAA: case 0xAF: fresult = std::fmod(fvalB, fvalC); break;
+                    }
+                    state.registers[aa] = Value::MakeFloat(fresult);
+                }
+                
+                Logger::d("Interpreter", "[0x90..AF] binop " + std::to_string(opcode) + " v" + std::to_string(aa) + " = v" + std::to_string(bb) + " op v" + std::to_string(cc));
+                state.pc += 3;
+                break;
+            }
+            case 0xB0: case 0xB1: case 0xB2: case 0xB3: case 0xB4: case 0xB5: case 0xB6: case 0xB7:
+            case 0xB8: case 0xB9: case 0xBA: case 0xBB: case 0xBC: case 0xBD: case 0xBE: case 0xBF:
+            case 0xC0: case 0xC1: case 0xC2: case 0xC3: case 0xC4: case 0xC5: case 0xC6: case 0xC7:
+            case 0xC8: case 0xC9: case 0xCA: case 0xCB: case 0xCC: case 0xCD: case 0xCE: case 0xCF: { // binop/2addr (12x)
+                uint8_t ab = safe8(bytecode, state.pc);
+                uint8_t a = ab & 0x0F;
+                uint8_t b = (ab >> 4) & 0x0F;
                 
                 int valA = (state.registers[a].type == ValueType::INT) ? state.registers[a].i : 0;
                 int valB = (state.registers[b].type == ValueType::INT) ? state.registers[b].i : 0;
                 
-                int result = 0;
-                switch (opcode) {
-                    case 0xB0: result = valA + valB; break;
-                    case 0xB1: result = valA - valB; break;
-                    case 0xB2: result = valA * valB; break;
-                    case 0xB3: result = (valB != 0) ? (valA / valB) : 0; break;
-                    case 0xB4: result = (valB != 0) ? (valA % valB) : 0; break;
-                    case 0xB5: result = valA & valB; break;
-                    case 0xB6: result = valA | valB; break;
-                    case 0xB7: result = valA ^ valB; break;
-                    case 0xB8: result = valA << (valB & 0x1F); break;
-                    case 0xB9: result = valA >> (valB & 0x1F); break;
-                    case 0xBA: result = (uint32_t)valA >> (valB & 0x1F); break;
+                if (opcode <= 0xC5) { // int and long ops
+                    int result = 0;
+                    switch (opcode) {
+                        case 0xB0: case 0xBB: result = valA + valB; break;
+                        case 0xB1: case 0xBC: result = valA - valB; break;
+                        case 0xB2: case 0xBD: result = valA * valB; break;
+                        case 0xB3: case 0xBE: result = (valB != 0) ? (valA / valB) : 0; break;
+                        case 0xB4: case 0xBF: result = (valB != 0) ? (valA % valB) : 0; break;
+                        case 0xB5: case 0xC0: result = valA & valB; break;
+                        case 0xB6: case 0xC1: result = valA | valB; break;
+                        case 0xB7: case 0xC2: result = valA ^ valB; break;
+                        case 0xB8: result = valA << (valB & 0x1F); break;
+                        case 0xB9: result = valA >> (valB & 0x1F); break;
+                        case 0xBA: result = (uint32_t)valA >> (valB & 0x1F); break;
+                        case 0xC3: result = valA << (valB & 0x3F); break;
+                        case 0xC4: result = valA >> (valB & 0x3F); break;
+                        case 0xC5: result = (uint32_t)valA >> (valB & 0x3F); break;
+                    }
+                    state.registers[a] = Value::MakeInt(result);
+                } else { // float and double ops
+                    float fvalA = (state.registers[a].type == ValueType::FLOAT) ? state.registers[a].f : (float)valA;
+                    float fvalB = (state.registers[b].type == ValueType::FLOAT) ? state.registers[b].f : (float)valB;
+                    float fresult = 0.0f;
+                    switch (opcode) {
+                        case 0xC6: case 0xCB: fresult = fvalA + fvalB; break;
+                        case 0xC7: case 0xCC: fresult = fvalA - fvalB; break;
+                        case 0xC8: case 0xCD: fresult = fvalA * fvalB; break;
+                        case 0xC9: case 0xCE: fresult = (fvalB != 0.0f) ? (fvalA / fvalB) : 0.0f; break;
+                        case 0xCA: case 0xCF: fresult = std::fmod(fvalA, fvalB); break;
+                    }
+                    state.registers[a] = Value::MakeFloat(fresult);
                 }
                 
-                state.registers[a] = Value::MakeInt(result);
-                Logger::d("Interpreter", "[0xB0..BA] binop/2addr (opcode=" + std::to_string(opcode) + ") v" + std::to_string(a) + " = v" + std::to_string(a) + " op v" + std::to_string(b) + " -> " + std::to_string(result));
+                Logger::d("Interpreter", "[0xB0..CF] binop/2addr " + std::to_string(opcode) + " v" + std::to_string(a) + " = v" + std::to_string(a) + " op v" + std::to_string(b));
                 state.pc += 1;
                 break;
             }

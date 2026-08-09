@@ -359,7 +359,97 @@ void StubRegistry::registerViewStubs() {
         return false;
     };
     stubs["Ljava/lang/Object;->toString()Ljava/lang/String;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            std::string text = "";
+            if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                InterpreterObject* obj = (InterpreterObject*)args[0].obj;
+                auto it = obj->fields.find("string_value");
+                if (it != obj->fields.end() && it->second.type == ValueType::OBJECT) {
+                    text = ((InterpreterObject*)it->second.obj)->className;
+                }
+            }
+            InterpreterObject* strObj = new InterpreterObject();
+            strObj->className = "Ljava/lang/String;";
+            InterpreterObject* inner = new InterpreterObject();
+            inner->className = text;
+            strObj->fields["string_value"] = Value::MakeObject(inner);
+            *outReturn = Value::MakeObject(strObj);
+        }
+        return false;
+    };
+    
+    stubs["Landroid/widget/EditText;->getText()Landroid/text/Editable;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 1 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            HWND hwnd = (HWND)viewObj->nativeHandle;
+            if (hwnd) {
+                char buf[512] = {0};
+                GetWindowTextA(hwnd, buf, sizeof(buf));
+                
+                InterpreterObject* editableObj = new InterpreterObject();
+                editableObj->className = "Landroid/text/Editable;";
+                InterpreterObject* inner = new InterpreterObject();
+                inner->className = std::string(buf);
+                editableObj->fields["string_value"] = Value::MakeObject(inner);
+                
+                if (outReturn) *outReturn = Value::MakeObject(editableObj);
+                return false;
+            }
+        }
         if (outReturn) *outReturn = Value::MakeNull();
+        return false;
+    };
+
+    stubs["Ljava/lang/Integer;->parseInt(Ljava/lang/String;)I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            int parsed = 0;
+            if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                InterpreterObject* strObj = (InterpreterObject*)args[0].obj;
+                auto it = strObj->fields.find("string_value");
+                if (it != strObj->fields.end() && it->second.type == ValueType::OBJECT) {
+                    std::string text = ((InterpreterObject*)it->second.obj)->className;
+                    try {
+                        parsed = std::stoi(text);
+                    } catch (...) {
+                        // ignore parse errors for now
+                    }
+                }
+            }
+            *outReturn = Value::MakeInt(parsed);
+        }
+        return false;
+    };
+    
+    stubs["Ljava/lang/String;->valueOf(I)Ljava/lang/String;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            int val = args.size() > 0 ? args[0].i : 0;
+            InterpreterObject* strObj = new InterpreterObject();
+            strObj->className = "Ljava/lang/String;";
+            InterpreterObject* inner = new InterpreterObject();
+            inner->className = std::to_string(val);
+            strObj->fields["string_value"] = Value::MakeObject(inner);
+            *outReturn = Value::MakeObject(strObj);
+        }
+        return false;
+    };
+
+    stubs["Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            InterpreterObject* strObj = (InterpreterObject*)args[1].obj;
+            if (viewObj && strObj) {
+                HWND hwnd = (HWND)viewObj->nativeHandle;
+                std::string text = "";
+                auto it = strObj->fields.find("string_value");
+                if (it != strObj->fields.end() && it->second.type == ValueType::OBJECT) {
+                    text = ((InterpreterObject*)it->second.obj)->className;
+                }
+                if (hwnd) {
+                    SetWindowTextA(hwnd, text.c_str());
+                    Logger::i("StubRegistry", "Updated TextView text to: " + text);
+                }
+            }
+        }
         return false;
     };
 }

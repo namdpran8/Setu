@@ -116,6 +116,12 @@ public:
     // Get type string by type_idx
     std::string getTypeString(uint32_t typeIdx) const;
 
+    // Get string by string_idx
+    std::string getString(uint32_t stringIdx) const {
+        if (stringIdx < m_strings.size()) return m_strings[stringIdx];
+        return "";
+    }
+
     // Looks up the initial value of a static field
     Value getStaticFieldValue(uint32_t fieldIdx) const;
     
