@@ -174,11 +174,11 @@ void LayoutInflater::inflateRecursive(const AxmlNode* node, HWND parentHwnd, Res
         if (!constraintNodes) { // fallback flow if no constraint solver requested (though we always pass it now)
             if (isHorizontal) {
                 childStartX += childW + 5;
-                childrenMaxHeight = std::max(childrenMaxHeight, childH);
+                childrenMaxHeight = max(childrenMaxHeight, childH);
                 childrenMaxWidth += childW + 5;
             } else {
                 childStartY += childH + 5;
-                childrenMaxWidth = std::max(childrenMaxWidth, childW);
+                childrenMaxWidth = max(childrenMaxWidth, childW);
                 childrenMaxHeight += childH + 5;
             }
         }
@@ -234,7 +234,7 @@ void LayoutInflater::resolveConstraints(std::vector<ConstraintNode>& nodes, int 
                     }
                     
                     if (node.widthMode == 2) { // MATCH_CONSTRAINT
-                        if (hasStart && hasEnd) node.w = std::max(0, endCoord - startCoord);
+                        if (hasStart && hasEnd) node.w = max(0, endCoord - startCoord);
                         else node.w = node.width;
                     } else if (node.widthMode == 1) node.w = parentWidth; // MATCH_PARENT
                     else node.w = node.width; // WRAP_CONTENT
@@ -284,7 +284,7 @@ void LayoutInflater::resolveConstraints(std::vector<ConstraintNode>& nodes, int 
                     }
                     
                     if (node.heightMode == 2) { // MATCH_CONSTRAINT
-                        if (hasTop && hasBottom) node.h = std::max(0, bottomCoord - topCoord);
+                        if (hasTop && hasBottom) node.h = max(0, bottomCoord - topCoord);
                         else node.h = node.height;
                     } else if (node.heightMode == 1) node.h = parentHeight; // MATCH_PARENT
                     else node.h = node.height; // WRAP_CONTENT
