@@ -7,6 +7,7 @@
 #include "../view/FrameLayout.h"
 #include "../view/RelativeLayout.h"
 #include "../view/ConstraintLayout.h"
+#include "../view/GridLayout.h"
 #include <string>
 #include <cwchar>
 
@@ -32,6 +33,16 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
 
     if (tag.find("ConstraintLayout") != std::string::npos) {
         view = std::make_shared<windroid::view::ConstraintLayout>();
+    } else if (tag.find("GridLayout") != std::string::npos) {
+        auto gl = std::make_shared<windroid::view::GridLayout>();
+        for (const auto& attr : node->attributes) {
+            if (attr.name == "columnCount") {
+                gl->setColumnCount(attr.typedValueData);
+            } else if (attr.name == "rowCount") {
+                gl->setRowCount(attr.typedValueData);
+            }
+        }
+        view = gl;
     } else if (tag.find("LinearLayout") != std::string::npos) {
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         
@@ -151,6 +162,8 @@ void LayoutInflater::parseLayoutParams(const AxmlNode* node, std::shared_ptr<win
     // Instantiate correct LayoutParams based on parent
     if (parentTag.find("ConstraintLayout") != std::string::npos) {
         lp = std::make_shared<windroid::view::ConstraintLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
+    } else if (parentTag.find("GridLayout") != std::string::npos) {
+        lp = std::make_shared<windroid::view::GridLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
     } else if (parentTag.find("LinearLayout") != std::string::npos) {
         lp = std::make_shared<windroid::view::LinearLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
     } else if (parentTag.find("FrameLayout") != std::string::npos) {
@@ -247,6 +260,37 @@ void LayoutInflater::parseLayoutParams(const AxmlNode* node, std::shared_ptr<win
             else if (attr.name == "layout_constraintGuide_begin") clp->guideBegin = (attr.typedValueData >> 8) * 2;
             else if (attr.name == "layout_constraintGuide_end") clp->guideEnd = (attr.typedValueData >> 8) * 2;
             else if (attr.name == "orientation") clp->orientation = attr.typedValueData;
+        }
+        
+        // GridLayout specific
+        auto glp = std::dynamic_pointer_cast<windroid::view::GridLayout::LayoutParams>(lp);
+        if (glp) {
+            if (attr.name == "layout_column") glp->columnSpec.spanStart = attr.typedValueData;
+            else if (attr.name == "layout_row") glp->rowSpec.spanStart = attr.typedValueData;
+            else if (attr.name == "layout_columnSpan") glp->columnSpec.spanSize = attr.typedValueData;
+            else if (attr.name == "layout_rowSpan") glp->rowSpec.spanSize = attr.typedValueData;
+            else if (attr.name == "layout_columnWeight") {
+                union { uint32_t i; float f; } u;
+                u.i = attr.typedValueData;
+                glp->columnSpec.weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
+            }
+            else if (attr.name == "layout_rowWeight") {
+                union { uint32_t i; float f; } u;
+                u.i = attr.typedValueData;
+                glp->rowSpec.weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
+            }
+            else if (attr.name == "layout_gravity") {
+                int gravity = attr.typedValueData;
+                if ((gravity & 0x7) == 0x7) glp->columnSpec.alignment = windroid::view::GridLayout::FILL;
+                else if ((gravity & 0x1) == 0x1) glp->columnSpec.alignment = windroid::view::GridLayout::CENTER;
+                else if ((gravity & 0x5) == 0x5 || (gravity & 0x800005) == 0x800005) glp->columnSpec.alignment = windroid::view::GridLayout::END;
+                else glp->columnSpec.alignment = windroid::view::GridLayout::START;
+                
+                if ((gravity & 0x70) == 0x70) glp->rowSpec.alignment = windroid::view::GridLayout::FILL;
+                else if ((gravity & 0x10) == 0x10) glp->rowSpec.alignment = windroid::view::GridLayout::CENTER;
+                else if ((gravity & 0x50) == 0x50 || (gravity & 0x800050) == 0x800050) glp->rowSpec.alignment = windroid::view::GridLayout::END;
+                else glp->rowSpec.alignment = windroid::view::GridLayout::START;
+            }
         }
     }
 
