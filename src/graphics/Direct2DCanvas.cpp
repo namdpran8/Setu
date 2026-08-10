@@ -87,6 +87,18 @@ void Direct2DCanvas::drawRoundRect(float left, float top, float right, float bot
     }
 }
 
+void Direct2DCanvas::drawLine(float startX, float startY, float stopX, float stopY, const Paint& paint) {
+    if (!mContext) return;
+    
+    auto brush = getCachedBrush(paint.getColor());
+    if (!brush) return;
+    
+    D2D1_POINT_2F start = D2D1::Point2F(startX, startY);
+    D2D1_POINT_2F stop = D2D1::Point2F(stopX, stopY);
+    
+    mContext->DrawLine(start, stop, brush, paint.getStrokeWidth());
+}
+
 void Direct2DCanvas::drawText(const std::wstring& text, float x, float y, const Paint& paint) {
     if (!mDWriteFactory || text.empty()) return;
 

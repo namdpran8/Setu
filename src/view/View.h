@@ -74,6 +74,12 @@ public:
     virtual bool dispatchTouchEvent(class MotionEvent& event);
     virtual bool onTouchEvent(class MotionEvent& event);
 
+    virtual bool dispatchKeyEvent(const class KeyEvent& event);
+    virtual bool onKeyEvent(const class KeyEvent& event);
+
+    bool isFocused() const { return mIsFocused; }
+    virtual void setFocus(bool focus) { mIsFocused = focus; }
+
     void setOnClickListener(std::function<void()> listener) { mOnClickListener = listener; }
     virtual void performClick() { if (mOnClickListener) mOnClickListener(); }
 
@@ -114,6 +120,7 @@ protected:
     std::unique_ptr<graphics::RenderNode> mRenderNode;
     std::function<void()> mOnClickListener;
     std::shared_ptr<LayoutParams> mLayoutParams;
+    bool mIsFocused = false;
 };
 
 } // namespace view

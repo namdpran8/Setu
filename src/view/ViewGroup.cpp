@@ -61,6 +61,16 @@ bool ViewGroup::dispatchTouchEvent(MotionEvent& event) {
     return View::dispatchTouchEvent(event);
 }
 
+bool ViewGroup::dispatchKeyEvent(const KeyEvent& event) {
+    // Traverse children to find the focused one that handles the event.
+    // We rely on the child's own dispatchKeyEvent/onKeyEvent to check focus.
+    for (auto it = mChildren.rbegin(); it != mChildren.rend(); ++it) {
+        if ((*it)->dispatchKeyEvent(event)) return true;
+    }
+    // If no child handled it (or none focused), try handling it ourselves
+    return View::dispatchKeyEvent(event);
+}
+
 void ViewGroup::measureChild(std::shared_ptr<View> child, int parentWidthMeasureSpec, int parentHeightMeasureSpec) {
     // A real implementation would parse LayoutParams.
     // For now, we just pass down exactly or at_most based on the parent.

@@ -51,6 +51,7 @@ public:
 
     // Hit testing and event routing
     bool dispatchTouchEvent(MotionEvent& event) override;
+    bool dispatchKeyEvent(const KeyEvent& event) override;
 
 protected:
     void measureChild(std::shared_ptr<View> child, int parentWidthMeasureSpec, int parentHeightMeasureSpec);

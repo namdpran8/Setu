@@ -2,6 +2,7 @@
 #include "../utils/Logger.h"
 #include "../widget/Button.h"
 #include "../widget/TextView.h"
+#include "../widget/EditText.h"
 #include "../view/LinearLayout.h"
 #include "../view/FrameLayout.h"
 #include "../view/RelativeLayout.h"
@@ -75,11 +76,17 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
             }
         }
         view = btn;
+    } else if (tag.find("EditText") != std::string::npos) {
+        auto et = std::make_shared<windroid::widget::EditText>();
+        for (const auto& attr : node->attributes) {
+            if (attr.name == "text" || attr.name == "hint") {
+                et->setText(utf8_to_utf16(resolveString(attr, resManager)));
+            }
+        }
+        view = et;
     } else if (tag == "Guideline") {
         view = std::make_shared<windroid::view::View>();
-    }
-
-    if (!view) {
+    } else {
         Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", falling back to View");
         view = std::make_shared<windroid::view::View>();
     }

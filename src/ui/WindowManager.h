@@ -32,6 +32,7 @@ public:
 
     static void clearWindow();
     static void setClickCallback(std::function<void(int)> cb);
+    static void triggerClickCallback(int controlId);
 
     // C++ View Hierarchy root
     static void setRootView(std::shared_ptr<windroid::view::View> rootView);

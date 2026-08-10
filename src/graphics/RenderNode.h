@@ -100,6 +100,16 @@ private:
     Paint paint;
 };
 
+class DrawLineCommand : public DrawCommand {
+public:
+    DrawLineCommand(float sx, float sy, float ex, float ey, const Paint& p) 
+        : sx(sx), sy(sy), ex(ex), ey(ey), paint(p) {}
+    void execute(Canvas& canvas) override { canvas.drawLine(sx, sy, ex, ey, paint); }
+private:
+    float sx, sy, ex, ey;
+    Paint paint;
+};
+
 class DrawTextCommand : public DrawCommand {
 public:
     DrawTextCommand(const std::wstring& txt, float x, float y, const Paint& p) 

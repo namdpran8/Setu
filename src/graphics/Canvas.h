@@ -25,6 +25,7 @@ public:
     virtual void drawColor(uint32_t color) = 0;
     virtual void drawRect(float left, float top, float right, float bottom, const Paint& paint) = 0;
     virtual void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, const Paint& paint) = 0;
+    virtual void drawLine(float startX, float startY, float stopX, float stopY, const Paint& paint) = 0;
     virtual void drawText(const std::wstring& text, float x, float y, const Paint& paint) = 0;
 
     virtual void drawRenderNode(RenderNode* node) = 0;

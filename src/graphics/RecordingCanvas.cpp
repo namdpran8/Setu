@@ -38,6 +38,10 @@ void RecordingCanvas::drawRoundRect(float left, float top, float right, float bo
     mNode->addCommand(std::make_unique<DrawRoundRectCommand>(left, top, right, bottom, rx, ry, paint));
 }
 
+void RecordingCanvas::drawLine(float startX, float startY, float stopX, float stopY, const Paint& paint) {
+    mNode->addCommand(std::make_unique<DrawLineCommand>(startX, startY, stopX, stopY, paint));
+}
+
 void RecordingCanvas::drawText(const std::wstring& text, float x, float y, const Paint& paint) {
     mNode->addCommand(std::make_unique<DrawTextCommand>(text, x, y, paint));
 }

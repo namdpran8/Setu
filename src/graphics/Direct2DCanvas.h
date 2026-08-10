@@ -25,6 +25,7 @@ public:
     void drawColor(uint32_t color) override;
     void drawRect(float left, float top, float right, float bottom, const Paint& paint) override;
     void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, const Paint& paint) override;
+    void drawLine(float startX, float startY, float stopX, float stopY, const Paint& paint) override;
     void drawText(const std::wstring& text, float x, float y, const Paint& paint) override;
     void drawRenderNode(RenderNode* node) override;
 

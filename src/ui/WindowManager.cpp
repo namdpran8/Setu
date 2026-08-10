@@ -2,6 +2,7 @@
 #include "../utils/Logger.h"
 #include "../view/View.h"
 #include "../view/MotionEvent.h"
+#include "../view/KeyEvent.h"
 #include "../view/Choreographer.h"
 #include "../graphics/Direct2DCanvas.h"
 
@@ -19,6 +20,12 @@ Microsoft::WRL::ComPtr<IDWriteFactory> WindowManager::s_dWriteFactory;
 
 void WindowManager::setClickCallback(std::function<void(int)> cb) {
     s_clickCallback = cb;
+}
+
+void WindowManager::triggerClickCallback(int controlId) {
+    if (s_clickCallback) {
+        s_clickCallback(controlId);
+    }
 }
 
 void WindowManager::setRootView(std::shared_ptr<windroid::view::View> rootView) {
@@ -183,6 +190,24 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                 windroid::view::MotionEvent event(windroid::view::MotionEvent::Action::UP, x, y);
                 s_rootView->dispatchTouchEvent(event);
                 InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return 0;
+        }
+        case WM_KEYDOWN: {
+            if (s_rootView) {
+                windroid::view::KeyEvent event(windroid::view::KeyEvent::Action::DOWN, (int)wParam, 0);
+                if (s_rootView->dispatchKeyEvent(event)) {
+                    // Handled
+                }
+            }
+            return 0;
+        }
+        case WM_CHAR: {
+            if (s_rootView) {
+                windroid::view::KeyEvent event(windroid::view::KeyEvent::Action::DOWN, 0, (wchar_t)wParam);
+                if (s_rootView->dispatchKeyEvent(event)) {
+                    // Handled
+                }
             }
             return 0;
         }

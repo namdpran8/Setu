@@ -1,0 +1,85 @@
+#include "EditText.h"
+#include "../view/MotionEvent.h"
+#include "../ui/WindowManager.h"
+
+#include "../view/KeyEvent.h"
+
+namespace windroid {
+namespace widget {
+
+EditText::EditText() {
+    // Material Design EditText styling
+    mBackgroundPaint.setColor(0xFFF5F5F5); // Light Gray background
+    mBackgroundPaint.setStyle(graphics::Style::FILL);
+    
+    mLinePaint.setColor(0xFF6200EE); // Purple underline
+    mLinePaint.setStrokeWidth(2.0f);
+    mLinePaint.setStyle(graphics::Style::STROKE);
+
+    // EditText text should be darker than normal TextView
+    setTextColor(0xFF000000); 
+}
+
+void EditText::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+    TextView::onMeasure(widthMeasureSpec, heightMeasureSpec);
+    
+    // Add some padding for the background and line
+    int paddedWidth = getMeasuredWidth() + 16;
+    int paddedHeight = getMeasuredHeight() + 24; // extra height for the line
+    
+    setMeasuredDimension(paddedWidth, paddedHeight);
+}
+
+void EditText::onDraw(graphics::Canvas& canvas) {
+    // Draw background
+    canvas.drawRoundRect(0, 0, (float)getWidth(), (float)getHeight(), 4.0f, 4.0f, mBackgroundPaint);
+    
+    // Draw text using TextView's implementation (with padding)
+    canvas.save();
+    canvas.translate(8.0f, 8.0f);
+    TextView::onDraw(canvas);
+    canvas.restore();
+    
+    // Draw underline (thicker if focused, but we will just draw it always for now)
+    if (mIsFocused) {
+        mLinePaint.setStrokeWidth(3.0f);
+    } else {
+        mLinePaint.setStrokeWidth(1.0f);
+    }
+    canvas.drawLine(0, (float)getHeight() - 2.0f, (float)getWidth(), (float)getHeight() - 2.0f, mLinePaint);
+}
+
+bool EditText::onTouchEvent(view::MotionEvent& event) {
+    if (event.getAction() == view::MotionEvent::Action::DOWN) {
+        mIsFocused = true;
+        InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
+        return true;
+    }
+    return false;
+}
+
+bool EditText::onKeyEvent(const view::KeyEvent& event) {
+    if (!mIsFocused) return false;
+
+    if (event.getAction() == view::KeyEvent::Action::DOWN) {
+        if (event.getKeyCode() == 8) { // Backspace
+            std::wstring currentText = getText();
+            if (!currentText.empty()) {
+                currentText.pop_back();
+                setText(currentText);
+                InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
+            }
+            return true;
+        } else if (event.getCharacter() >= 32 && event.getCharacter() <= 126) {
+            std::wstring currentText = getText();
+            currentText += std::wstring(1, event.getCharacter());
+            setText(currentText);
+            InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
+            return true;
+        }
+    }
+    return false;
+}
+
+} // namespace widget
+} // namespace windroid

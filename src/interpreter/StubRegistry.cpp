@@ -420,6 +420,11 @@ void StubRegistry::registerViewStubs() {
             int controlId = view ? view->getId() : 0;
             if (controlId != 0 && listener != nullptr) {
                 clickListeners[controlId] = listener;
+                if (view) {
+                    view->setOnClickListener([controlId]() {
+                        WindowManager::triggerClickCallback(controlId);
+                    });
+                }
                 Logger::i("StubRegistry", "Registered onClickListener for control ID: " + std::to_string(controlId));
             } else {
                 Logger::w("StubRegistry", "Failed to register onClickListener: invalid control ID or null listener.");
@@ -504,8 +509,12 @@ void StubRegistry::registerViewStubs() {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
             windroid::view::View* view = (windroid::view::View*)viewObj->nativeHandle;
             if (view) {
-                // Assuming TextView/EditText base
                 std::string text = "stubbed_text";
+                windroid::widget::TextView* tv = dynamic_cast<windroid::widget::TextView*>(view);
+                if (tv) {
+                    std::wstring wtext = tv->getText();
+                    text = std::string(wtext.begin(), wtext.end());
+                }
                 
                 InterpreterObject* editableObj = new InterpreterObject();
                 editableObj->className = "Landroid/text/Editable;";

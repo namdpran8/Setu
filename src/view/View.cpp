@@ -61,12 +61,24 @@ void View::setMeasuredDimension(int measuredWidth, int measuredHeight) {
 }
 
 bool View::dispatchTouchEvent(MotionEvent& event) {
-    // Basic View just calls onTouchEvent
     return onTouchEvent(event);
 }
 
 bool View::onTouchEvent(MotionEvent& event) {
-    // Base implementation does nothing
+    if (event.getAction() == MotionEvent::Action::DOWN) {
+        if (mOnClickListener) {
+            performClick();
+            return true;
+        }
+    }
+    return false;
+}
+
+bool View::dispatchKeyEvent(const KeyEvent& event) {
+    return onKeyEvent(event);
+}
+
+bool View::onKeyEvent(const KeyEvent& event) {
     return false;
 }
 

@@ -31,7 +31,8 @@ add_executable(winandroid_runtime
     "src/view/RelativeLayout.cpp"
     "src/view/ConstraintLayout.cpp"
     "src/widget/TextView.cpp"
-    "src/widget/Button.cpp")
+    "src/widget/Button.cpp"
+    "src/widget/EditText.cpp")
 
 target_include_directories(winandroid_runtime PRIVATE include)
 target_link_libraries(winandroid_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi)
