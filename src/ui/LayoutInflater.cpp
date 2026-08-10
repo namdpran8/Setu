@@ -1,10 +1,17 @@
 #include "LayoutInflater.h"
 #include "../utils/Logger.h"
-#include <windows.h>
+#include "../widget/Button.h"
+#include "../widget/TextView.h"
+#include "../view/LinearLayout.h"
+#include "../view/FrameLayout.h"
+#include "../view/RelativeLayout.h"
+#include "../view/ConstraintLayout.h"
 #include <string>
-#include <algorithm>
+#include <cwchar>
 
-// Helper to convert UTF-8 to UTF-16 for Win32 API
+namespace windroid {
+
+// Helper to convert std::string to std::wstring
 static std::wstring utf8_to_utf16(const std::string& utf8) {
     if (utf8.empty()) return std::wstring();
     int size_needed = MultiByteToWideChar(CP_UTF8, 0, &utf8[0], (int)utf8.size(), NULL, 0);
@@ -13,341 +20,230 @@ static std::wstring utf8_to_utf16(const std::string& utf8) {
     return wstrTo;
 }
 
-#include "../widget/TextView.h"
-#include "../widget/Button.h"
-#include "../view/ViewGroup.h"
+std::shared_ptr<windroid::view::View> LayoutInflater::inflate(const AxmlNode* node, ResourceManager* resManager) {
+    if (!node) return nullptr;
+    return inflateRecursive(node, resManager);
+}
 
-std::shared_ptr<windroid::view::View> LayoutInflater::inflate(const AxmlNode* node, ResourceManager* resManager, int parentWidth, int parentHeight) {
-    ConstraintNode root = inflateRecursive(node, resManager);
-    
-    // Set root node dimensions
-    root.x = 0; root.y = 0; root.w = parentWidth; root.h = parentHeight;
-    
-    layoutNode(root, parentWidth, parentHeight);
-    return root.view;
+std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const AxmlNode* node, ResourceManager* resManager) {
+    std::string tag = node->tag;
+    std::shared_ptr<windroid::view::View> view = nullptr;
+
+    if (tag.find("ConstraintLayout") != std::string::npos) {
+        view = std::make_shared<windroid::view::ConstraintLayout>();
+    } else if (tag.find("LinearLayout") != std::string::npos) {
+        auto ll = std::make_shared<windroid::view::LinearLayout>();
+        
+        // Check orientation
+        for (const auto& attr : node->attributes) {
+            if (attr.name == "orientation") {
+                if (attr.typedValueData == 1 || resolveString(attr, resManager) == "vertical") {
+                    ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
+                } else {
+                    ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
+                }
+                break;
+            }
+        }
+        view = ll;
+    } else if (tag.find("FrameLayout") != std::string::npos) {
+        view = std::make_shared<windroid::view::FrameLayout>();
+    } else if (tag.find("RelativeLayout") != std::string::npos) {
+        view = std::make_shared<windroid::view::RelativeLayout>();
+    } else if (tag.find("TextView") != std::string::npos) {
+        auto tv = std::make_shared<windroid::widget::TextView>();
+        for (const auto& attr : node->attributes) {
+            if (attr.name == "text") {
+                tv->setText(utf8_to_utf16(resolveString(attr, resManager)));
+            } else if (attr.name == "textSize") {
+                tv->setTextSize((float)parseDimension(resolveString(attr, resManager)));
+            } else if (attr.name == "textColor") {
+                // Simplistic color parsing
+                uint32_t color = 0xFF000000;
+                if (attr.typedValueType >= 0x1c && attr.typedValueType <= 0x1f) {
+                    color = attr.typedValueData;
+                }
+                tv->setTextColor(color);
+            }
+        }
+        view = tv;
+    } else if (tag.find("Button") != std::string::npos) {
+        auto btn = std::make_shared<windroid::widget::Button>();
+        for (const auto& attr : node->attributes) {
+            if (attr.name == "text") {
+                btn->setText(utf8_to_utf16(resolveString(attr, resManager)));
+            }
+        }
+        view = btn;
+    } else if (tag == "Guideline") {
+        view = std::make_shared<windroid::view::View>();
+    }
+
+    if (!view) {
+        Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", falling back to View");
+        view = std::make_shared<windroid::view::View>();
+    }
+
+    parseViewAttributes(node, view, resManager);
+
+    // Parse children if it is a ViewGroup
+    auto viewGroup = std::dynamic_pointer_cast<windroid::view::ViewGroup>(view);
+    if (viewGroup) {
+        for (const auto& childNode : node->children) {
+            auto childView = inflateRecursive(childNode.get(), resManager);
+            if (childView) {
+                parseLayoutParams(childNode.get(), childView, tag);
+                viewGroup->addView(childView);
+            }
+        }
+    }
+
+    return view;
 }
 
 std::string LayoutInflater::resolveString(const AxmlAttribute& attr, ResourceManager* resManager) {
-    if (!attr.rawValue.empty()) return attr.rawValue;
-    if (attr.typedValueType == 0x01 || attr.typedValueType == 0x03) {
+    if (attr.typedValueType == 0x03) { // TYPE_STRING
+        if (!attr.rawValue.empty()) {
+            return attr.rawValue;
+        }
+    } else if (attr.typedValueType == 0x01) { // TYPE_REFERENCE
         if (resManager) {
-            std::string resolved = resManager->getResourcePath(attr.typedValueData);
-            if (!resolved.empty()) return resolved;
+            return resManager->getString(attr.typedValueData);
         }
     }
-    return "";
+    return std::to_string(attr.typedValueData);
 }
 
-ConstraintNode LayoutInflater::inflateRecursive(const AxmlNode* node, ResourceManager* resManager) {
-    ConstraintNode cnode;
-    if (!node) return cnode;
-    
-    std::string tag = node->tag;
-    
-    cnode.width = 80;
-    cnode.height = 70;
-
-    std::string text = "";
-    
-    if (tag.find("ConstraintLayout") != std::string::npos) cnode.isConstraintLayout = true;
-    if (tag.find("LinearLayout") != std::string::npos) {
-        cnode.isLinearLayout = true;
-        cnode.isHorizontal = true; // Default Android behavior
+int LayoutInflater::parseDimension(const std::string& dimenStr) {
+    if (dimenStr.empty()) return 0;
+    try {
+        if (dimenStr.find("dip") != std::string::npos || dimenStr.find("dp") != std::string::npos) {
+            return std::stoi(dimenStr) * 2; // naive density multiplier
+        } else if (dimenStr.find("sp") != std::string::npos) {
+            return std::stoi(dimenStr) * 2;
+        } else if (dimenStr.find("px") != std::string::npos) {
+            return std::stoi(dimenStr);
+        }
+        return std::stoi(dimenStr);
+    } catch (...) {
+        return 0;
     }
-    if (tag.find("Guideline") != std::string::npos) cnode.isGuideline = true;
+}
+
+void LayoutInflater::parseViewAttributes(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, ResourceManager* resManager) {
+    for (const auto& attr : node->attributes) {
+        if (attr.name == "id") {
+            view->setId(attr.typedValueData);
+        }
+    }
+}
+
+void LayoutInflater::parseLayoutParams(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, const std::string& parentTag) {
+    std::shared_ptr<windroid::view::View::LayoutParams> lp;
+
+    // Instantiate correct LayoutParams based on parent
+    if (parentTag.find("ConstraintLayout") != std::string::npos) {
+        lp = std::make_shared<windroid::view::ConstraintLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
+    } else if (parentTag.find("LinearLayout") != std::string::npos) {
+        lp = std::make_shared<windroid::view::LinearLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
+    } else if (parentTag.find("FrameLayout") != std::string::npos) {
+        lp = std::make_shared<windroid::view::FrameLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
+    } else if (parentTag.find("RelativeLayout") != std::string::npos) {
+        lp = std::make_shared<windroid::view::RelativeLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
+    } else {
+        lp = std::make_shared<windroid::view::View::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
+    }
 
     for (const auto& attr : node->attributes) {
-        if (attr.name == "text") text = resolveString(attr, resManager);
-        else if (attr.name == "id" && attr.typedValueType == 0x01) cnode.id = attr.typedValueData;
-        else if (attr.name == "orientation") {
-            if (attr.typedValueData == 0) { cnode.isHorizontal = true; cnode.isHorizontalGuide = true; }
-            else if (attr.typedValueData == 1) { cnode.isHorizontal = false; cnode.isHorizontalGuide = false; }
-        }
-        else if (attr.name == "layout_width") {
-            int32_t val = (int32_t)attr.typedValueData;
-            if (attr.typedValueType == 0x10 || attr.typedValueType == 0x11) {
-                if (val == -1) cnode.widthMode = 1; // MATCH_PARENT
-                else if (val == -2) cnode.widthMode = 0; // WRAP_CONTENT
-            } else if (attr.typedValueType == 0x05) { // DIMENSION
-                int unit = val & 0xF;
-                int actualVal = val >> 8;
-                if (actualVal == 0) cnode.widthMode = 2; // MATCH_CONSTRAINT (0dp)
-                else { cnode.widthMode = 0; cnode.width = actualVal; }
-            } else {
-                cnode.widthMode = 0; cnode.width = val; // Fallback
-            }
-        }
-        else if (attr.name == "layout_height") {
-            int32_t val = (int32_t)attr.typedValueData;
-            if (attr.typedValueType == 0x10 || attr.typedValueType == 0x11) {
-                if (val == -1) cnode.heightMode = 1; // MATCH_PARENT
-                else if (val == -2) cnode.heightMode = 0; // WRAP_CONTENT
-            } else if (attr.typedValueType == 0x05) { // DIMENSION
-                int unit = val & 0xF;
-                int actualVal = val >> 8;
-                if (actualVal == 0) cnode.heightMode = 2; // MATCH_CONSTRAINT (0dp)
-                else { cnode.heightMode = 0; cnode.height = actualVal; }
-            } else {
-                cnode.heightMode = 0; cnode.height = val; // Fallback
-            }
-        }
-        else if (attr.name == "layout_constraintTop_toTopOf") cnode.topToTop = attr.typedValueData;
-        else if (attr.name == "layout_constraintTop_toBottomOf") cnode.topToBottom = attr.typedValueData;
-        else if (attr.name == "layout_constraintBottom_toTopOf") cnode.bottomToTop = attr.typedValueData;
-        else if (attr.name == "layout_constraintBottom_toBottomOf") cnode.bottomToBottom = attr.typedValueData;
-        else if (attr.name == "layout_constraintStart_toStartOf") cnode.startToStart = attr.typedValueData;
-        else if (attr.name == "layout_constraintStart_toEndOf") cnode.startToEnd = attr.typedValueData;
-        else if (attr.name == "layout_constraintEnd_toStartOf") cnode.endToStart = attr.typedValueData;
-        else if (attr.name == "layout_constraintEnd_toEndOf") cnode.endToEnd = attr.typedValueData;
-        else if (attr.name == "layout_constraintHorizontal_bias") {
-            if (attr.typedValueType == 0x04) cnode.horizontalBias = *(float*)&attr.typedValueData;
-        }
-        else if (attr.name == "layout_constraintVertical_bias") {
-            if (attr.typedValueType == 0x04) cnode.verticalBias = *(float*)&attr.typedValueData;
-        }
-        else if (attr.name == "layout_constraintGuide_percent") {
-            if (attr.typedValueType == 0x04) cnode.guidePercent = *(float*)&attr.typedValueData;
-        }
-        else if (attr.name == "layout_constraintGuide_begin") cnode.guideBegin = attr.typedValueData;
-        else if (attr.name == "layout_constraintGuide_end") cnode.guideEnd = attr.typedValueData;
-    }
-
-    if (!cnode.isGuideline) {
-        if (tag.find("TextView") != std::string::npos) {
-            auto tv = std::make_shared<windroid::widget::TextView>();
-            tv->setText(utf8_to_utf16(text));
-            cnode.view = tv;
-            cnode.width = 300; cnode.height = 60;
-        } else if (tag.find("Button") != std::string::npos) {
-            auto btn = std::make_shared<windroid::widget::Button>();
-            btn->setText(utf8_to_utf16(text));
-            cnode.view = btn;
-        } else {
-            cnode.view = std::make_shared<windroid::view::ViewGroup>();
+        if (attr.name == "layout_width") {
+            if (attr.typedValueData == 0xFFFFFFFF) lp->width = windroid::view::View::MATCH_PARENT;
+            else if (attr.typedValueData == 0xFFFFFFFE) lp->width = windroid::view::View::WRAP_CONTENT;
+            else if (attr.typedValueType == 0x10) lp->width = attr.typedValueData; // int
+            else if (attr.typedValueType == 0x05) lp->width = (attr.typedValueData >> 8) * 2; // naive dp parsing
+        } else if (attr.name == "layout_height") {
+            if (attr.typedValueData == 0xFFFFFFFF) lp->height = windroid::view::View::MATCH_PARENT;
+            else if (attr.typedValueData == 0xFFFFFFFE) lp->height = windroid::view::View::WRAP_CONTENT;
+            else if (attr.typedValueType == 0x10) lp->height = attr.typedValueData;
+            else if (attr.typedValueType == 0x05) lp->height = (attr.typedValueData >> 8) * 2;
+        } else if (attr.name == "layout_marginLeft" || attr.name == "layout_marginStart") {
+            lp->leftMargin = (attr.typedValueType == 0x05) ? (attr.typedValueData >> 8) * 2 : attr.typedValueData;
+        } else if (attr.name == "layout_marginTop") {
+            lp->topMargin = (attr.typedValueType == 0x05) ? (attr.typedValueData >> 8) * 2 : attr.typedValueData;
+        } else if (attr.name == "layout_marginRight" || attr.name == "layout_marginEnd") {
+            lp->rightMargin = (attr.typedValueType == 0x05) ? (attr.typedValueData >> 8) * 2 : attr.typedValueData;
+        } else if (attr.name == "layout_marginBottom") {
+            lp->bottomMargin = (attr.typedValueType == 0x05) ? (attr.typedValueData >> 8) * 2 : attr.typedValueData;
         }
         
-        if (cnode.view) {
-            cnode.view->setId(cnode.id);
-        }
-    }
-    
-    for (const auto& child : node->children) {
-        ConstraintNode childNode = inflateRecursive(child.get(), resManager);
-        if (childNode.view || childNode.isGuideline) {
-            cnode.children.push_back(childNode);
-            if (cnode.view && childNode.view) {
-                auto viewGroup = std::dynamic_pointer_cast<windroid::view::ViewGroup>(cnode.view);
-                if (viewGroup) {
-                    viewGroup->addView(childNode.view);
-                }
+        // LinearLayout specific
+        auto llp = std::dynamic_pointer_cast<windroid::view::LinearLayout::LayoutParams>(lp);
+        if (llp) {
+            if (attr.name == "layout_weight") {
+                union { uint32_t i; float f; } u;
+                u.i = attr.typedValueData;
+                llp->weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
+            } else if (attr.name == "layout_gravity") {
+                llp->gravity = attr.typedValueData;
             }
         }
+        
+        // FrameLayout specific
+        auto flp = std::dynamic_pointer_cast<windroid::view::FrameLayout::LayoutParams>(lp);
+        if (flp) {
+            if (attr.name == "layout_gravity") {
+                flp->gravity = attr.typedValueData;
+            }
+        }
+        
+        // RelativeLayout specific
+        auto rlp = std::dynamic_pointer_cast<windroid::view::RelativeLayout::LayoutParams>(lp);
+        if (rlp) {
+            if (attr.name == windroid::view::RelativeLayout::LayoutParams::ABOVE ||
+                attr.name == windroid::view::RelativeLayout::LayoutParams::BELOW ||
+                attr.name == windroid::view::RelativeLayout::LayoutParams::LEFT_OF ||
+                attr.name == windroid::view::RelativeLayout::LayoutParams::RIGHT_OF ||
+                attr.name == windroid::view::RelativeLayout::LayoutParams::ALIGN_PARENT_LEFT ||
+                attr.name == windroid::view::RelativeLayout::LayoutParams::ALIGN_PARENT_TOP ||
+                attr.name == windroid::view::RelativeLayout::LayoutParams::ALIGN_PARENT_RIGHT ||
+                attr.name == windroid::view::RelativeLayout::LayoutParams::ALIGN_PARENT_BOTTOM) {
+                rlp->rules[attr.name] = attr.typedValueData;
+            }
+        }
+        
+        // ConstraintLayout specific
+        auto clp = std::dynamic_pointer_cast<windroid::view::ConstraintLayout::LayoutParams>(lp);
+        if (clp) {
+            if (node->tag == "Guideline") clp->isGuideline = true;
+            if (attr.name == "layout_constraintTop_toTopOf") clp->topToTop = attr.typedValueData;
+            else if (attr.name == "layout_constraintTop_toBottomOf") clp->topToBottom = attr.typedValueData;
+            else if (attr.name == "layout_constraintBottom_toTopOf") clp->bottomToTop = attr.typedValueData;
+            else if (attr.name == "layout_constraintBottom_toBottomOf") clp->bottomToBottom = attr.typedValueData;
+            else if (attr.name == "layout_constraintStart_toStartOf" || attr.name == "layout_constraintLeft_toLeftOf") clp->startToStart = attr.typedValueData;
+            else if (attr.name == "layout_constraintStart_toEndOf" || attr.name == "layout_constraintLeft_toRightOf") clp->startToEnd = attr.typedValueData;
+            else if (attr.name == "layout_constraintEnd_toStartOf" || attr.name == "layout_constraintRight_toLeftOf") clp->endToStart = attr.typedValueData;
+            else if (attr.name == "layout_constraintEnd_toEndOf" || attr.name == "layout_constraintRight_toRightOf") clp->endToEnd = attr.typedValueData;
+            else if (attr.name == "layout_constraintHorizontal_bias") {
+                union { uint32_t i; float f; } u;
+                u.i = attr.typedValueData;
+                clp->horizontalBias = u.f;
+            }
+            else if (attr.name == "layout_constraintVertical_bias") {
+                union { uint32_t i; float f; } u;
+                u.i = attr.typedValueData;
+                clp->verticalBias = u.f;
+            }
+            else if (attr.name == "layout_constraintGuide_percent") {
+                union { uint32_t i; float f; } u;
+                u.i = attr.typedValueData;
+                clp->guidePercent = u.f;
+            }
+            else if (attr.name == "layout_constraintGuide_begin") clp->guideBegin = (attr.typedValueData >> 8) * 2;
+            else if (attr.name == "layout_constraintGuide_end") clp->guideEnd = (attr.typedValueData >> 8) * 2;
+            else if (attr.name == "orientation") clp->orientation = attr.typedValueData;
+        }
     }
-    
-    return cnode;
+
+    view->setLayoutParams(lp);
 }
 
-void LayoutInflater::layoutNode(ConstraintNode& node, int parentWidth, int parentHeight) {
-    if (node.isConstraintLayout) {
-        resolveConstraints(node.children, parentWidth, parentHeight);
-        for (auto& child : node.children) {
-            layoutNode(child, child.w, child.h);
-        }
-    } else if (node.isLinearLayout) {
-        int currentX = 0, currentY = 0;
-        int maxChildHeight = 0, maxChildWidth = 0;
-        for (auto& child : node.children) {
-            child.x = currentX;
-            child.y = currentY;
-            child.w = child.width; 
-            child.h = child.height;
-            if (child.widthMode == 1) child.w = parentWidth;
-            if (child.heightMode == 1) child.h = parentHeight;
-            
-            if (node.isHorizontal) {
-                currentX += child.w + 5; 
-                maxChildHeight = max(maxChildHeight, child.h);
-            } else {
-                currentY += child.h + 5;
-                maxChildWidth = max(maxChildWidth, child.w);
-            }
-            if (child.view) {
-                child.view->setMeasuredDimension(child.w, child.h);
-                child.view->layout(child.x, child.y, child.x + child.w, child.y + child.h);
-            }
-            layoutNode(child, child.w, child.h);
-        }
-    } else {
-        // Fallback for Generic ViewGroups
-        for (auto& child : node.children) {
-            child.x = 0; child.y = 0;
-            child.w = child.width; child.h = child.height;
-            if (child.widthMode == 1) child.w = parentWidth;
-            if (child.heightMode == 1) child.h = parentHeight;
-            if (child.view) {
-                child.view->setMeasuredDimension(child.w, child.h);
-                child.view->layout(child.x, child.y, child.x + child.w, child.y + child.h);
-            }
-            layoutNode(child, child.w, child.h);
-        }
-    }
-    if (node.view) {
-        node.view->setMeasuredDimension(node.w, node.h);
-        node.view->layout(node.x, node.y, node.x + node.w, node.y + node.h);
-    }
-}
-
-void LayoutInflater::resolveConstraints(std::vector<ConstraintNode>& nodes, int parentWidth, int parentHeight) {
-    size_t maxIterations = nodes.size();
-    
-    auto getNode = [&](uint32_t id) -> ConstraintNode* {
-        if (id == 0 || id == 0xFFFFFFFF) return nullptr;
-        for (auto& n : nodes) if (n.id == id) return &n;
-        return nullptr;
-    };
-    
-    for (size_t iter = 0; iter < maxIterations; ++iter) {
-        bool changed = false;
-        
-        for (auto& node : nodes) {
-            // Guideline Resolution
-            if (node.isGuideline) {
-                if (!node.resolvedX || !node.resolvedY) {
-                    if (node.isHorizontalGuide) {
-                        if (node.guidePercent >= 0) node.y = (int)(parentHeight * node.guidePercent);
-                        else if (node.guideBegin >= 0) node.y = node.guideBegin;
-                        else if (node.guideEnd >= 0) node.y = parentHeight - node.guideEnd;
-                        else node.y = 0;
-                        node.x = 0; node.w = parentWidth; node.h = 0;
-                    } else {
-                        if (node.guidePercent >= 0) node.x = (int)(parentWidth * node.guidePercent);
-                        else if (node.guideBegin >= 0) node.x = node.guideBegin;
-                        else if (node.guideEnd >= 0) node.x = parentWidth - node.guideEnd;
-                        else node.x = 0;
-                        node.y = 0; node.w = 0; node.h = parentHeight;
-                    }
-                    node.resolvedX = true; 
-                    node.resolvedY = true;
-                    changed = true;
-                }
-                continue;
-            }
-            
-            // X Resolution
-            if (!node.resolvedX) {
-                bool startReady = (node.startToStart == 0 || node.startToStart == 0xFFFFFFFF || (getNode(node.startToStart) && getNode(node.startToStart)->resolvedX)) &&
-                                  (node.startToEnd == 0 || node.startToEnd == 0xFFFFFFFF || (getNode(node.startToEnd) && getNode(node.startToEnd)->resolvedX));
-                bool endReady = (node.endToStart == 0 || node.endToStart == 0xFFFFFFFF || (getNode(node.endToStart) && getNode(node.endToStart)->resolvedX)) &&
-                                (node.endToEnd == 0 || node.endToEnd == 0xFFFFFFFF || (getNode(node.endToEnd) && getNode(node.endToEnd)->resolvedX));
-                                
-                if (startReady && endReady) {
-                    int startCoord = 0;
-                    bool hasStart = false;
-                    if (node.startToStart != 0xFFFFFFFF) {
-                        if (node.startToStart == 0) startCoord = 0;
-                        else if (auto t = getNode(node.startToStart)) startCoord = t->x;
-                        hasStart = true;
-                    } else if (node.startToEnd != 0xFFFFFFFF) {
-                        if (node.startToEnd == 0) startCoord = parentWidth; 
-                        else if (auto t = getNode(node.startToEnd)) startCoord = t->x + t->w;
-                        hasStart = true;
-                    }
-
-                    int endCoord = parentWidth;
-                    bool hasEnd = false;
-                    if (node.endToStart != 0xFFFFFFFF) {
-                        if (node.endToStart == 0) endCoord = 0;
-                        else if (auto t = getNode(node.endToStart)) endCoord = t->x;
-                        hasEnd = true;
-                    } else if (node.endToEnd != 0xFFFFFFFF) {
-                        if (node.endToEnd == 0) endCoord = parentWidth;
-                        else if (auto t = getNode(node.endToEnd)) endCoord = t->x + t->w;
-                        hasEnd = true;
-                    }
-                    
-                    if (node.widthMode == 2) { // MATCH_CONSTRAINT
-                        if (hasStart && hasEnd) node.w = max(0, endCoord - startCoord);
-                        else node.w = node.width;
-                    } else if (node.widthMode == 1) node.w = parentWidth; // MATCH_PARENT
-                    else node.w = node.width; // WRAP_CONTENT
-
-                    if (hasStart && hasEnd) {
-                        int available = (endCoord - startCoord) - node.w;
-                        node.x = startCoord + (int)(available * node.horizontalBias);
-                    } else if (hasStart) node.x = startCoord;
-                    else if (hasEnd) node.x = endCoord - node.w;
-                    else node.x = 0;
-                    
-                    node.resolvedX = true;
-                    changed = true;
-                }
-            }
-            
-            // Y Resolution
-            if (!node.resolvedY) {
-                bool topReady = (node.topToTop == 0 || node.topToTop == 0xFFFFFFFF || (getNode(node.topToTop) && getNode(node.topToTop)->resolvedY)) &&
-                                (node.topToBottom == 0 || node.topToBottom == 0xFFFFFFFF || (getNode(node.topToBottom) && getNode(node.topToBottom)->resolvedY));
-                bool bottomReady = (node.bottomToTop == 0 || node.bottomToTop == 0xFFFFFFFF || (getNode(node.bottomToTop) && getNode(node.bottomToTop)->resolvedY)) &&
-                                   (node.bottomToBottom == 0 || node.bottomToBottom == 0xFFFFFFFF || (getNode(node.bottomToBottom) && getNode(node.bottomToBottom)->resolvedY));
-                                
-                if (topReady && bottomReady) {
-                    int topCoord = 0;
-                    bool hasTop = false;
-                    if (node.topToTop != 0xFFFFFFFF) {
-                        if (node.topToTop == 0) topCoord = 0;
-                        else if (auto t = getNode(node.topToTop)) topCoord = t->y;
-                        hasTop = true;
-                    } else if (node.topToBottom != 0xFFFFFFFF) {
-                        if (node.topToBottom == 0) topCoord = parentHeight; 
-                        else if (auto t = getNode(node.topToBottom)) topCoord = t->y + t->h;
-                        hasTop = true;
-                    }
-
-                    int bottomCoord = parentHeight;
-                    bool hasBottom = false;
-                    if (node.bottomToTop != 0xFFFFFFFF) {
-                        if (node.bottomToTop == 0) bottomCoord = 0;
-                        else if (auto t = getNode(node.bottomToTop)) bottomCoord = t->y;
-                        hasBottom = true;
-                    } else if (node.bottomToBottom != 0xFFFFFFFF) {
-                        if (node.bottomToBottom == 0) bottomCoord = parentHeight;
-                        else if (auto t = getNode(node.bottomToBottom)) bottomCoord = t->y + t->h;
-                        hasBottom = true;
-                    }
-                    
-                    if (node.heightMode == 2) { // MATCH_CONSTRAINT
-                        if (hasTop && hasBottom) node.h = max(0, bottomCoord - topCoord);
-                        else node.h = node.height;
-                    } else if (node.heightMode == 1) node.h = parentHeight; // MATCH_PARENT
-                    else node.h = node.height; // WRAP_CONTENT
-
-                    if (hasTop && hasBottom) {
-                        int available = (bottomCoord - topCoord) - node.h;
-                        node.y = topCoord + (int)(available * node.verticalBias);
-                    } else if (hasTop) node.y = topCoord;
-                    else if (hasBottom) node.y = bottomCoord - node.h;
-                    else node.y = 0;
-                    
-                    node.resolvedY = true;
-                    changed = true;
-                }
-            }
-        }
-        
-        if (!changed) break; 
-    }
-    
-    for (auto& node : nodes) {
-        if (!node.resolvedX || !node.resolvedY) {
-            Logger::w("LayoutInflater", "Cycle or unresolved constraint for ID: " + std::to_string(node.id));
-            if (!node.resolvedX) { node.x = 0; node.w = node.width; node.resolvedX = true; }
-            if (!node.resolvedY) { node.y = 0; node.h = node.height; node.resolvedY = true; }
-        }
-        
-        if (node.view) {
-            Logger::d("LayoutInflater", "Layout ID " + std::to_string(node.id) + " -> x: " + std::to_string(node.x) + ", y: " + std::to_string(node.y) + ", w: " + std::to_string(node.w) + ", h: " + std::to_string(node.h));
-            node.view->setMeasuredDimension(node.w, node.h);
-            node.view->layout(node.x, node.y, node.x + node.w, node.y + node.h);
-        }
-    }
-}
+} // namespace windroid

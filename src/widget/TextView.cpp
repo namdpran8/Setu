@@ -6,7 +6,7 @@ namespace widget {
 
 TextView::TextView() {
     mTextPaint.setColor(0xFF000000); // Black by default
-    mTextPaint.setTextSize(14.0f);
+    mTextPaint.setTextSize(16.0f);
 }
 
 void TextView::setText(const std::wstring& text) {

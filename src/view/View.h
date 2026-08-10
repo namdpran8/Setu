@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <memory>
+#include <functional>
 #include "../graphics/Canvas.h"
 #include "../graphics/RenderNode.h"
 
@@ -11,11 +12,32 @@ class ViewGroup;
 
 class View {
 public:
+    static const int MATCH_PARENT = -1;
+    static const int WRAP_CONTENT = -2;
+
+    class LayoutParams {
+    public:
+        int width;
+        int height;
+        
+        // Margins
+        int leftMargin = 0;
+        int topMargin = 0;
+        int rightMargin = 0;
+        int bottomMargin = 0;
+
+        LayoutParams(int w, int h) : width(w), height(h) {}
+        virtual ~LayoutParams() = default;
+    };
+
     View();
     virtual ~View() = default;
 
     int getId() const { return mId; }
     void setId(int id) { mId = id; }
+
+    std::shared_ptr<LayoutParams> getLayoutParams() const { return mLayoutParams; }
+    void setLayoutParams(std::shared_ptr<LayoutParams> params) { mLayoutParams = params; }
 
     // Layout dimensions and positioning (relative to parent)
     int getLeft() const { return mLeft; }
@@ -52,6 +74,9 @@ public:
     virtual bool dispatchTouchEvent(class MotionEvent& event);
     virtual bool onTouchEvent(class MotionEvent& event);
 
+    void setOnClickListener(std::function<void()> listener) { mOnClickListener = listener; }
+    virtual void performClick() { if (mOnClickListener) mOnClickListener(); }
+
     // MeasureSpec constants
     static const int MEASURE_SPEC_UNSPECIFIED = 0 << 30;
     static const int MEASURE_SPEC_EXACTLY = 1 << 30;
@@ -87,6 +112,8 @@ protected:
     ViewGroup* mParent = nullptr;
 
     std::unique_ptr<graphics::RenderNode> mRenderNode;
+    std::function<void()> mOnClickListener;
+    std::shared_ptr<LayoutParams> mLayoutParams;
 };
 
 } // namespace view

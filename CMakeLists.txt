@@ -26,6 +26,10 @@ add_executable(winandroid_runtime
     "src/view/View.cpp"
     "src/view/ViewGroup.cpp"
     "src/view/Choreographer.cpp"
+    "src/view/LinearLayout.cpp"
+    "src/view/FrameLayout.cpp"
+    "src/view/RelativeLayout.cpp"
+    "src/view/ConstraintLayout.cpp"
     "src/widget/TextView.cpp"
     "src/widget/Button.cpp")
 

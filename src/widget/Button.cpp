@@ -1,26 +1,18 @@
 #include "Button.h"
 #include "../view/MotionEvent.h"
+#include <windows.h>
+#include "../ui/WindowManager.h"
 
 namespace windroid {
 namespace widget {
 
 Button::Button() {
-    // Default button styling
-    mBackgroundPaint.setColor(0xFFCCCCCC); // Light gray background
+    // Material Design Purple Button styling
+    mBackgroundPaint.setColor(0xFF6200EE); // Material Purple
     mBackgroundPaint.setStyle(graphics::Style::FILL);
     
     // Default text color for button
-    setTextColor(0xFF000000); // Black text
-}
-
-void Button::setOnClickListener(std::function<void()> listener) {
-    mOnClickListener = listener;
-}
-
-void Button::performClick() {
-    if (mOnClickListener) {
-        mOnClickListener();
-    }
+    setTextColor(0xFFFFFFFF); // White text
 }
 
 void Button::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -49,15 +41,17 @@ void Button::onDraw(graphics::Canvas& canvas) {
 
 bool Button::onTouchEvent(view::MotionEvent& event) {
     if (event.getAction() == view::MotionEvent::Action::DOWN) {
-        mBackgroundPaint.setColor(0xFF999999); // Darker gray when pressed
-        // Ideally we'd call invalidate() here to trigger a redraw
+        mBackgroundPaint.setColor(0xFF3700B3); // Darker purple when pressed
+        InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
         return true;
     } else if (event.getAction() == view::MotionEvent::Action::UP) {
-        mBackgroundPaint.setColor(0xFFCCCCCC); // Restore original color
+        mBackgroundPaint.setColor(0xFF6200EE); // Restore original purple
+        InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
         performClick();
         return true;
     } else if (event.getAction() == view::MotionEvent::Action::CANCEL) {
-        mBackgroundPaint.setColor(0xFFCCCCCC); // Restore original color
+        mBackgroundPaint.setColor(0xFF6200EE); // Restore original purple
+        InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
         return true;
     }
     return false;

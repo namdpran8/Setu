@@ -58,23 +58,5 @@ protected:
     std::vector<std::shared_ptr<View>> mChildren;
 };
 
-// We will also provide a basic LinearLayout as it's heavily used.
-class LinearLayout : public ViewGroup {
-public:
-    enum class Orientation {
-        HORIZONTAL,
-        VERTICAL
-    };
-
-    void setOrientation(Orientation orientation) { mOrientation = orientation; }
-    Orientation getOrientation() const { return mOrientation; }
-
-    void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
-    void onLayout(bool changed, int l, int t, int r, int b) override;
-
-private:
-    Orientation mOrientation = Orientation::VERTICAL;
-};
-
 } // namespace view
 } // namespace windroid

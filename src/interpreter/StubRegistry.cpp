@@ -123,7 +123,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                             GetClientRect(WindowManager::getMainWindow(), &rect);
                             int pW = rect.right > 0 ? rect.right : 400;
                             int pH = rect.bottom > 0 ? rect.bottom : 800;
-                            auto rootView = LayoutInflater::inflate(root, m_resManager, pW, pH);
+                            auto rootView = windroid::LayoutInflater::inflate(root, m_resManager);
                             WindowManager::setRootView(rootView);
                         }
                     }
@@ -394,7 +394,7 @@ void StubRegistry::registerViewStubs() {
                             GetClientRect(WindowManager::getMainWindow(), &rect);
                             int pW = rect.right > 0 ? rect.right : 400;
                             int pH = rect.bottom > 0 ? rect.bottom : 800;
-                            auto rootView = LayoutInflater::inflate(root, m_resManager, pW, pH);
+                            auto rootView = windroid::LayoutInflater::inflate(root, m_resManager);
                             WindowManager::setRootView(rootView);
                             
                             InterpreterObject* viewObj = new InterpreterObject();
