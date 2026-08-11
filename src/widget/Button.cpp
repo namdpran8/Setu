@@ -1,11 +1,31 @@
 #include "Button.h"
 #include "../view/MotionEvent.h"
 #include <windows.h>
+#include "../ui/TypedArray.h"
 #include "../ui/WindowManager.h"
 #include "../utils/Logger.h"
 
 namespace windroid {
 namespace widget {
+
+Button::Button(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes)
+    : TextView(resManager, theme, node, defStyleAttr, defStyleRes) {
+    
+    mBackgroundPaint.setColor(0xFF6200EE); // Material Purple
+    mBackgroundPaint.setStyle(graphics::Style::FILL);
+    setTextColor(0xFFFFFFFF); // White text
+
+    if (resManager) {
+        // Mock styleables (Android framework IDs for android:background)
+        static const uint32_t attr_background = 0x010100d4;
+        
+        std::vector<uint32_t> styleables = { attr_background };
+        TypedArray a(resManager, styleables);
+        a.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
+        
+        if (a.hasValue(0)) mBackgroundPaint.setColor(a.getColor(0, 0xFF6200EE));
+    }
+}
 
 Button::Button() {
     // Material Design Purple Button styling

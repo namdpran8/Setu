@@ -22,6 +22,9 @@ public:
     // Gets a string value by resource ID (same as getResourcePath, but named appropriately)
     std::string getString(uint32_t resId) const;
 
+    // Get a complex bag (style/theme) by resource ID
+    const ArscParser::Bag* getBag(uint32_t resId) const;
+
 private:
     ApkExtractor* m_extractor;
     ArscParser m_arscParser;

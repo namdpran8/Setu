@@ -8,6 +8,13 @@
 namespace windroid {
 namespace view {
 
+View::View(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes) {
+    // In a real implementation, we would extract View's styleables here (e.g. layout_width, layout_height, visibility, id)
+    // using TypedArray ta(resManager, { R::styleable::View_id, R::styleable::View_visibility, ... });
+    // ta.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
+    // setId(ta.getInt(0, 0));
+}
+
 View::View() {}
 
 void View::measure(int widthMeasureSpec, int heightMeasureSpec) {

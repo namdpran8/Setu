@@ -7,6 +7,7 @@
 
 struct AxmlAttribute {
     std::string name;
+    uint32_t nameResId; // The Resource ID of this attribute (e.g., 0x010100f4 for layout_width)
     std::string rawValue; // For string types
     uint32_t typedValueData;
     uint8_t typedValueType;
@@ -35,8 +36,12 @@ public:
 private:
     // We will store all the parsed strings here so we can look them up later
     std::vector<std::string> m_stringPool;
+    // Map from string pool index to global Resource ID
+    std::vector<uint32_t> m_resourceMap;
     std::unique_ptr<AxmlNode> m_root;
     
     // Internal helper function to read the string pool chunk
     bool parseStringPool(const uint8_t* chunkStart);
+    // Internal helper function to read the resource map chunk
+    bool parseResourceMap(const uint8_t* chunkStart);
 };

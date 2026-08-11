@@ -8,6 +8,7 @@ namespace widget {
 
 class TextView : public view::View {
 public:
+    TextView(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes);
     TextView();
     virtual ~TextView() = default;
 

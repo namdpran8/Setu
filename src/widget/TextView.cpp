@@ -1,11 +1,43 @@
 #include "TextView.h"
 #include <algorithm>
 #include <cmath>
+#include <windows.h>
 #include "../ui/WindowManager.h"
+#include "../ui/TypedArray.h"
 #include <wrl/client.h>
 
 namespace windroid {
 namespace widget {
+
+static std::wstring utf8_to_utf16(const std::string& utf8) {
+    if (utf8.empty()) return std::wstring();
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, &utf8[0], (int)utf8.size(), NULL, 0);
+    std::wstring wstrTo(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, &utf8[0], (int)utf8.size(), &wstrTo[0], size_needed);
+    return wstrTo;
+}
+
+TextView::TextView(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes)
+    : View(resManager, theme, node, defStyleAttr, defStyleRes) {
+    
+    mTextPaint.setColor(0xFF000000); // Black by default
+    mTextPaint.setTextSize(16.0f);
+
+    if (resManager) {
+        // Mock styleables (Android framework IDs for android:text, android:textSize, android:textColor)
+        static const uint32_t attr_text = 0x0101014f;
+        static const uint32_t attr_textSize = 0x01010095;
+        static const uint32_t attr_textColor = 0x01010098;
+        
+        std::vector<uint32_t> styleables = { attr_text, attr_textSize, attr_textColor };
+        TypedArray a(resManager, styleables);
+        a.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
+        
+        if (a.hasValue(0)) setText(utf8_to_utf16(a.getString(0)));
+        if (a.hasValue(1)) setTextSize((float)a.getDimensionPixelSize(1, 16));
+        if (a.hasValue(2)) setTextColor(a.getColor(2, 0xFF000000));
+    }
+}
 
 TextView::TextView() {
     mTextPaint.setColor(0xFF000000); // Black by default

@@ -91,6 +91,14 @@ void ArscParser::parsePackage(const uint8_t* ptr) {
     
     Logger::d("ArscParser", "Parsing package ID: " + std::to_string(packageId));
     
+    // Parse Type and Key String pools
+    if (pkgHeader->typeStrings > 0) {
+        parseStringPool(ptr + pkgHeader->typeStrings, m_typeStrings);
+    }
+    if (pkgHeader->keyStrings > 0) {
+        parseStringPool(ptr + pkgHeader->keyStrings, m_keyStrings);
+    }
+    
     const uint8_t* chunkPtr = ptr + pkgHeader->header.headerSize;
     uint32_t bytesRemaining = pkgHeader->header.size - pkgHeader->header.headerSize;
     
@@ -118,6 +126,17 @@ void ArscParser::parsePackage(const uint8_t* ptr) {
                             uint32_t resId = (packageId << 24) | (typeId << 16) | entryIndex;
                             m_resourceStringPoolIndices[resId] = value->data;
                         }
+                    } else { // FLAG_COMPLEX
+                        const ResTable_map_entry* mapEntry = reinterpret_cast<const ResTable_map_entry*>(entryHeader);
+                        uint32_t resId = (packageId << 24) | (typeId << 16) | entryIndex;
+                        
+                        Bag bag;
+                        bag.parentResId = mapEntry->parent;
+                        
+                        const ResTable_map* mapStart = reinterpret_cast<const ResTable_map*>(entryPtr + mapEntry->size);
+                        bag.maps.assign(mapStart, mapStart + mapEntry->count);
+                        
+                        m_bags[resId] = bag;
                     }
                 }
             }
@@ -137,4 +156,12 @@ std::string ArscParser::resolveStringValue(uint32_t resId) const {
         }
     }
     return "";
+}
+
+const ArscParser::Bag* ArscParser::getBag(uint32_t resId) const {
+    auto it = m_bags.find(resId);
+    if (it != m_bags.end()) {
+        return &it->second;
+    }
+    return nullptr;
 }

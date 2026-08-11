@@ -60,8 +60,9 @@ bool AxmlParser::parse(const std::vector<uint8_t>& axmlBuffer) {
         // Safety check to prevent infinite loops on corrupted files
         if (chunk->size == 0) break;
 
-        // 0x0102 is the magic number for RES_XML_START_ELEMENT_TYPE (e.g. <manifest>, <activity>)
-        if (chunk->type == 0x0102) {
+        if (chunk->type == 0x0180) { // RES_XML_RESOURCE_MAP_TYPE
+            parseResourceMap(currentPtr);
+        } else if (chunk->type == 0x0102) {
             
             // The node header is right at the start of this chunk
             const ResXMLTree_node* node = reinterpret_cast<const ResXMLTree_node*>(currentPtr);
@@ -90,9 +91,14 @@ bool AxmlParser::parse(const std::vector<uint8_t>& axmlBuffer) {
                 const ResXMLTree_attribute* attr = reinterpret_cast<const ResXMLTree_attribute*>(attrPtr);
                 
                 string attrName = (attr->name != 0xFFFFFFFF) ? m_stringPool[attr->name] : "UNKNOWN";
+                uint32_t attrResId = 0;
+                if (attr->name != 0xFFFFFFFF && attr->name < m_resourceMap.size()) {
+                    attrResId = m_resourceMap[attr->name];
+                }
                 
                 AxmlAttribute a;
                 a.name = attrName;
+                a.nameResId = attrResId;
                 a.rawValue = (attr->rawValue != 0xFFFFFFFF) ? m_stringPool[attr->rawValue] : "";
                 a.typedValueType = attr->typedValue_dataType;
                 a.typedValueData = attr->typedValue_data;
@@ -205,5 +211,23 @@ bool AxmlParser::parseStringPool(const uint8_t* chunkStart) {
         }
     }
 
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// Helper to parse the resource map chunk
+// -----------------------------------------------------------------------------
+bool AxmlParser::parseResourceMap(const uint8_t* chunkStart) {
+    const ResChunk_header* header = reinterpret_cast<const ResChunk_header*>(chunkStart);
+    if (header->type != 0x0180) {
+        Logger::e("AxmlParser", "Expected Resource Map chunk, but got type: " + std::to_string(header->type));
+        return false;
+    }
+
+    uint32_t count = (header->size - header->headerSize) / sizeof(uint32_t);
+    const uint32_t* ids = reinterpret_cast<const uint32_t*>(chunkStart + header->headerSize);
+    
+    m_resourceMap.assign(ids, ids + count);
+    Logger::d("AxmlParser", "Parsed Resource Map with " + std::to_string(count) + " entries.");
     return true;
 }

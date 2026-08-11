@@ -22,12 +22,12 @@ static std::wstring utf8_to_utf16(const std::string& utf8) {
     return wstrTo;
 }
 
-std::shared_ptr<windroid::view::View> LayoutInflater::inflate(const AxmlNode* node, ResourceManager* resManager) {
+std::shared_ptr<windroid::view::View> LayoutInflater::inflate(const AxmlNode* node, ResourceManager* resManager, Theme* theme) {
     if (!node) return nullptr;
-    return inflateRecursive(node, resManager);
+    return inflateRecursive(node, resManager, theme);
 }
 
-std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const AxmlNode* node, ResourceManager* resManager) {
+std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const AxmlNode* node, ResourceManager* resManager, Theme* theme) {
     std::string tag = node->tag;
     std::shared_ptr<windroid::view::View> view = nullptr;
 
@@ -69,45 +69,24 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
     } else if (tag.find("RelativeLayout") != std::string::npos) {
         view = std::make_shared<windroid::view::RelativeLayout>();
     } else if (tag.find("TextView") != std::string::npos) {
-        auto tv = std::make_shared<windroid::widget::TextView>();
-        for (const auto& attr : node->attributes) {
-            if (attr.name == "text") {
-                tv->setText(utf8_to_utf16(resolveString(attr, resManager)));
-            } else if (attr.name == "textSize") {
-                tv->setTextSize((float)parseDimension(resolveString(attr, resManager)));
-            } else if (attr.name == "textColor") {
-                // Simplistic color parsing
-                uint32_t color = 0xFF000000;
-                if (attr.typedValueType >= 0x1c && attr.typedValueType <= 0x1f) {
-                    color = attr.typedValueData;
-                }
-                tv->setTextColor(color);
-            }
-        }
-        view = tv;
+        view = std::make_shared<windroid::widget::TextView>(resManager, theme, node, 0, 0);
     } else if (tag.find("Button") != std::string::npos) {
-        auto btn = std::make_shared<windroid::widget::Button>();
-        for (const auto& attr : node->attributes) {
-            if (attr.name == "text") {
-                btn->setText(utf8_to_utf16(resolveString(attr, resManager)));
-            }
-        }
-        view = btn;
+        view = std::make_shared<windroid::widget::Button>(resManager, theme, node, 0, 0);
     } else if (tag.find("EditText") != std::string::npos) {
-        auto et = std::make_shared<windroid::widget::EditText>();
-        for (const auto& attr : node->attributes) {
-            if (attr.name == "text" || attr.name == "hint") {
-                et->setText(utf8_to_utf16(resolveString(attr, resManager)));
-            }
-        }
-        view = et;
+        view = std::make_shared<windroid::widget::EditText>(resManager, theme, node, 0, 0);
     } else if (tag.find("Guideline") != std::string::npos || tag.find("Space") != std::string::npos || tag == "View" || tag == "android.view.View") {
-        view = std::make_shared<windroid::view::View>();
+        view = std::make_shared<windroid::view::View>(resManager, theme, node, 0, 0);
     } else if (tag.find("HorizontalScrollView") != std::string::npos) {
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
         view = ll;
     } else if (tag.find("RecyclerView") != std::string::npos || tag.find("ScrollView") != std::string::npos) {
+        auto ll = std::make_shared<windroid::view::LinearLayout>();
+        ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
+        view = ll;
+    } else if (tag.find("SlidingUpPanelLayout") != std::string::npos) {
+        // Fallback: Use Vertical LinearLayout so the main content takes the screen
+        // and the sliding panel is pushed down off-screen (since main content is match_parent).
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
         view = ll;
@@ -118,13 +97,13 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
         view = std::make_shared<windroid::view::FrameLayout>();
     }
 
-    parseViewAttributes(node, view, resManager);
+    parseViewAttributes(node, view, resManager, theme);
 
     // Parse children if it is a ViewGroup
     auto viewGroup = std::dynamic_pointer_cast<windroid::view::ViewGroup>(view);
     if (viewGroup) {
         for (const auto& childNode : node->children) {
-            auto childView = inflateRecursive(childNode.get(), resManager);
+            auto childView = inflateRecursive(childNode.get(), resManager, theme);
             if (childView) {
                 parseLayoutParams(childNode.get(), childView, viewGroup);
                 viewGroup->addView(childView);
@@ -173,7 +152,7 @@ int LayoutInflater::parseComplexDimension(uint32_t data) {
     return value; // px or others
 }
 
-void LayoutInflater::parseViewAttributes(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, ResourceManager* resManager) {
+void LayoutInflater::parseViewAttributes(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, ResourceManager* resManager, Theme* theme) {
     for (const auto& attr : node->attributes) {
         if (attr.name == "id") {
             view->setId(attr.typedValueData);

@@ -2,10 +2,34 @@
 #include "../view/MotionEvent.h"
 #include "../ui/WindowManager.h"
 
+#include "../ui/TypedArray.h"
 #include "../view/KeyEvent.h"
 
 namespace windroid {
 namespace widget {
+
+EditText::EditText(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes)
+    : TextView(resManager, theme, node, defStyleAttr, defStyleRes) {
+    
+    mBackgroundPaint.setColor(0xFFF5F5F5); // Light Gray background
+    mBackgroundPaint.setStyle(graphics::Style::FILL);
+    
+    mLinePaint.setColor(0xFF6200EE); // Purple underline
+    mLinePaint.setStrokeWidth(2.0f);
+    mLinePaint.setStyle(graphics::Style::STROKE);
+
+    setTextColor(0xFF000000); 
+
+    if (resManager) {
+        // Just mock parsing background color here too
+        static const uint32_t attr_background = 0x010100d4;
+        std::vector<uint32_t> styleables = { attr_background };
+        TypedArray a(resManager, styleables);
+        a.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
+        
+        if (a.hasValue(0)) mBackgroundPaint.setColor(a.getColor(0, 0xFFF5F5F5));
+    }
+}
 
 EditText::EditText() {
     // Material Design EditText styling

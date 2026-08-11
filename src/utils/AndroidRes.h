@@ -76,6 +76,16 @@ struct Res_value {
     uint32_t data;
 };
 
+struct ResTable_map_entry : public ResTable_entry {
+    uint32_t parent;
+    uint32_t count;
+};
+
+struct ResTable_map {
+    uint32_t name;
+    Res_value value;
+};
+
 // --- AXML Specific Structs ---
 
 struct ResXMLTree_node {

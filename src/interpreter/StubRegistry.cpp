@@ -12,6 +12,22 @@ ResourceManager* StubRegistry::m_resManager = nullptr;
 MultiDexManager* StubRegistry::m_multiDexManager = nullptr;
 std::unordered_map<int, InterpreterObject*> StubRegistry::clickListeners;
 
+static std::wstring utf8_to_utf16(const std::string& utf8) {
+    if (utf8.empty()) return std::wstring();
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, &utf8[0], (int)utf8.size(), NULL, 0);
+    std::wstring utf16(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, &utf8[0], (int)utf8.size(), &utf16[0], size_needed);
+    return utf16;
+}
+
+static std::string utf16_to_utf8(const std::wstring& utf16) {
+    if (utf16.empty()) return std::string();
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, &utf16[0], (int)utf16.size(), NULL, 0, NULL, NULL);
+    std::string utf8(size_needed, 0);
+    WideCharToMultiByte(CP_UTF8, 0, &utf16[0], (int)utf16.size(), &utf8[0], size_needed, NULL, NULL);
+    return utf8;
+}
+
 void StubRegistry::init(ResourceManager* resManager, MultiDexManager* multiDexManager) {
     m_resManager = resManager;
     m_multiDexManager = multiDexManager;
@@ -409,6 +425,48 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/view/ViewGroup;->removeAllViews()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         return false;
     };
+
+    stubs["Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::OBJECT && args[1].obj) {
+                InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+                windroid::widget::TextView* view = (windroid::widget::TextView*)viewObj->nativeHandle;
+                InterpreterObject* strObj = (InterpreterObject*)args[1].obj;
+                
+                std::string strVal;
+                if (strObj->className == "Ljava/lang/String;" && strObj->fields.count("string_value")) {
+                    strVal = ((InterpreterObject*)strObj->fields["string_value"].obj)->className;
+                } else {
+                    strVal = strObj->className; // Fallback to class name if it's a raw string wrapper
+                }
+                
+                if (view && !strVal.empty()) {
+                    view->setText(utf8_to_utf16(strVal));
+                    Logger::d("StubRegistry", "TextView.setText: " + strVal);
+                }
+            }
+            return false;
+        };
+        
+    stubs["Landroid/widget/TextView;->getText()Ljava/lang/CharSequence;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 1 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+                windroid::widget::TextView* view = (windroid::widget::TextView*)viewObj->nativeHandle;
+                if (view) {
+                    std::string strVal = utf16_to_utf8(view->getText());
+                    InterpreterObject* strObj = new InterpreterObject();
+                    strObj->className = "Ljava/lang/String;";
+                    InterpreterObject* inner = new InterpreterObject();
+                    inner->className = strVal;
+                    strObj->fields["string_value"] = Value::MakeObject(inner);
+                    if (outReturn) *outReturn = Value::MakeObject(strObj);
+                    return false;
+                }
+            }
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        };
 
     stubs["Landroid/widget/RelativeLayout$LayoutParams;-><init>(II)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool { return false; };
     stubs["Landroid/widget/RelativeLayout$LayoutParams;->addRule(II)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool { return false; };

@@ -1,16 +1,25 @@
 #pragma once
-#include <string>
 #include <memory>
+#include <string>
+#include <vector>
 #include <functional>
 #include "../graphics/Canvas.h"
 #include "../graphics/RenderNode.h"
+#include "MotionEvent.h"
+#include "KeyEvent.h"
+
+// Forward declare Context/Theme so we don't need a heavy include
+class ResourceManager;
+struct AxmlNode;
 
 namespace windroid {
+class Theme;
+class TypedArray;
 namespace view {
 
 class ViewGroup;
 
-class View {
+class View : public std::enable_shared_from_this<View> {
 public:
     static const int MATCH_PARENT = -1;
     static const int WRAP_CONTENT = -2;
@@ -33,6 +42,7 @@ public:
         virtual ~LayoutParams() = default;
     };
 
+    View(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes);
     View();
     virtual ~View() = default;
 

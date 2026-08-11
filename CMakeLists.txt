@@ -19,6 +19,8 @@ add_executable(winandroid_runtime
     "src/interpreter/Interpreter.cpp"
     "src/interpreter/StubRegistry.cpp"
     "src/ui/WindowManager.cpp"
+    "src/ui/Theme.cpp"
+    "src/ui/TypedArray.cpp"
     "src/ui/LayoutInflater.cpp"
     "src/graphics/Paint.cpp"
     "src/graphics/Direct2DCanvas.cpp"
