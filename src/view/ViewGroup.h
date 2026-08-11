@@ -55,6 +55,7 @@ public:
     bool dispatchKeyEvent(const KeyEvent& event) override;
 
     virtual std::shared_ptr<View::LayoutParams> generateLayoutParams(const AxmlNode* node);
+    static void parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, const AxmlNode* node);
 
 protected:
     void measureChild(std::shared_ptr<View> child, int parentWidthMeasureSpec, int parentHeightMeasureSpec);

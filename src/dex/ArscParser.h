@@ -23,7 +23,10 @@ public:
     // Get a complex bag by resource ID
     const Bag* getBag(uint32_t resId) const;
 
+    uint8_t getPackageId() const { return m_packageId; }
+
 private:
+    uint8_t m_packageId = 0;
     void parseStringPool(const uint8_t* ptr, std::vector<std::string>& outStrings);
     void parsePackage(const uint8_t* ptr);
 

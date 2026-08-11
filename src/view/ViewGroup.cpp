@@ -1,6 +1,7 @@
 #include "ViewGroup.h"
 #include <algorithm>
 #include "MotionEvent.h"
+#include "../AxmlPraserer/AxmlParser.h"
 
 namespace windroid {
 namespace view {
@@ -25,8 +26,10 @@ void ViewGroup::onDraw(graphics::Canvas& canvas) {
 
 void ViewGroup::dispatchDraw(graphics::Canvas& canvas) {
     for (auto& child : mChildren) {
-        child->updateRenderNode();
-        canvas.drawRenderNode(child->getRenderNode());
+        if (child->getVisibility() == View::VISIBLE) {
+            child->updateRenderNode();
+            canvas.drawRenderNode(child->getRenderNode());
+        }
     }
 }
 
@@ -140,8 +143,47 @@ void ViewGroup::measureChildWithMargins(std::shared_ptr<View> child,
     child->measure(childWidthMeasureSpec, childHeightMeasureSpec);
 }
 
+void ViewGroup::parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, const AxmlNode* node) {
+    if (!node || !lp) return;
+    for (const auto& attr : node->attributes) {
+        if (attr.name == "layout_width") {
+            if (attr.typedValueType == 0x03) { // STRING
+                if (attr.rawValue == "match_parent" || attr.rawValue == "fill_parent") lp->width = View::MATCH_PARENT;
+                else if (attr.rawValue == "wrap_content") lp->width = View::WRAP_CONTENT;
+            } else if (attr.typedValueType == 0x10 || attr.typedValueType == 0x11) { // INT
+                if ((int)attr.typedValueData == -1) lp->width = View::MATCH_PARENT;
+                else if ((int)attr.typedValueData == -2) lp->width = View::WRAP_CONTENT;
+                else lp->width = attr.typedValueData;
+            } else if (attr.typedValueType == 0x05) { // DIMENSION
+                lp->width = attr.typedValueData; // Raw for now, should map px
+            }
+        } else if (attr.name == "layout_height") {
+            if (attr.typedValueType == 0x03) { 
+                if (attr.rawValue == "match_parent" || attr.rawValue == "fill_parent") lp->height = View::MATCH_PARENT;
+                else if (attr.rawValue == "wrap_content") lp->height = View::WRAP_CONTENT;
+            } else if (attr.typedValueType == 0x10 || attr.typedValueType == 0x11) { // INT
+                if ((int)attr.typedValueData == -1) lp->height = View::MATCH_PARENT;
+                else if ((int)attr.typedValueData == -2) lp->height = View::WRAP_CONTENT;
+                else lp->height = attr.typedValueData;
+            } else if (attr.typedValueType == 0x05) { // DIMENSION
+                lp->height = attr.typedValueData;
+            }
+        } else if (attr.name == "layout_marginLeft" || attr.name == "layout_marginStart") {
+            lp->leftMargin = attr.typedValueData;
+        } else if (attr.name == "layout_marginRight" || attr.name == "layout_marginEnd") {
+            lp->rightMargin = attr.typedValueData;
+        } else if (attr.name == "layout_marginTop") {
+            lp->topMargin = attr.typedValueData;
+        } else if (attr.name == "layout_marginBottom") {
+            lp->bottomMargin = attr.typedValueData;
+        }
+    }
+}
+
 std::shared_ptr<View::LayoutParams> ViewGroup::generateLayoutParams(const AxmlNode* node) {
-    return std::make_shared<View::LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
+    auto lp = std::make_shared<View::LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
+    parseBaseLayoutParams(lp, node);
+    return lp;
 }
 
 void ViewGroup::dump(int depth) {

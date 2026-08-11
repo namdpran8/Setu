@@ -11,9 +11,10 @@ namespace widget {
 Button::Button(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes)
     : TextView(resManager, theme, node, defStyleAttr, defStyleRes) {
     
-    mBackgroundPaint.setColor(0xFF6200EE); // Material Purple
+    mGravity = 0x11; // Gravity::CENTER by default for Button
+
+    mBackgroundPaint.setColor(0xFFDDDDDD); // Light gray default
     mBackgroundPaint.setStyle(graphics::Style::FILL);
-    setTextColor(0xFFFFFFFF); // White text
 
     if (resManager) {
         // Mock styleables (Android framework IDs for android:background)
@@ -23,7 +24,7 @@ Button::Button(ResourceManager* resManager, Theme* theme, const struct AxmlNode*
         TypedArray a(resManager, styleables);
         a.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
         
-        if (a.hasValue(0)) mBackgroundPaint.setColor(a.getColor(0, 0xFF6200EE));
+        if (a.hasValue(0)) mBackgroundPaint.setColor(a.getColor(0, 0xFFDDDDDD));
     }
 }
 
@@ -55,8 +56,8 @@ void Button::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 }
 
 void Button::onDraw(graphics::Canvas& canvas) {
-    // Draw button background
-    canvas.drawRoundRect(0, 0, (float)getWidth(), (float)getHeight(), 8.0f, 8.0f, mBackgroundPaint);
+    // Draw button background (use drawRect instead of drawRoundRect to prevent sparkles when buttons are adjacent without margins)
+    canvas.drawRect(0, 0, (float)getWidth(), (float)getHeight(), mBackgroundPaint);
     
     // Adjust canvas for padding before drawing text
     canvas.save();

@@ -88,6 +88,7 @@ bool ArscParser::parse(const std::vector<uint8_t>& buffer) {
 void ArscParser::parsePackage(const uint8_t* ptr) {
     const ResTable_package* pkgHeader = reinterpret_cast<const ResTable_package*>(ptr);
     uint32_t packageId = pkgHeader->id;
+    m_packageId = (uint8_t)packageId;
     
     Logger::d("ArscParser", "Parsing package ID: " + std::to_string(packageId));
     
@@ -109,34 +110,64 @@ void ArscParser::parsePackage(const uint8_t* ptr) {
             const ResTable_type* typeHeader = reinterpret_cast<const ResTable_type*>(chunkPtr);
             uint32_t typeId = typeHeader->id;
             
-            const uint32_t* offsets = reinterpret_cast<const uint32_t*>(chunkPtr + typeHeader->header.headerSize);
+            const uint8_t* indices = chunkPtr + typeHeader->header.headerSize;
             const uint8_t* entriesStart = chunkPtr + typeHeader->entriesStart;
+            bool isSparse = (typeHeader->flags & 0x01) != 0;
+            bool isOffset16 = (typeHeader->flags & 0x02) != 0;
+            const uint8_t* chunkEnd = chunkPtr + chunkHeader->size;
             
-            for (uint32_t entryIndex = 0; entryIndex < typeHeader->entryCount; ++entryIndex) {
-                if (offsets[entryIndex] != 0xFFFFFFFF) {
-                    const uint8_t* entryPtr = entriesStart + offsets[entryIndex];
-                    const ResTable_entry* entryHeader = reinterpret_cast<const ResTable_entry*>(entryPtr);
+            for (uint32_t i = 0; i < typeHeader->entryCount; ++i) {
+                uint32_t entryIndex;
+                uint32_t offset;
+                
+                if (isSparse) {
+                    const ResTable_sparseTypeEntry* sparseIndices = reinterpret_cast<const ResTable_sparseTypeEntry*>(indices);
+                    entryIndex = sparseIndices[i].idx;
+                    offset = sparseIndices[i].offset;
+                    if (offset != 0xFFFF) offset *= 4;
+                } else {
+                    entryIndex = i;
+                    if (isOffset16) {
+                        const uint16_t* indices16 = reinterpret_cast<const uint16_t*>(indices);
+                        offset = indices16[i];
+                        if (offset != 0xFFFF) offset *= 4;
+                    } else {
+                        const uint32_t* indices32 = reinterpret_cast<const uint32_t*>(indices);
+                        offset = indices32[i];
+                    }
+                }
+                
+                if (offset != 0xFFFFFFFF && offset != 0xFFFF) {
+                    const uint8_t* entryPtr = entriesStart + offset;
                     
-                    // Simple entry (no FLAG_COMPLEX)
-                    if ((entryHeader->flags & 0x0001) == 0) {
-                        const Res_value* value = reinterpret_cast<const Res_value*>(entryPtr + entryHeader->size);
+                    // Simple bounds check
+                    if (entryPtr + sizeof(ResTable_entry) <= chunkEnd) {
+                        const ResTable_entry* entryHeader = reinterpret_cast<const ResTable_entry*>(entryPtr);
                         
-                        // If it's a string reference
-                        if (value->dataType == 0x03) {
-                            uint32_t resId = (packageId << 24) | (typeId << 16) | entryIndex;
-                            m_resourceStringPoolIndices[resId] = value->data;
+                        // Simple entry (no FLAG_COMPLEX)
+                        if ((entryHeader->flags & 0x0001) == 0) {
+                            if (entryPtr + entryHeader->size + sizeof(Res_value) <= chunkEnd) {
+                                const Res_value* value = reinterpret_cast<const Res_value*>(entryPtr + entryHeader->size);
+                                if (value->dataType == 0x03) {
+                                    uint32_t resId = (packageId << 24) | (typeId << 16) | entryIndex;
+                                    m_resourceStringPoolIndices[resId] = value->data;
+                                }
+                            }
+                        } else { // FLAG_COMPLEX
+                            if (entryPtr + sizeof(ResTable_map_entry) <= chunkEnd) {
+                                const ResTable_map_entry* mapEntry = reinterpret_cast<const ResTable_map_entry*>(entryHeader);
+                                uint32_t resId = (packageId << 24) | (typeId << 16) | entryIndex;
+                                
+                                Bag bag;
+                                bag.parentResId = mapEntry->parent;
+                                
+                                const ResTable_map* mapStart = reinterpret_cast<const ResTable_map*>(entryPtr + mapEntry->size);
+                                if (reinterpret_cast<const uint8_t*>(mapStart + mapEntry->count) <= chunkEnd) {
+                                    bag.maps.assign(mapStart, mapStart + mapEntry->count);
+                                    m_bags[resId] = bag;
+                                }
+                            }
                         }
-                    } else { // FLAG_COMPLEX
-                        const ResTable_map_entry* mapEntry = reinterpret_cast<const ResTable_map_entry*>(entryHeader);
-                        uint32_t resId = (packageId << 24) | (typeId << 16) | entryIndex;
-                        
-                        Bag bag;
-                        bag.parentResId = mapEntry->parent;
-                        
-                        const ResTable_map* mapStart = reinterpret_cast<const ResTable_map*>(entryPtr + mapEntry->size);
-                        bag.maps.assign(mapStart, mapStart + mapEntry->count);
-                        
-                        m_bags[resId] = bag;
                     }
                 }
             }

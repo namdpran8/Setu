@@ -177,6 +177,7 @@ void LinearLayout::onLayout(bool changed, int l, int t, int r, int b) {
 std::shared_ptr<View::LayoutParams> LinearLayout::generateLayoutParams(const AxmlNode* node) {
     auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
     if (!node) return lp;
+    ViewGroup::parseBaseLayoutParams(lp, node);
     for (const auto& attr : node->attributes) {
         if (attr.name == "layout_weight") {
             union { uint32_t i; float f; } u;

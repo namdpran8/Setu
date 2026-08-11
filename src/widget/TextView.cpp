@@ -22,20 +22,23 @@ TextView::TextView(ResourceManager* resManager, Theme* theme, const struct AxmlN
     
     mTextPaint.setColor(0xFF000000); // Black by default
     mTextPaint.setTextSize(16.0f);
+    mGravity = 0x33;
 
     if (resManager) {
-        // Mock styleables (Android framework IDs for android:text, android:textSize, android:textColor)
+        // Mock styleables (Android framework IDs for android:text, android:textSize, android:textColor, android:gravity)
         static const uint32_t attr_text = 0x0101014f;
         static const uint32_t attr_textSize = 0x01010095;
         static const uint32_t attr_textColor = 0x01010098;
+        static const uint32_t attr_gravity = 0x010100af;
         
-        std::vector<uint32_t> styleables = { attr_text, attr_textSize, attr_textColor };
+        std::vector<uint32_t> styleables = { attr_text, attr_textSize, attr_textColor, attr_gravity };
         TypedArray a(resManager, styleables);
         a.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
         
         if (a.hasValue(0)) setText(utf8_to_utf16(a.getString(0)));
         if (a.hasValue(1)) setTextSize((float)a.getDimensionPixelSize(1, 16));
         if (a.hasValue(2)) setTextColor(a.getColor(2, 0xFF000000));
+        if (a.hasValue(3)) mGravity = a.getInt(3, 0x33);
     }
 }
 
@@ -124,14 +127,18 @@ void TextView::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 }
 
 void TextView::onDraw(graphics::Canvas& canvas) {
-    // TODO: Add a debug mode in the future to toggle bounds visibility
-    // graphics::Paint redPaint;
-    // redPaint.setColor(0xFFFF0000); // Red
-    // redPaint.setStyle(graphics::Style::FILL);
-    // canvas.drawRect(0, 0, 50, 50, redPaint);
-
     if (!mText.empty()) {
-        canvas.drawText(mText, 0, mTextPaint.getTextSize(), mTextPaint);
+        float x = 0;
+        float y = mTextPaint.getTextSize();
+
+        if (mGravity == 0x11) { // CENTER
+            // Approximate centering based on bounds
+            float approxTextWidth = mText.length() * (mTextPaint.getTextSize() * 0.6f);
+            x = (getWidth() - approxTextWidth) / 2.0f;
+            y = (getHeight() + mTextPaint.getTextSize()) / 2.0f - (mTextPaint.getTextSize() * 0.2f);
+        }
+
+        canvas.drawText(mText, x, y, mTextPaint);
     }
 }
 

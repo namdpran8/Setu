@@ -180,6 +180,9 @@ int main(int argc, char* argv[]) {
     if (!resManager.init()) {
         Logger::e("Main", "Failed to initialize ResourceManager!");
     }
+    if (!resManager.loadFrameworkApk("testapk/framework-res.apk")) {
+        Logger::w("Main", "Failed to load framework-res.apk. Framework attributes will not resolve.");
+    }
 
     // ---------------------------------------------------------
     // PHASE 2.5+: DYNAMIC BYTECODE EXTRACTION & INTERPRETATION

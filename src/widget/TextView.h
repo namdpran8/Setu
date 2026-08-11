@@ -21,9 +21,10 @@ public:
     void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
     void onDraw(graphics::Canvas& canvas) override;
 
-private:
+protected:
     std::wstring mText;
     graphics::Paint mTextPaint;
+    int mGravity = 0x33; // Gravity::TOP | Gravity::LEFT
 };
 
 } // namespace widget

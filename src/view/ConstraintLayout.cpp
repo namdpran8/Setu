@@ -236,6 +236,7 @@ void ConstraintLayout::onLayout(bool changed, int l, int t, int r, int b) {
 std::shared_ptr<View::LayoutParams> ConstraintLayout::generateLayoutParams(const AxmlNode* node) {
     auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
     if (!node) return lp;
+    ViewGroup::parseBaseLayoutParams(lp, node);
 
     auto parseConstraintTarget = [&](const AxmlAttribute& a) {
         if (a.typedValueType == 0x03) { // TYPE_STRING

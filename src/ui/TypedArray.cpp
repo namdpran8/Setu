@@ -17,13 +17,6 @@ TypedArray::~TypedArray() {
 const AxmlAttribute* TypedArray::findAttributeInNode(const AxmlNode* node, uint32_t attrResId) const {
     for (const auto& attr : node->attributes) {
         if (attr.nameResId == attrResId) return &attr;
-        
-        // Temporary fallback for Phase 3 testing before framework-res is loaded
-        if (attrResId == 0x0101014f && attr.name == "text") return &attr;
-        if (attrResId == 0x01010095 && attr.name == "textSize") return &attr;
-        if (attrResId == 0x01010098 && attr.name == "textColor") return &attr;
-        if (attrResId == 0x010100d4 && attr.name == "background") return &attr;
-        if (attrResId == 0x01010150 && attr.name == "hint") return &attr;
     }
     return nullptr;
 }

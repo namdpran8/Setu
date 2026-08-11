@@ -847,4 +847,54 @@ void StubRegistry::registerViewStubs() {
         }
         return false;
     };
+
+    stubs["Ljava/lang/String;->concat(Ljava/lang/String;)Ljava/lang/String;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            std::string text1 = "", text2 = "";
+            if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                InterpreterObject* str1 = (InterpreterObject*)args[0].obj;
+                auto it1 = str1->fields.find("string_value");
+                if (it1 != str1->fields.end() && it1->second.type == ValueType::OBJECT) text1 = ((InterpreterObject*)it1->second.obj)->className;
+            }
+            if (args.size() > 1 && args[1].type == ValueType::OBJECT && args[1].obj) {
+                InterpreterObject* str2 = (InterpreterObject*)args[1].obj;
+                auto it2 = str2->fields.find("string_value");
+                if (it2 != str2->fields.end() && it2->second.type == ValueType::OBJECT) text2 = ((InterpreterObject*)it2->second.obj)->className;
+            }
+            InterpreterObject* strObj = new InterpreterObject();
+            strObj->className = "Ljava/lang/String;";
+            InterpreterObject* inner = new InterpreterObject();
+            inner->className = text1 + text2;
+            strObj->fields["string_value"] = Value::MakeObject(inner);
+            *outReturn = Value::MakeObject(strObj);
+        }
+        return false;
+    };
+
+    stubs["Ljava/lang/NullPointerException;-><init>(Ljava/lang/String;)V"] = emptyStub;
+    
+    stubs["Landroid/view/View;->getResources()Landroid/content/res/Resources;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            InterpreterObject* resObj = new InterpreterObject();
+            resObj->className = "Landroid/content/res/Resources;";
+            *outReturn = Value::MakeObject(resObj);
+        }
+        return false;
+    };
+
+    stubs["Landroid/content/res/Resources;->getResourceName(I)Ljava/lang/String;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            std::string resName = "unknown_resource";
+            if (args.size() > 1 && args[1].type == ValueType::INT && m_resManager) {
+                resName = m_resManager->getResourcePath(args[1].i);
+            }
+            InterpreterObject* strObj = new InterpreterObject();
+            strObj->className = "Ljava/lang/String;";
+            InterpreterObject* inner = new InterpreterObject();
+            inner->className = resName;
+            strObj->fields["string_value"] = Value::MakeObject(inner);
+            *outReturn = Value::MakeObject(strObj);
+        }
+        return false;
+    };
 }

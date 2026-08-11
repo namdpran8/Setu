@@ -259,6 +259,7 @@ void GridLayout::onLayout(bool changed, int l, int t, int r, int b) {
 std::shared_ptr<View::LayoutParams> GridLayout::generateLayoutParams(const AxmlNode* node) {
     auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
     if (!node) return lp;
+    ViewGroup::parseBaseLayoutParams(lp, node);
     for (const auto& attr : node->attributes) {
         if (attr.name == "layout_column") lp->columnSpec.spanStart = attr.typedValueData;
         else if (attr.name == "layout_row") lp->rowSpec.spanStart = attr.typedValueData;

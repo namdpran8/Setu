@@ -57,10 +57,15 @@ struct ResTable_typeSpec {
 struct ResTable_type {
     ResChunk_header header;
     uint8_t id;
-    uint8_t res0;
-    uint16_t res1;
+    uint8_t flags;
+    uint16_t reserved;
     uint32_t entryCount;
     uint32_t entriesStart;
+};
+
+struct ResTable_sparseTypeEntry {
+    uint16_t idx;
+    uint16_t offset;
 };
 
 struct ResTable_entry {
