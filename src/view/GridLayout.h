@@ -39,6 +39,8 @@ protected:
     void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
     void onLayout(bool changed, int l, int t, int r, int b) override;
 
+    std::shared_ptr<View::LayoutParams> generateLayoutParams(const AxmlNode* node) override;
+
 private:
     int mRowCount = 0;
     int mColumnCount = 0;

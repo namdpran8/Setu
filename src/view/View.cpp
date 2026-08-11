@@ -1,7 +1,9 @@
 #include "View.h"
+#include "ViewGroup.h"
 #include <algorithm>
 #include "../graphics/RecordingCanvas.h"
 #include "MotionEvent.h"
+#include "../utils/Logger.h"
 
 namespace windroid {
 namespace view {
@@ -60,6 +62,18 @@ void View::setMeasuredDimension(int measuredWidth, int measuredHeight) {
     mMeasuredHeight = measuredHeight;
 }
 
+void View::setLayoutParams(std::shared_ptr<LayoutParams> params) {
+    mLayoutParams = params;
+    requestLayout();
+}
+
+void View::requestLayout() {
+    mIsLayoutRequested = true;
+    if (mParent) {
+        mParent->requestLayout();
+    }
+}
+
 bool View::dispatchTouchEvent(MotionEvent& event) {
     return onTouchEvent(event);
 }
@@ -92,5 +106,19 @@ void View::updateRenderNode() {
     draw(canvas);
 }
 
+
+void View::dump(int depth) {
+    std::string indent(depth * 2, ' ');
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "%s[%s id=%d] bounds=(%d,%d)-(%d,%d) w=%d h=%d",
+             indent.c_str(),
+             getClassName().c_str(),
+             mId,
+             mLeft, mTop, mRight, mBottom,
+             mRight - mLeft, mBottom - mTop);
+    Logger::i("ViewDump", std::string(buffer));
+}
+
 } // namespace view
 } // namespace windroid
+

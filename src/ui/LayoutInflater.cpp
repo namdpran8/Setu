@@ -43,18 +43,24 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
             }
         }
         view = gl;
-    } else if (tag.find("LinearLayout") != std::string::npos) {
+    } else if (tag.find("LinearLayout") != std::string::npos || tag.find("TableLayout") != std::string::npos || tag.find("TableRow") != std::string::npos) {
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         
         // Check orientation
-        for (const auto& attr : node->attributes) {
-            if (attr.name == "orientation") {
-                if (attr.typedValueData == 1 || resolveString(attr, resManager) == "vertical") {
-                    ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
-                } else {
-                    ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
+        if (tag.find("TableLayout") != std::string::npos) {
+            ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
+        } else if (tag.find("TableRow") != std::string::npos) {
+            ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
+        } else {
+            for (const auto& attr : node->attributes) {
+                if (attr.name == "orientation") {
+                    if (attr.typedValueData == 1 || resolveString(attr, resManager) == "vertical") {
+                        ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
+                    } else {
+                        ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
+                    }
+                    break;
                 }
-                break;
             }
         }
         view = ll;
@@ -95,11 +101,21 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
             }
         }
         view = et;
-    } else if (tag == "Guideline") {
+    } else if (tag.find("Guideline") != std::string::npos || tag.find("Space") != std::string::npos || tag == "View" || tag == "android.view.View") {
         view = std::make_shared<windroid::view::View>();
+    } else if (tag.find("HorizontalScrollView") != std::string::npos) {
+        auto ll = std::make_shared<windroid::view::LinearLayout>();
+        ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
+        view = ll;
+    } else if (tag.find("RecyclerView") != std::string::npos || tag.find("ScrollView") != std::string::npos) {
+        auto ll = std::make_shared<windroid::view::LinearLayout>();
+        ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
+        view = ll;
+    } else if (tag.find("ConstraintLayout") != std::string::npos) {
+        view = std::make_shared<windroid::view::ConstraintLayout>();
     } else {
-        Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", falling back to View");
-        view = std::make_shared<windroid::view::View>();
+        Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", falling back to FrameLayout");
+        view = std::make_shared<windroid::view::FrameLayout>();
     }
 
     parseViewAttributes(node, view, resManager);
@@ -110,7 +126,7 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
         for (const auto& childNode : node->children) {
             auto childView = inflateRecursive(childNode.get(), resManager);
             if (childView) {
-                parseLayoutParams(childNode.get(), childView, tag);
+                parseLayoutParams(childNode.get(), childView, viewGroup);
                 viewGroup->addView(childView);
             }
         }
@@ -148,149 +164,57 @@ int LayoutInflater::parseDimension(const std::string& dimenStr) {
     }
 }
 
+int LayoutInflater::parseComplexDimension(uint32_t data) {
+    int value = (int)(data >> 8);
+    int unit = data & 0x0F;
+    if (unit == 1 || unit == 2) { // dp or sp
+        return value * 2;
+    }
+    return value; // px or others
+}
+
 void LayoutInflater::parseViewAttributes(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, ResourceManager* resManager) {
     for (const auto& attr : node->attributes) {
         if (attr.name == "id") {
             view->setId(attr.typedValueData);
+        } else if (attr.name == "visibility") {
+            if (attr.typedValueData == 0) view->setVisibility(windroid::view::View::VISIBLE);
+            else if (attr.typedValueData == 1) view->setVisibility(windroid::view::View::INVISIBLE);
+            else if (attr.typedValueData == 2) view->setVisibility(windroid::view::View::GONE);
         }
     }
 }
 
-void LayoutInflater::parseLayoutParams(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, const std::string& parentTag) {
+void LayoutInflater::parseLayoutParams(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, std::shared_ptr<windroid::view::ViewGroup> parent) {
     std::shared_ptr<windroid::view::View::LayoutParams> lp;
-
-    // Instantiate correct LayoutParams based on parent
-    if (parentTag.find("ConstraintLayout") != std::string::npos) {
-        lp = std::make_shared<windroid::view::ConstraintLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
-    } else if (parentTag.find("GridLayout") != std::string::npos) {
-        lp = std::make_shared<windroid::view::GridLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
-    } else if (parentTag.find("LinearLayout") != std::string::npos) {
-        lp = std::make_shared<windroid::view::LinearLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
-    } else if (parentTag.find("FrameLayout") != std::string::npos) {
-        lp = std::make_shared<windroid::view::FrameLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
-    } else if (parentTag.find("RelativeLayout") != std::string::npos) {
-        lp = std::make_shared<windroid::view::RelativeLayout::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
+    if (parent) {
+        lp = parent->generateLayoutParams(node);
     } else {
         lp = std::make_shared<windroid::view::View::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
     }
+
+    auto parseDim = [](const AxmlAttribute& attr) {
+        if (attr.typedValueType == 0x05) return LayoutInflater::parseComplexDimension(attr.typedValueData);
+        return (int)attr.typedValueData;
+    };
 
     for (const auto& attr : node->attributes) {
         if (attr.name == "layout_width") {
             if (attr.typedValueData == 0xFFFFFFFF) lp->width = windroid::view::View::MATCH_PARENT;
             else if (attr.typedValueData == 0xFFFFFFFE) lp->width = windroid::view::View::WRAP_CONTENT;
-            else if (attr.typedValueType == 0x10) lp->width = attr.typedValueData; // int
-            else if (attr.typedValueType == 0x05) lp->width = (attr.typedValueData >> 8) * 2; // naive dp parsing
+            else lp->width = parseDim(attr);
         } else if (attr.name == "layout_height") {
             if (attr.typedValueData == 0xFFFFFFFF) lp->height = windroid::view::View::MATCH_PARENT;
             else if (attr.typedValueData == 0xFFFFFFFE) lp->height = windroid::view::View::WRAP_CONTENT;
-            else if (attr.typedValueType == 0x10) lp->height = attr.typedValueData;
-            else if (attr.typedValueType == 0x05) lp->height = (attr.typedValueData >> 8) * 2;
+            else lp->height = parseDim(attr);
         } else if (attr.name == "layout_marginLeft" || attr.name == "layout_marginStart") {
-            lp->leftMargin = (attr.typedValueType == 0x05) ? (attr.typedValueData >> 8) * 2 : attr.typedValueData;
+            lp->leftMargin = parseDim(attr);
         } else if (attr.name == "layout_marginTop") {
-            lp->topMargin = (attr.typedValueType == 0x05) ? (attr.typedValueData >> 8) * 2 : attr.typedValueData;
+            lp->topMargin = parseDim(attr);
         } else if (attr.name == "layout_marginRight" || attr.name == "layout_marginEnd") {
-            lp->rightMargin = (attr.typedValueType == 0x05) ? (attr.typedValueData >> 8) * 2 : attr.typedValueData;
+            lp->rightMargin = parseDim(attr);
         } else if (attr.name == "layout_marginBottom") {
-            lp->bottomMargin = (attr.typedValueType == 0x05) ? (attr.typedValueData >> 8) * 2 : attr.typedValueData;
-        }
-        
-        // LinearLayout specific
-        auto llp = std::dynamic_pointer_cast<windroid::view::LinearLayout::LayoutParams>(lp);
-        if (llp) {
-            if (attr.name == "layout_weight") {
-                union { uint32_t i; float f; } u;
-                u.i = attr.typedValueData;
-                llp->weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
-            } else if (attr.name == "layout_gravity") {
-                llp->gravity = attr.typedValueData;
-            }
-        }
-        
-        // FrameLayout specific
-        auto flp = std::dynamic_pointer_cast<windroid::view::FrameLayout::LayoutParams>(lp);
-        if (flp) {
-            if (attr.name == "layout_gravity") {
-                flp->gravity = attr.typedValueData;
-            }
-        }
-        
-        // RelativeLayout specific
-        auto rlp = std::dynamic_pointer_cast<windroid::view::RelativeLayout::LayoutParams>(lp);
-        if (rlp) {
-            if (attr.name == windroid::view::RelativeLayout::LayoutParams::ABOVE ||
-                attr.name == windroid::view::RelativeLayout::LayoutParams::BELOW ||
-                attr.name == windroid::view::RelativeLayout::LayoutParams::LEFT_OF ||
-                attr.name == windroid::view::RelativeLayout::LayoutParams::RIGHT_OF ||
-                attr.name == windroid::view::RelativeLayout::LayoutParams::ALIGN_PARENT_LEFT ||
-                attr.name == windroid::view::RelativeLayout::LayoutParams::ALIGN_PARENT_TOP ||
-                attr.name == windroid::view::RelativeLayout::LayoutParams::ALIGN_PARENT_RIGHT ||
-                attr.name == windroid::view::RelativeLayout::LayoutParams::ALIGN_PARENT_BOTTOM) {
-                rlp->rules[attr.name] = attr.typedValueData;
-            }
-        }
-        
-        // ConstraintLayout specific
-        auto clp = std::dynamic_pointer_cast<windroid::view::ConstraintLayout::LayoutParams>(lp);
-        if (clp) {
-            if (node->tag == "Guideline") clp->isGuideline = true;
-            if (attr.name == "layout_constraintTop_toTopOf") clp->topToTop = attr.typedValueData;
-            else if (attr.name == "layout_constraintTop_toBottomOf") clp->topToBottom = attr.typedValueData;
-            else if (attr.name == "layout_constraintBottom_toTopOf") clp->bottomToTop = attr.typedValueData;
-            else if (attr.name == "layout_constraintBottom_toBottomOf") clp->bottomToBottom = attr.typedValueData;
-            else if (attr.name == "layout_constraintStart_toStartOf" || attr.name == "layout_constraintLeft_toLeftOf") clp->startToStart = attr.typedValueData;
-            else if (attr.name == "layout_constraintStart_toEndOf" || attr.name == "layout_constraintLeft_toRightOf") clp->startToEnd = attr.typedValueData;
-            else if (attr.name == "layout_constraintEnd_toStartOf" || attr.name == "layout_constraintRight_toLeftOf") clp->endToStart = attr.typedValueData;
-            else if (attr.name == "layout_constraintEnd_toEndOf" || attr.name == "layout_constraintRight_toRightOf") clp->endToEnd = attr.typedValueData;
-            else if (attr.name == "layout_constraintHorizontal_bias") {
-                union { uint32_t i; float f; } u;
-                u.i = attr.typedValueData;
-                clp->horizontalBias = u.f;
-            }
-            else if (attr.name == "layout_constraintVertical_bias") {
-                union { uint32_t i; float f; } u;
-                u.i = attr.typedValueData;
-                clp->verticalBias = u.f;
-            }
-            else if (attr.name == "layout_constraintGuide_percent") {
-                union { uint32_t i; float f; } u;
-                u.i = attr.typedValueData;
-                clp->guidePercent = u.f;
-            }
-            else if (attr.name == "layout_constraintGuide_begin") clp->guideBegin = (attr.typedValueData >> 8) * 2;
-            else if (attr.name == "layout_constraintGuide_end") clp->guideEnd = (attr.typedValueData >> 8) * 2;
-            else if (attr.name == "orientation") clp->orientation = attr.typedValueData;
-        }
-        
-        // GridLayout specific
-        auto glp = std::dynamic_pointer_cast<windroid::view::GridLayout::LayoutParams>(lp);
-        if (glp) {
-            if (attr.name == "layout_column") glp->columnSpec.spanStart = attr.typedValueData;
-            else if (attr.name == "layout_row") glp->rowSpec.spanStart = attr.typedValueData;
-            else if (attr.name == "layout_columnSpan") glp->columnSpec.spanSize = attr.typedValueData;
-            else if (attr.name == "layout_rowSpan") glp->rowSpec.spanSize = attr.typedValueData;
-            else if (attr.name == "layout_columnWeight") {
-                union { uint32_t i; float f; } u;
-                u.i = attr.typedValueData;
-                glp->columnSpec.weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
-            }
-            else if (attr.name == "layout_rowWeight") {
-                union { uint32_t i; float f; } u;
-                u.i = attr.typedValueData;
-                glp->rowSpec.weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
-            }
-            else if (attr.name == "layout_gravity") {
-                int gravity = attr.typedValueData;
-                if ((gravity & 0x7) == 0x7) glp->columnSpec.alignment = windroid::view::GridLayout::FILL;
-                else if ((gravity & 0x1) == 0x1) glp->columnSpec.alignment = windroid::view::GridLayout::CENTER;
-                else if ((gravity & 0x5) == 0x5 || (gravity & 0x800005) == 0x800005) glp->columnSpec.alignment = windroid::view::GridLayout::END;
-                else glp->columnSpec.alignment = windroid::view::GridLayout::START;
-                
-                if ((gravity & 0x70) == 0x70) glp->rowSpec.alignment = windroid::view::GridLayout::FILL;
-                else if ((gravity & 0x10) == 0x10) glp->rowSpec.alignment = windroid::view::GridLayout::CENTER;
-                else if ((gravity & 0x50) == 0x50 || (gravity & 0x800050) == 0x800050) glp->rowSpec.alignment = windroid::view::GridLayout::END;
-                else glp->rowSpec.alignment = windroid::view::GridLayout::START;
-            }
+            lp->bottomMargin = parseDim(attr);
         }
     }
 

@@ -3,6 +3,7 @@
 #include <vector>
 #include <memory>
 
+struct AxmlNode;
 namespace windroid {
 namespace view {
 
@@ -53,10 +54,19 @@ public:
     bool dispatchTouchEvent(MotionEvent& event) override;
     bool dispatchKeyEvent(const KeyEvent& event) override;
 
+    virtual std::shared_ptr<View::LayoutParams> generateLayoutParams(const AxmlNode* node);
+
 protected:
     void measureChild(std::shared_ptr<View> child, int parentWidthMeasureSpec, int parentHeightMeasureSpec);
+    void measureChildWithMargins(std::shared_ptr<View> child, 
+        int parentWidthMeasureSpec, int widthUsed,
+        int parentHeightMeasureSpec, int heightUsed);
+    static int getChildMeasureSpec(int spec, int padding, int childDimension);
     
     std::vector<std::shared_ptr<View>> mChildren;
+
+    virtual void dump(int depth = 0) override;
+    virtual std::string getClassName() const override { return "ViewGroup"; }
 };
 
 } // namespace view

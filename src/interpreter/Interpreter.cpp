@@ -862,17 +862,18 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 std::string methodSig = currentDex ? currentDex->getMethodSignature(methodIdx) : std::to_string(methodIdx);
                 
                 // 1. Try to find the bytecode in the DEX file
-                // getMethodSignature returns "Lclass;->method(Lparams;)V"
-                // getMethodBytecode expects (className, methodName)
-                // We need to parse methodSig to extract className and methodName
-                // Format: Lcom/pranshu/test1/MainActivity;->onCreate(Landroid/os/Bundle;)V
                 size_t arrowPos = methodSig.find("->");
                 size_t parenPos = methodSig.find('(');
                 bool executedBytecode = false;
                 
                 if (arrowPos != std::string::npos && parenPos != std::string::npos && multiDexManager != nullptr) {
                     if (StubRegistry::isStubbed(methodSig)) {
-                        executedBytecode = StubRegistry::invoke(methodSig, &state, args, &state.methodReturnVal);
+                        bool exceptionThrown = StubRegistry::invoke(methodSig, &state, args, &state.methodReturnVal);
+                        if (exceptionThrown) {
+                            Logger::e("Interpreter", "Exception thrown in native stub!");
+                            return Value::MakeNull(); // Halt
+                        }
+                        executedBytecode = true;
                     } else {
                         auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(methodSig);
                         if (!bcResult.bytecode.empty() && bcDex) {

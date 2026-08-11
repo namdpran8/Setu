@@ -1,8 +1,72 @@
 #include "RelativeLayout.h"
 #include <algorithm>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include "../AxmlPraserer/AxmlParser.h"
 
 namespace windroid {
 namespace view {
+
+static std::vector<std::shared_ptr<View>> getSortedChildren(const std::vector<std::shared_ptr<View>>& children) {
+    std::unordered_map<View*, std::vector<std::shared_ptr<View>>> graph;
+    std::unordered_map<View*, int> inDegree;
+    std::vector<std::shared_ptr<View>> sorted;
+    std::unordered_map<int, std::shared_ptr<View>> idMap;
+
+    for (const auto& child : children) {
+        if (child->getId() != 0) {
+            idMap[child->getId()] = child;
+        }
+        inDegree[child.get()] = 0;
+    }
+
+    for (const auto& child : children) {
+        auto lp = std::dynamic_pointer_cast<RelativeLayout::LayoutParams>(child->getLayoutParams());
+        if (!lp) continue;
+
+        for (const auto& rule : {RelativeLayout::LayoutParams::ABOVE, RelativeLayout::LayoutParams::BELOW, 
+                                 RelativeLayout::LayoutParams::LEFT_OF, RelativeLayout::LayoutParams::RIGHT_OF}) {
+            if (lp->rules.count(rule)) {
+                int targetId = lp->rules[rule];
+                if (idMap.count(targetId)) {
+                    auto target = idMap[targetId];
+                    graph[target.get()].push_back(child);
+                    inDegree[child.get()]++;
+                }
+            }
+        }
+    }
+
+    std::vector<std::shared_ptr<View>> queue;
+    for (const auto& child : children) {
+        if (inDegree[child.get()] == 0) {
+            queue.push_back(child);
+        }
+    }
+
+    while (!queue.empty()) {
+        auto curr = queue.front();
+        queue.erase(queue.begin());
+        sorted.push_back(curr);
+
+        for (const auto& dependent : graph[curr.get()]) {
+            inDegree[dependent.get()]--;
+            if (inDegree[dependent.get()] == 0) {
+                queue.push_back(dependent);
+            }
+        }
+    }
+
+    if (sorted.size() != children.size()) {
+        for (const auto& child : children) {
+            if (std::find(sorted.begin(), sorted.end(), child) == sorted.end()) {
+                sorted.push_back(child);
+            }
+        }
+    }
+    return sorted;
+}
 
 const std::string RelativeLayout::LayoutParams::ABOVE = "layout_above";
 const std::string RelativeLayout::LayoutParams::BELOW = "layout_below";
@@ -31,8 +95,10 @@ void RelativeLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     int heightMode = getMode(heightMeasureSpec);
     int heightSize = getSize(heightMeasureSpec);
 
-    // Naive pass 1: Measure all children without dependencies first
-    for (auto& child : mChildren) {
+    // Topological sort pass
+    auto sortedChildren = getSortedChildren(mChildren);
+
+    for (auto& child : sortedChildren) {
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         if (!lp) lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
 
@@ -54,8 +120,10 @@ void RelativeLayout::onLayout(bool changed, int l, int t, int r, int b) {
     int parentWidth = r - l;
     int parentHeight = b - t;
 
+    auto sortedChildren = getSortedChildren(mChildren);
+
     // Apply rules to figure out positioning
-    for (auto& child : mChildren) {
+    for (auto& child : sortedChildren) {
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         if (!lp) continue;
 
@@ -109,6 +177,24 @@ void RelativeLayout::onLayout(bool changed, int l, int t, int r, int b) {
 
         child->layout(childLeft, childTop, childRight, childBottom);
     }
+}
+
+std::shared_ptr<View::LayoutParams> RelativeLayout::generateLayoutParams(const AxmlNode* node) {
+    auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
+    if (!node) return lp;
+    for (const auto& attr : node->attributes) {
+        if (attr.name == LayoutParams::ABOVE ||
+            attr.name == LayoutParams::BELOW ||
+            attr.name == LayoutParams::LEFT_OF ||
+            attr.name == LayoutParams::RIGHT_OF ||
+            attr.name == LayoutParams::ALIGN_PARENT_LEFT ||
+            attr.name == LayoutParams::ALIGN_PARENT_TOP ||
+            attr.name == LayoutParams::ALIGN_PARENT_RIGHT ||
+            attr.name == LayoutParams::ALIGN_PARENT_BOTTOM) {
+            lp->rules[attr.name] = attr.typedValueData;
+        }
+    }
+    return lp;
 }
 
 } // namespace view

@@ -38,6 +38,30 @@ bool StubRegistry::isStubbed(const std::string& methodSignature) {
     if (methodSignature.find("Landroid/content/SharedPreferences") != std::string::npos) return true;
     if (methodSignature.find("Landroid/app/Activity;->getWindow") != std::string::npos) return true;
     if (methodSignature.find("Landroid/view/Window;") != std::string::npos) return true;
+    if (methodSignature.find("Landroidx/fragment/app/FragmentManager") != std::string::npos) return true;
+    if (methodSignature.find("Landroidx/fragment/app/FragmentTransaction") != std::string::npos) return true;
+    if (methodSignature.find("Landroidx/fragment/app/FragmentActivity;->getSupportFragmentManager") != std::string::npos) return true;
+    if (methodSignature.find("Landroidx/lifecycle/") != std::string::npos) return true;
+    if (methodSignature.find("Ljava/lang/Enum;") != std::string::npos) return true;
+    if (methodSignature.find("Ljava/lang/Integer;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/graphics/Rect;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/animation/LayoutTransition;") != std::string::npos) return true;
+    if (methodSignature.find("Ljava/lang/IllegalStateException;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/widget/OverScroller;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/widget/ImageView;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/view/View;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/view/ViewGroup;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/widget/TextView;") != std::string::npos) return true;
+    if (methodSignature.find("Lj0/w;") != std::string::npos) return true;
+    if (methodSignature.find("Lz1/g;") != std::string::npos) return true;
+    if (methodSignature.find("Ln0/a;") != std::string::npos) return true;
+    if (methodSignature.find("Lu0/c;") != std::string::npos) return true;
+    if (methodSignature.find("Lg/F;") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/os/Build$VERSION;") != std::string::npos) return true;
+    if (methodSignature.find("Lx0/b;") != std::string::npos) return true;
+    if (methodSignature.find("Landroidx/recyclerview/") != std::string::npos) return true;
+    if (methodSignature.find("Landroid/util/SparseArray;") != std::string::npos) return true;
+    if (methodSignature.find("Ljava/lang/ThreadLocal;") != std::string::npos) return true;
     
     return false;
 }
@@ -250,10 +274,34 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             return false;
         }
 
-        if (methodSignature.find("Landroid/app/FragmentTransaction;->") != std::string::npos) {
+        if (methodSignature.find("Landroid/app/FragmentTransaction;->") != std::string::npos ||
+            methodSignature.find("Landroidx/fragment/app/FragmentTransaction;->") != std::string::npos) {
             if (outReturn && methodSignature.find("->commit") == std::string::npos) {
                 *outReturn = args.size() > 0 ? args[0] : Value::MakeNull();
             }
+            return false;
+        }
+
+        if (methodSignature.find("Landroidx/fragment/app/FragmentManager;->") != std::string::npos ||
+            methodSignature.find("Landroid/app/FragmentManager;->") != std::string::npos) {
+            if (outReturn) {
+                if (methodSignature.find("->beginTransaction") != std::string::npos) {
+                    *outReturn = Value::MakeObject(new InterpreterObject()); // Dummy transaction
+                } else {
+                    *outReturn = Value::MakeNull();
+                }
+            }
+            return false;
+        }
+
+        if (methodSignature.find("Landroidx/lifecycle/") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+
+        if (methodSignature.find("Landroidx/fragment/app/FragmentActivity;->getSupportFragmentManager") != std::string::npos ||
+            methodSignature.find("Landroid/app/Activity;->getFragmentManager") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
             return false;
         }
 
@@ -265,6 +313,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
         Logger::w("StubRegistry", "Unimplemented stub: " + methodSignature);
         // We do not throw an exception here just because it's a stub missing, 
         // we'll just return false (no exception thrown) and ignore it for now.
+        if (outReturn) *outReturn = Value::MakeNull();
         return false;
     }
 }
@@ -438,6 +487,17 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/widget/Button;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
     stubs["Landroid/widget/TextView;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
 
+    auto setOnLongClickListenerStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        // We're just stubbing this to avoid crash, no actual long-click handling implemented yet
+        if (args.size() >= 2) {
+            Logger::d("StubRegistry", "Executed: setOnLongClickListener");
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V"] = setOnLongClickListenerStub;
+    stubs["Landroid/widget/Button;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V"] = setOnLongClickListenerStub;
+    stubs["Landroid/widget/TextView;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V"] = setOnLongClickListenerStub;
+
     auto emptyStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (outReturn) *outReturn = Value::MakeNull();
         return false;
@@ -479,6 +539,73 @@ void StubRegistry::registerViewStubs() {
             return false;
         };
     stubs["Lz1/g;->e(Ljava/lang/Object;Ljava/lang/String;)V"] = emptyStub;
+    
+    stubs["Landroid/graphics/Rect;-><init>()V"] = emptyStub;
+    stubs["Landroid/animation/LayoutTransition;-><init>()V"] = emptyStub;
+    stubs["Landroid/animation/LayoutTransition;->disableTransitionType(I)V"] = emptyStub;
+    stubs["Landroid/view/ViewGroup;->setLayoutTransition(Landroid/animation/LayoutTransition;)V"] = emptyStub;
+    stubs["Landroid/widget/TextView;->setShowSoftInputOnFocus(Z)V"] = emptyStub;
+    stubs["Landroid/widget/OverScroller;->abortAnimation()V"] = emptyStub;
+    stubs["Landroid/widget/ImageView;->setImageResource(I)V"] = emptyStub;
+    stubs["Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V"] = emptyStub;
+    
+    stubs["Landroidx/recyclerview/widget/RecyclerView;->r(Landroid/view/View;)V"] = emptyStub;
+    stubs["Landroid/view/View;->clearAnimation()V"] = emptyStub;
+    stubs["Landroid/widget/TextView;->addTextChangedListener(Landroid/text/TextWatcher;)V"] = emptyStub;
+    stubs["Landroid/view/ViewGroup;->requestLayout()V"] = emptyStub;
+    stubs["Ljava/lang/ThreadLocal;-><init>()V"] = emptyStub;
+    stubs["Landroid/util/SparseArray;-><init>()V"] = emptyStub;
+    stubs["Landroid/util/SparseArray;->size()I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeInt(0);
+        return false;
+    };
+    stubs["Landroidx/recyclerview/widget/RecyclerView;->M(Landroid/view/View;)Lm0/g0;"] = emptyStub;
+    stubs["Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;"] = emptyStub;
+    stubs["Lz1/g;->b(Ljava/lang/Object;)V"] = emptyStub;
+    stubs["Lz1/g;->d(Ljava/lang/Object;Ljava/lang/String;)V"] = emptyStub;
+    stubs["Lz1/g;->a(Ljava/lang/Object;Ljava/lang/Object;)Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
+                *outReturn = Value::MakeInt(args[0].obj == args[1].obj ? 1 : 0);
+            } else {
+                *outReturn = Value::MakeInt(0);
+            }
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->setEnabled(Z)V"] = emptyStub;
+    stubs["Landroid/app/Activity;->getResources()Landroid/content/res/Resources;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
+        return false;
+    };
+    stubs["Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
+        return false;
+    };
+    stubs["Landroid/content/res/Resources;->getDisplayMetrics()Landroid/util/DisplayMetrics;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
+        return false;
+    };
+    stubs["Landroid/view/View;->requestFocus()Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeInt(1);
+        return false;
+    };
+    stubs["Landroid/view/View;->getPaddingRight()I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeInt(0);
+        return false;
+    };
+    stubs["Landroid/view/View;->getPaddingLeft()I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeInt(0);
+        return false;
+    };
+    stubs["Landroid/widget/TextView;->setMinWidth(I)V"] = emptyStub;
+    stubs["Landroid/view/View;->setAccessibilityDelegate(Landroid/view/View$AccessibilityDelegate;)V"] = emptyStub;
+
+    
+    stubs["Landroid/view/View;->removeCallbacks(Ljava/lang/Runnable;)Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeInt(0);
+        return false;
+    };
     
     stubs["Ljava/lang/Enum;->compareTo(Ljava/lang/Enum;)I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (outReturn) *outReturn = Value::MakeInt(1);
@@ -547,6 +674,37 @@ void StubRegistry::registerViewStubs() {
             }
             *outReturn = Value::MakeInt(parsed);
         }
+        return false;
+    };
+    
+    stubs["Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            int val = args.size() > 0 ? args[0].i : 0;
+            InterpreterObject* intObj = new InterpreterObject();
+            intObj->className = "Ljava/lang/Integer;";
+            intObj->fields["value"] = Value::MakeInt(val);
+            *outReturn = Value::MakeObject(intObj);
+        }
+        return false;
+    };
+    
+    stubs["Ljava/lang/Integer;->intValue()I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            int val = 0;
+            if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                InterpreterObject* intObj = (InterpreterObject*)args[0].obj;
+                auto it = intObj->fields.find("value");
+                if (it != intObj->fields.end() && it->second.type == ValueType::INT) {
+                    val = it->second.i;
+                }
+            }
+            *outReturn = Value::MakeInt(val);
+        }
+        return false;
+    };
+
+    stubs["Ljava/lang/Enum;->ordinal()I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeInt(0); 
         return false;
     };
     

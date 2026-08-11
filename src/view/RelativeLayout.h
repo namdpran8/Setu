@@ -32,6 +32,8 @@ public:
     void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
     void onLayout(bool changed, int l, int t, int r, int b) override;
 
+    std::shared_ptr<View::LayoutParams> generateLayoutParams(const AxmlNode* node) override;
+
 private:
     std::shared_ptr<View> getViewById(int id);
     void applyRules(std::shared_ptr<View> child, std::shared_ptr<LayoutParams> lp, int parentWidth, int parentHeight);

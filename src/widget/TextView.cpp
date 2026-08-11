@@ -1,5 +1,8 @@
 #include "TextView.h"
 #include <algorithm>
+#include <cmath>
+#include "../ui/WindowManager.h"
+#include <wrl/client.h>
 
 namespace windroid {
 namespace widget {
@@ -24,10 +27,46 @@ void TextView::setTextSize(float size) {
 }
 
 void TextView::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-    // Very naive measurement for Phase 2.
-    // In Phase 3 (Text Measurement), we will query DirectWrite for actual bounds.
-    int desiredWidth = (int)(mText.length() * (mTextPaint.getTextSize() * 0.6f)); 
-    int desiredHeight = (int)(mTextPaint.getTextSize() * 1.5f);
+    int desiredWidth = 0;
+    int desiredHeight = 0;
+    
+    auto dWriteFactory = WindowManager::getDWriteFactory();
+    if (dWriteFactory && !mText.empty()) {
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> textFormat;
+        dWriteFactory->CreateTextFormat(
+            L"Segoe UI",
+            nullptr,
+            DWRITE_FONT_WEIGHT_NORMAL,
+            DWRITE_FONT_STYLE_NORMAL,
+            DWRITE_FONT_STRETCH_NORMAL,
+            mTextPaint.getTextSize(),
+            L"en-us",
+            &textFormat
+        );
+
+        if (textFormat) {
+            Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
+            dWriteFactory->CreateTextLayout(
+                mText.c_str(),
+                (UINT32)mText.length(),
+                textFormat.Get(),
+                10000.0f, // Large max width for WRAP_CONTENT
+                10000.0f, // Large max height for WRAP_CONTENT
+                &textLayout
+            );
+
+            if (textLayout) {
+                DWRITE_TEXT_METRICS metrics;
+                textLayout->GetMetrics(&metrics);
+                desiredWidth = (int)std::ceil(metrics.width);
+                desiredHeight = (int)std::ceil(metrics.height);
+            }
+        }
+    } else {
+        // Fallback
+        desiredWidth = (int)(mText.length() * (mTextPaint.getTextSize() * 0.6f)); 
+        desiredHeight = (int)(mTextPaint.getTextSize() * 1.5f);
+    }
 
     int widthMode = getMode(widthMeasureSpec);
     int widthSize = getSize(widthMeasureSpec);
@@ -40,23 +79,28 @@ void TextView::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     if (widthMode == MEASURE_SPEC_EXACTLY) {
         measuredWidth = widthSize;
     } else if (widthMode == MEASURE_SPEC_AT_MOST) {
-        measuredWidth = std::min(desiredWidth, widthSize);
+        measuredWidth = (std::min)(desiredWidth, widthSize);
     }
 
     if (heightMode == MEASURE_SPEC_EXACTLY) {
         measuredHeight = heightSize;
     } else if (heightMode == MEASURE_SPEC_AT_MOST) {
-        measuredHeight = std::min(desiredHeight, heightSize);
+        measuredHeight = (std::min)(desiredHeight, heightSize);
     }
 
     setMeasuredDimension(measuredWidth, measuredHeight);
 }
 
 void TextView::onDraw(graphics::Canvas& canvas) {
-    // Draw the text
-    // We adjust Y slightly downwards because Canvas drawText expects baseline in Android, 
-    // but our Direct2D implementation handles it (roughly) for now.
-    canvas.drawText(mText, 0, mTextPaint.getTextSize(), mTextPaint);
+    // TODO: Add a debug mode in the future to toggle bounds visibility
+    // graphics::Paint redPaint;
+    // redPaint.setColor(0xFFFF0000); // Red
+    // redPaint.setStyle(graphics::Style::FILL);
+    // canvas.drawRect(0, 0, 50, 50, redPaint);
+
+    if (!mText.empty()) {
+        canvas.drawText(mText, 0, mTextPaint.getTextSize(), mTextPaint);
+    }
 }
 
 } // namespace widget

@@ -41,6 +41,8 @@ public:
     void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
     void onLayout(bool changed, int l, int t, int r, int b) override;
 
+    std::shared_ptr<View::LayoutParams> generateLayoutParams(const AxmlNode* node) override;
+
 private:
     struct ResolvedNode {
         std::shared_ptr<View> view;
@@ -54,7 +56,8 @@ private:
         bool hResolved = false;
     };
 
-    std::map<int, ResolvedNode> mResolvedNodes;
+    std::vector<ResolvedNode> mResolvedNodes;
+    std::map<int, size_t> mIdToIndex;
     
     void resolveConstraints(int parentWidth, int parentHeight);
     int resolveX(int id, int parentWidth, std::vector<int>& path);

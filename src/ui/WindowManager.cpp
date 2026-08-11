@@ -195,6 +195,11 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         }
         case WM_KEYDOWN: {
             if (s_rootView) {
+                if (wParam == VK_F8) {
+                    Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP START ---");
+                    s_rootView->dump(0);
+                    Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP END ---");
+                }
                 windroid::view::KeyEvent event(windroid::view::KeyEvent::Action::DOWN, (int)wParam, 0);
                 if (s_rootView->dispatchKeyEvent(event)) {
                     // Handled

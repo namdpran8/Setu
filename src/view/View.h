@@ -14,6 +14,9 @@ class View {
 public:
     static const int MATCH_PARENT = -1;
     static const int WRAP_CONTENT = -2;
+    static const int VISIBLE = 0x00000000;
+    static const int INVISIBLE = 0x00000004;
+    static const int GONE = 0x00000008;
 
     class LayoutParams {
     public:
@@ -37,7 +40,8 @@ public:
     void setId(int id) { mId = id; }
 
     std::shared_ptr<LayoutParams> getLayoutParams() const { return mLayoutParams; }
-    void setLayoutParams(std::shared_ptr<LayoutParams> params) { mLayoutParams = params; }
+    void setLayoutParams(std::shared_ptr<LayoutParams> params);
+    void requestLayout();
 
     // Layout dimensions and positioning (relative to parent)
     int getLeft() const { return mLeft; }
@@ -60,6 +64,9 @@ public:
     ViewGroup* getParent() const { return mParent; }
     void setParent(ViewGroup* parent) { mParent = parent; }
 
+    int getVisibility() const { return mVisibility; }
+    void setVisibility(int visibility) { mVisibility = visibility; }
+
     // Android Measure/Layout/Draw passes
     virtual void measure(int widthMeasureSpec, int heightMeasureSpec);
     virtual void layout(int l, int t, int r, int b);
@@ -69,6 +76,9 @@ public:
     virtual void onMeasure(int widthMeasureSpec, int heightMeasureSpec);
     virtual void onLayout(bool changed, int l, int t, int r, int b);
     virtual void onDraw(graphics::Canvas& canvas);
+
+    virtual void dump(int depth = 0);
+    virtual std::string getClassName() const { return "View"; }
 
     // Event handling
     virtual bool dispatchTouchEvent(class MotionEvent& event);
@@ -121,6 +131,8 @@ protected:
     std::function<void()> mOnClickListener;
     std::shared_ptr<LayoutParams> mLayoutParams;
     bool mIsFocused = false;
+    int mVisibility = VISIBLE;
+    bool mIsLayoutRequested = false;
 };
 
 } // namespace view

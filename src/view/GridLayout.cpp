@@ -1,6 +1,7 @@
 #include "GridLayout.h"
 #include <algorithm>
 #include <cmath>
+#include "../AxmlPraserer/AxmlParser.h"
 
 namespace windroid {
 namespace view {
@@ -253,6 +254,40 @@ void GridLayout::onLayout(bool changed, int l, int t, int r, int b) {
 
         child->layout(finalLeft, finalTop, finalLeft + childWidth, finalTop + childHeight);
     }
+}
+
+std::shared_ptr<View::LayoutParams> GridLayout::generateLayoutParams(const AxmlNode* node) {
+    auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
+    if (!node) return lp;
+    for (const auto& attr : node->attributes) {
+        if (attr.name == "layout_column") lp->columnSpec.spanStart = attr.typedValueData;
+        else if (attr.name == "layout_row") lp->rowSpec.spanStart = attr.typedValueData;
+        else if (attr.name == "layout_columnSpan") lp->columnSpec.spanSize = attr.typedValueData;
+        else if (attr.name == "layout_rowSpan") lp->rowSpec.spanSize = attr.typedValueData;
+        else if (attr.name == "layout_columnWeight") {
+            union { uint32_t i; float f; } u;
+            u.i = attr.typedValueData;
+            lp->columnSpec.weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
+        }
+        else if (attr.name == "layout_rowWeight") {
+            union { uint32_t i; float f; } u;
+            u.i = attr.typedValueData;
+            lp->rowSpec.weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
+        }
+        else if (attr.name == "layout_gravity") {
+            int gravity = attr.typedValueData;
+            if ((gravity & 0x7) == 0x7) lp->columnSpec.alignment = GridLayout::FILL;
+            else if ((gravity & 0x1) == 0x1) lp->columnSpec.alignment = GridLayout::CENTER;
+            else if ((gravity & 0x5) == 0x5 || (gravity & 0x800005) == 0x800005) lp->columnSpec.alignment = GridLayout::END;
+            else lp->columnSpec.alignment = GridLayout::START;
+            
+            if ((gravity & 0x70) == 0x70) lp->rowSpec.alignment = GridLayout::FILL;
+            else if ((gravity & 0x10) == 0x10) lp->rowSpec.alignment = GridLayout::CENTER;
+            else if ((gravity & 0x50) == 0x50 || (gravity & 0x800050) == 0x800050) lp->rowSpec.alignment = GridLayout::END;
+            else lp->rowSpec.alignment = GridLayout::START;
+        }
+    }
+    return lp;
 }
 
 } // namespace view

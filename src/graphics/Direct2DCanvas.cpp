@@ -18,8 +18,9 @@ void Direct2DCanvas::save() {
 
 void Direct2DCanvas::restore() {
     if (mStateStack.size() > 1) {
+        State s = mStateStack.back();
         mStateStack.pop_back();
-        mContext->SetTransform(mStateStack.back().transform);
+        mContext->SetTransform(s.transform);
     }
 }
 

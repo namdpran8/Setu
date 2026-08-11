@@ -71,10 +71,84 @@ bool ViewGroup::dispatchKeyEvent(const KeyEvent& event) {
     return View::dispatchKeyEvent(event);
 }
 
+int ViewGroup::getChildMeasureSpec(int spec, int padding, int childDimension) {
+    int specMode = View::getMode(spec);
+    int specSize = View::getSize(spec);
+    int size = std::max(0, specSize - padding);
+
+    int resultSize = 0;
+    int resultMode = 0;
+
+    if (specMode == View::MEASURE_SPEC_EXACTLY) {
+        if (childDimension >= 0) {
+            resultSize = childDimension;
+            resultMode = View::MEASURE_SPEC_EXACTLY;
+        } else if (childDimension == View::MATCH_PARENT) {
+            resultSize = size;
+            resultMode = View::MEASURE_SPEC_EXACTLY;
+        } else if (childDimension == View::WRAP_CONTENT) {
+            resultSize = size;
+            resultMode = View::MEASURE_SPEC_AT_MOST;
+        }
+    } else if (specMode == View::MEASURE_SPEC_AT_MOST) {
+        if (childDimension >= 0) {
+            resultSize = childDimension;
+            resultMode = View::MEASURE_SPEC_EXACTLY;
+        } else if (childDimension == View::MATCH_PARENT) {
+            resultSize = size;
+            resultMode = View::MEASURE_SPEC_AT_MOST;
+        } else if (childDimension == View::WRAP_CONTENT) {
+            resultSize = size;
+            resultMode = View::MEASURE_SPEC_AT_MOST;
+        }
+    } else if (specMode == View::MEASURE_SPEC_UNSPECIFIED) {
+        if (childDimension >= 0) {
+            resultSize = childDimension;
+            resultMode = View::MEASURE_SPEC_EXACTLY;
+        } else if (childDimension == View::MATCH_PARENT) {
+            resultSize = size;
+            resultMode = View::MEASURE_SPEC_UNSPECIFIED;
+        } else if (childDimension == View::WRAP_CONTENT) {
+            resultSize = size;
+            resultMode = View::MEASURE_SPEC_UNSPECIFIED;
+        }
+    }
+    return View::makeMeasureSpec(resultSize, resultMode);
+}
+
 void ViewGroup::measureChild(std::shared_ptr<View> child, int parentWidthMeasureSpec, int parentHeightMeasureSpec) {
-    // A real implementation would parse LayoutParams.
-    // For now, we just pass down exactly or at_most based on the parent.
-    child->measure(parentWidthMeasureSpec, parentHeightMeasureSpec);
+    auto lp = child->getLayoutParams();
+    if (!lp) return;
+
+    int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec, 0, lp->width);
+    int childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec, 0, lp->height);
+
+    child->measure(childWidthMeasureSpec, childHeightMeasureSpec);
+}
+
+void ViewGroup::measureChildWithMargins(std::shared_ptr<View> child, 
+        int parentWidthMeasureSpec, int widthUsed,
+        int parentHeightMeasureSpec, int heightUsed) {
+    auto lp = child->getLayoutParams();
+    if (!lp) return;
+
+    int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec,
+            widthUsed + lp->leftMargin + lp->rightMargin, lp->width);
+    int childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec,
+            heightUsed + lp->topMargin + lp->bottomMargin, lp->height);
+
+    child->measure(childWidthMeasureSpec, childHeightMeasureSpec);
+}
+
+std::shared_ptr<View::LayoutParams> ViewGroup::generateLayoutParams(const AxmlNode* node) {
+    return std::make_shared<View::LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
+}
+
+void ViewGroup::dump(int depth) {
+    View::dump(depth);
+    for (auto& child : mChildren) {
+        child->dump(depth + 1);
+    }
 }
 
 } // namespace view

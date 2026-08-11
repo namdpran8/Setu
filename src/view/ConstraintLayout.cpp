@@ -1,6 +1,7 @@
 #include "ConstraintLayout.h"
 #include <algorithm>
 #include "../utils/Logger.h"
+#include "../AxmlPraserer/AxmlParser.h"
 
 namespace windroid {
 namespace view {
@@ -13,6 +14,7 @@ void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 
     // Initial pass: populate ResolvedNodes
     mResolvedNodes.clear();
+    mIdToIndex.clear();
     for (auto& child : mChildren) {
         ResolvedNode node;
         node.view = child;
@@ -35,7 +37,11 @@ void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             node.h = 0;
         }
 
-        mResolvedNodes[child->getId()] = node;
+        mResolvedNodes.push_back(node);
+        int id = child->getId();
+        if (id != -1 && id != 0) {
+            mIdToIndex[id] = mResolvedNodes.size() - 1;
+        }
     }
 
     // Resolve positions and MATCH_CONSTRAINT sizes
@@ -44,13 +50,12 @@ void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     // After resolving, apply measurement
     int maxWidth = 0;
     int maxHeight = 0;
-    for (auto& pair : mResolvedNodes) {
-        auto& node = pair.second;
+    for (auto& node : mResolvedNodes) {
         auto child = node.view;
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         
         // Remeasure if it was MATCH_CONSTRAINT
-        if (lp && lp->width == 0) {
+        if (lp && (lp->width == 0 || lp->height == 0)) {
             child->measure(View::makeMeasureSpec(node.w, View::MEASURE_SPEC_EXACTLY), View::makeMeasureSpec(node.h, View::MEASURE_SPEC_EXACTLY));
         }
 
@@ -69,15 +74,15 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
     
     auto getNode = [&](int id) -> ResolvedNode* {
         if (id == 0 || id == -1) return nullptr;
-        if (mResolvedNodes.count(id)) return &mResolvedNodes[id];
+        auto it = mIdToIndex.find(id);
+        if (it != mIdToIndex.end()) return &mResolvedNodes[it->second];
         return nullptr;
     };
     
     for (size_t iter = 0; iter < maxIterations; ++iter) {
         bool changed = false;
         
-        for (auto& pair : mResolvedNodes) {
-            auto& node = pair.second;
+        for (auto& node : mResolvedNodes) {
             auto lp = std::dynamic_pointer_cast<LayoutParams>(node.view->getLayoutParams());
             if (!lp) continue;
 
@@ -213,8 +218,7 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
     }
     
     // Fallback for unresolved cycles
-    for (auto& pair : mResolvedNodes) {
-        auto& node = pair.second;
+    for (auto& node : mResolvedNodes) {
         if (!node.xResolved || !node.yResolved) {
             Logger::w("ConstraintLayout", "Cycle or unresolved constraint for ID: " + std::to_string(node.view->getId()));
             if (!node.xResolved) { node.x = 0; node.xResolved = true; }
@@ -224,10 +228,54 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
 }
 
 void ConstraintLayout::onLayout(bool changed, int l, int t, int r, int b) {
-    for (auto& pair : mResolvedNodes) {
-        auto& node = pair.second;
+    for (auto& node : mResolvedNodes) {
         node.view->layout(node.x, node.y, node.x + node.w, node.y + node.h);
     }
+}
+
+std::shared_ptr<View::LayoutParams> ConstraintLayout::generateLayoutParams(const AxmlNode* node) {
+    auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
+    if (!node) return lp;
+
+    auto parseConstraintTarget = [&](const AxmlAttribute& a) {
+        if (a.typedValueType == 0x03) { // TYPE_STRING
+            if (a.rawValue == "parent") return 0;
+        }
+        if (a.typedValueData == 0) return 0;
+        return (int)a.typedValueData;
+    };
+
+    if (node->tag.find("Guideline") != std::string::npos) lp->isGuideline = true;
+
+    for (const auto& attr : node->attributes) {
+        if (attr.name == "layout_constraintTop_toTopOf") lp->topToTop = parseConstraintTarget(attr);
+        else if (attr.name == "layout_constraintTop_toBottomOf") lp->topToBottom = parseConstraintTarget(attr);
+        else if (attr.name == "layout_constraintBottom_toTopOf") lp->bottomToTop = parseConstraintTarget(attr);
+        else if (attr.name == "layout_constraintBottom_toBottomOf") lp->bottomToBottom = parseConstraintTarget(attr);
+        else if (attr.name == "layout_constraintStart_toStartOf" || attr.name == "layout_constraintLeft_toLeftOf") lp->startToStart = parseConstraintTarget(attr);
+        else if (attr.name == "layout_constraintStart_toEndOf" || attr.name == "layout_constraintLeft_toRightOf") lp->startToEnd = parseConstraintTarget(attr);
+        else if (attr.name == "layout_constraintEnd_toStartOf" || attr.name == "layout_constraintRight_toLeftOf") lp->endToStart = parseConstraintTarget(attr);
+        else if (attr.name == "layout_constraintEnd_toEndOf" || attr.name == "layout_constraintRight_toRightOf") lp->endToEnd = parseConstraintTarget(attr);
+        else if (attr.name == "layout_constraintHorizontal_bias") {
+            union { uint32_t i; float f; } u;
+            u.i = attr.typedValueData;
+            lp->horizontalBias = u.f;
+        }
+        else if (attr.name == "layout_constraintVertical_bias") {
+            union { uint32_t i; float f; } u;
+            u.i = attr.typedValueData;
+            lp->verticalBias = u.f;
+        }
+        else if (attr.name == "layout_constraintGuide_percent") {
+            union { uint32_t i; float f; } u;
+            u.i = attr.typedValueData;
+            lp->guidePercent = u.f;
+        }
+        else if (attr.name == "layout_constraintGuide_begin") lp->guideBegin = (attr.typedValueData >> 8) * 2;
+        else if (attr.name == "layout_constraintGuide_end") lp->guideEnd = (attr.typedValueData >> 8) * 2;
+        else if (attr.name == "orientation") lp->orientation = attr.typedValueData;
+    }
+    return lp;
 }
 
 } // namespace view

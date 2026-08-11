@@ -18,8 +18,9 @@ private:
     
     // Helpers to parse common attributes
     static void parseViewAttributes(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, ResourceManager* resManager);
-    static void parseLayoutParams(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, const std::string& parentTag);
+    static void parseLayoutParams(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, std::shared_ptr<windroid::view::ViewGroup> parent);
     static int parseDimension(const std::string& dimenStr);
+    static int parseComplexDimension(uint32_t data);
 };
 
 } // namespace windroid
