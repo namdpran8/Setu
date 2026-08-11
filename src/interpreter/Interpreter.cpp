@@ -96,6 +96,20 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 state.pc += 3; // Format 22x is 4 bytes
                 break;
             }
+            case 0x42: { // The Teapot Opcode
+                Logger::e("Interpreter", R"(
+       (
+        )
+     _.._
+   /___  \
+   |    | |
+   \____/ /
+    `--'
+                )");
+                Logger::e("Interpreter", "[0x42] Error 418: I'm a teapot. Cannot execute Java.");
+                isRunning = false;
+                break;
+            }
             case 0x0E: { // return-void
                 Logger::d("Interpreter", "[0x0E] return-void -> Exiting method");
                 isRunning = false;

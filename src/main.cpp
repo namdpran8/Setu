@@ -12,6 +12,7 @@
 #include <windows.h>
 #include <commdlg.h>
 #include <functional>
+#include <algorithm>
 
 std::string getApkPathWithDialog() {
     char filename[MAX_PATH];
@@ -123,6 +124,16 @@ int main(int argc, char* argv[]) {
             Logger::e("Main", "No APK selected. Exiting.");
             return 1;
         }
+    }
+
+    std::string lowerApk = apkPath;
+    std::transform(lowerApk.begin(), lowerApk.end(), lowerApk.begin(), ::tolower);
+    if (lowerApk.find("skynet.apk") != std::string::npos || lowerApk.find("hal9000.apk") != std::string::npos) {
+        char username[256] = "Dave";
+        DWORD username_len = sizeof(username);
+        GetUserNameA(username, &username_len);
+        Logger::e("HAL9000", std::string("I'm sorry ") + username + ", I'm afraid I can't run that.");
+        return 1;
     }
 
     ApkExtractor extractor;

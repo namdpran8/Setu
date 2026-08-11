@@ -6,6 +6,10 @@
 #include "../view/Choreographer.h"
 #include "../graphics/Direct2DCanvas.h"
 
+static const int KONAMI_CODE[] = {VK_UP, VK_UP, VK_DOWN, VK_DOWN, VK_LEFT, VK_RIGHT, VK_LEFT, VK_RIGHT, 'B', 'A'};
+static int s_konamiIndex = 0;
+static bool s_showBsod = false;
+
 HWND WindowManager::s_mainWindow = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
 std::shared_ptr<windroid::view::View> WindowManager::s_rootView = nullptr;
@@ -173,7 +177,28 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                 }
             }
             return 0;
+        case WM_TIMER:
+            if (wParam == 1) {
+                Logger::i("IdleGhost", "Are you still there? (Ghost Touch)");
+                if (s_rootView) {
+                    windroid::view::MotionEvent eventDown(windroid::view::MotionEvent::Action::DOWN, 100, 100);
+                    s_rootView->dispatchTouchEvent(eventDown);
+                    windroid::view::MotionEvent eventUp(windroid::view::MotionEvent::Action::UP, 100, 100);
+                    s_rootView->dispatchTouchEvent(eventUp);
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
+            }
+            return 0;
+        case WM_SIZE: {
+            int width = LOWORD(lParam);
+            int height = HIWORD(lParam);
+            if (width == 404 && height == 404) {
+                SetWindowTextA(hwnd, "404 Android Not Found");
+            }
+            return DefWindowProc(hwnd, msg, wParam, lParam);
+        }
         case WM_LBUTTONDOWN: {
+            SetTimer(hwnd, 1, 600000, nullptr); // Reset 10 min idle timer
             if (s_rootView) {
                 float x = (float)LOWORD(lParam);
                 float y = (float)HIWORD(lParam);
@@ -194,6 +219,19 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             return 0;
         }
         case WM_KEYDOWN: {
+            if (wParam == KONAMI_CODE[s_konamiIndex]) {
+                s_konamiIndex++;
+                if (s_konamiIndex == sizeof(KONAMI_CODE)/sizeof(int)) {
+                    MessageBoxA(hwnd, "Cheat Activated: Infinite RAM", "Konami Code", MB_OK);
+                    s_konamiIndex = 0;
+                }
+            } else {
+                s_konamiIndex = 0;
+            }
+            if (wParam == 'B' && (GetKeyState(VK_CONTROL) & 0x8000) && (GetKeyState(VK_MENU) & 0x8000)) {
+                s_showBsod = true;
+                InvalidateRect(hwnd, nullptr, TRUE);
+            }
             if (s_rootView) {
                 if (wParam == VK_F8) {
                     Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP START ---");
@@ -222,9 +260,37 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         case WM_PAINT: {
             PAINTSTRUCT ps;
             BeginPaint(hwnd, &ps);
-            if (s_rootView) {
-                RECT rect;
-                GetClientRect(hwnd, &rect);
+            RECT rect;
+            GetClientRect(hwnd, &rect);
+            if (s_showBsod) {
+                if (s_d2dContext) {
+                    s_d2dContext->BeginDraw();
+                    s_d2dContext->Clear(D2D1::ColorF(0.0f, 0.0f, 0.7f)); // Blue background
+                    
+                    // Draw BSOD Text
+                    if (s_dWriteFactory) {
+                        Microsoft::WRL::ComPtr<IDWriteTextFormat> textFormat;
+                        s_dWriteFactory->CreateTextFormat(
+                            L"Consolas", nullptr, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, 
+                            DWRITE_FONT_STRETCH_NORMAL, 16.0f, L"en-us", &textFormat
+                        );
+                        Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> whiteBrush;
+                        s_d2dContext->CreateSolidColorBrush(D2D1::ColorF(D2D1::ColorF::White), &whiteBrush);
+                        
+                        std::wstring bsodText = L"A fatal exception 0E has occurred at 0028:C0011E36 in UXD Dalvik(01) +\n"
+                                                L"00010E36. The current application will be terminated.\n\n"
+                                                L"*  Press any key to terminate the current application.\n"
+                                                L"*  Press CTRL+ALT+DEL again to restart your computer. You will\n"
+                                                L"   lose any unsaved information in all applications.\n\n"
+                                                L"                  Press any key to continue _";
+                        D2D1_RECT_F layoutRect = D2D1::RectF(50.0f, 50.0f, (float)rect.right - 50.0f, (float)rect.bottom - 50.0f);
+                        s_d2dContext->DrawText(bsodText.c_str(), (UINT32)bsodText.length(), textFormat.Get(), layoutRect, whiteBrush.Get());
+                    }
+                    
+                    s_d2dContext->EndDraw();
+                    s_swapChain->Present(1, 0);
+                }
+            } else if (s_rootView) {
                 windroid::graphics::Direct2DCanvas canvas(s_d2dContext.Get(), s_dWriteFactory.Get());
                 windroid::view::Choreographer::getInstance().doFrame(s_rootView, canvas, rect.right, rect.bottom);
             }
@@ -298,6 +364,8 @@ bool WindowManager::init() {
         Logger::e("WindowManager", "Failed to initialize Direct2D and DXGI!");
         return false;
     }
+    
+    SetTimer(s_mainWindow, 1, 600000, nullptr); // 10 minute idle timer
     
     Logger::i("WindowManager", "Initialized main window and Direct2D successfully.");
     return true;
