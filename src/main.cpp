@@ -102,7 +102,16 @@ std::string resolveMainActivity(const AxmlNode* root) {
 }
 
 int main(int argc, char* argv[]) {
+    Logger::i("Main", R"(
+ __      __.__            .___         .__    .___ 
+/  \    /  \  | \    \   \__| _/______  |__| __| _/ 
+\   \/\/   /  |  | \ \/ / __ |\_  __ \ |  |/ __ |  
+ \        /|  |  |  \  / / / |  | \/ |  / /_/ |  
+  \__/\  / |__|  |__/\____ |__|    |__\____ |  
+       \/                 \/               \/  
+    )");
     Logger::i("Main", "Windroid Runtime - APK Inspector Started");
+    Logger::i("Main", "Fun fact: Dalvik was named after a fishing village in Iceland! \xF0\x9F\x90\xA7");
 
     std::string apkPath = "";
     

@@ -199,6 +199,9 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP START ---");
                     s_rootView->dump(0);
                     Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP END ---");
+                } else if (wParam == VK_F9) {
+                    MessageBoxA(hwnd, "You found the hidden Windroid Easter Egg!\n\nDalvik says hello from the grave... \xE2\x98\xA0\xEF\xB8\x8F", "Secret Discovered!", MB_OK | MB_ICONINFORMATION);
+                    Logger::i("EasterEgg", "User pressed F9! Pshhh...");
                 }
                 windroid::view::KeyEvent event(windroid::view::KeyEvent::Action::DOWN, (int)wParam, 0);
                 if (s_rootView->dispatchKeyEvent(event)) {
@@ -276,7 +279,7 @@ bool WindowManager::init() {
     s_mainWindow = CreateWindowEx(
         0,
         "WindroidMainWindow",
-        "Windroid Runtime (Direct2D RenderNode)",
+        "Windroid Runtime (Powered by Caffeine & Tears)",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         540, 1170, // Average modern phone aspect ratio
