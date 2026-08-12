@@ -45,6 +45,7 @@ std::shared_ptr<windroid::view::View> WindowManager::getRootView() {
 
 void WindowManager::clearWindow() {
     if (s_mainWindow) {
+        // Another one bites the dust...
         EnumChildWindows(s_mainWindow, [](HWND hwnd, LPARAM lParam) -> BOOL {
             DestroyWindow(hwnd);
             return TRUE;
@@ -374,6 +375,9 @@ bool WindowManager::init() {
 void WindowManager::runMessageLoop() {
     Logger::i("WindowManager", "Starting message loop...");
     MSG msg;
+    
+    // Around the world, around the world...
+    // Around the world, around the world...
     while (GetMessage(&msg, nullptr, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);

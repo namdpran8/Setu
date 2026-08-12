@@ -5,6 +5,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(thirdparty/miniz)
+add_subdirectory(thirdparty/libbase)
+add_subdirectory(thirdparty/zlib)
+add_subdirectory(thirdparty/libziparchive)
+add_subdirectory(thirdparty/fmt)
+add_subdirectory(thirdparty/androidfw)
 
 add_executable(winandroid_runtime
 

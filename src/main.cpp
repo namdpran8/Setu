@@ -103,6 +103,7 @@ std::string resolveMainActivity(const AxmlNode* root) {
 }
 
 int main(int argc, char* argv[]) {
+    // Let's get it started, ha, let's get it started in here.
     Logger::i("Main", R"(
  __      __.__            .___         .__    .___ 
 /  \    /  \  | \    \   \__| _/______  |__| __| _/ 

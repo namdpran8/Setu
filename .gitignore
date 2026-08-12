@@ -364,3 +364,14 @@ FodyWeavers.xsddexdump.txt
 mainactivity.txt
 testapk/
 dexdump.txt
+
+
+# Build results
+/build/
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+...

@@ -184,6 +184,8 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
             case 0x27: { // throw
                 uint8_t aa = safe8(bytecode, state.pc);
                 Logger::w("Interpreter", "[0x27] throw v" + std::to_string(aa) + " (UNIMPLEMENTED - Exiting method to prevent crash)");
+                Logger::e("Interpreter", "FATAL: Never Gonna Give You Up (but the app just crashed) - Rick Astley");
+                Logger::e("Interpreter", "You have been rick rolled.");
                 isRunning = false;
                 break;
             }
@@ -586,6 +588,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     }
                     Logger::d("Interpreter", "[0x52..58] iget-* v" + std::to_string(a) + ", v" + std::to_string(b) + " -> " + fieldName);
                 } else {
+                    // Hello, is it me you're looking for? - Lionel Richie
                     Logger::w("Interpreter", "[0x52..58] iget-* failed: v" + std::to_string(b) + " is null or not object. Type=" + std::to_string((int)objVal.type));
                     state.registers[a] = Value::MakeNull();
                 }
