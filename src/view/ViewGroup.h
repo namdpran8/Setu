@@ -40,6 +40,8 @@ public:
 
     // Measure pass override to measure children (subclasses must implement specific logic)
     void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
+    
+    std::shared_ptr<View> findViewById(int targetId) override;
 
     // Layout pass override to layout children (subclasses must implement specific logic)
     void onLayout(bool changed, int l, int t, int r, int b) override;

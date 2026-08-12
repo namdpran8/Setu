@@ -157,6 +157,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                     auto layoutTree = m_resManager->getLayout(layoutId);
                     if (layoutTree) {
                         android::ResXMLParser parser(*layoutTree);
+                        parser.restart();
                         Logger::i("StubRegistry", "Inflating layout...");
                         RECT rect;
                         GetClientRect(WindowManager::getMainWindow(), &rect);
@@ -493,6 +494,7 @@ void StubRegistry::registerViewStubs() {
                     auto layoutTree = m_resManager->getLayout(layoutId);
                     if (layoutTree) {
                         android::ResXMLParser parser(*layoutTree);
+                        parser.restart();
                         Logger::i("StubRegistry", "Inflating layout...");
                         RECT rect;
                         GetClientRect(WindowManager::getMainWindow(), &rect);
@@ -533,10 +535,32 @@ void StubRegistry::registerViewStubs() {
                 Logger::w("StubRegistry", "Failed to register onClickListener: invalid control ID or null listener.");
             }
         } else {
-            Logger::e("StubRegistry", "setOnClickListener called with invalid arguments.");
-        }
+            Logger::e("StubRegistry", "setOnClickListener called with invalid arguments.");        }
         return false;
     };
+    
+    // ViewBinding generated findChildViewById stub
+    stubs["Lq1/b;->g(Landroid/view/View;I)Landroid/view/View;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 3 && args[1].type == ValueType::OBJECT && args[1].obj && args[2].type == ValueType::INT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[1].obj;
+            windroid::view::View* rootView = (windroid::view::View*)viewObj->nativeHandle;
+            int targetId = args[2].i;
+            
+            if (rootView) {
+                auto foundView = rootView->findViewById(targetId);
+                if (foundView) {
+                    InterpreterObject* newViewObj = new InterpreterObject();
+                    newViewObj->className = "Landroid/view/View;";
+                    newViewObj->nativeHandle = foundView.get();
+                    if (outReturn) *outReturn = Value::MakeObject(newViewObj);
+                    return false;
+                }
+            }
+        }
+        if (outReturn) *outReturn = Value::MakeNull();
+        return false;
+    };
+
     stubs["Landroid/view/View;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
     stubs["Landroid/widget/Button;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
     stubs["Landroid/widget/TextView;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
@@ -894,6 +918,7 @@ void StubRegistry::registerViewStubs() {
         return false;
     };
 }
+
 
 
 

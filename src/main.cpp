@@ -67,7 +67,8 @@ std::string resolveMainActivity(android::ResXMLParser* parser) {
                     size_t nameLen;
                     const char16_t* name16 = parser->getAttributeName(i, &nameLen);
                     std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
-                    if (attrName == "name" || attrName == "targetActivity") {
+                    uint32_t resId = parser->getAttributeNameResID(i);
+                    if (attrName == "name" || attrName == "targetActivity" || resId == 0x01010003) {
                         size_t valLen;
                         const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
                         if (val16) currentActivity = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
@@ -78,7 +79,8 @@ std::string resolveMainActivity(android::ResXMLParser* parser) {
                     size_t nameLen;
                     const char16_t* name16 = parser->getAttributeName(i, &nameLen);
                     std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
-                    if (attrName == "name") {
+                    uint32_t resId = parser->getAttributeNameResID(i);
+                    if (attrName == "name" || resId == 0x01010003) {
                         size_t valLen;
                         const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
                         if (val16) {
@@ -168,6 +170,7 @@ int main(int argc, char* argv[]) {
         android::ResXMLTree tree;
         if (tree.setTo(axmlBuffer.data(), axmlBuffer.size(), true) == android::NO_ERROR) {
             android::ResXMLParser parser(tree);
+            parser.restart();
             mainActivityClass = resolveMainActivity(&parser);
             if (!mainActivityClass.empty()) {
                 Logger::i("Main", "Resolved Main Activity: " + mainActivityClass);
@@ -271,6 +274,7 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
 
 
 

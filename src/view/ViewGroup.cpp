@@ -7,6 +7,14 @@
 namespace windroid {
 namespace view {
 
+std::shared_ptr<View> ViewGroup::findViewById(int targetId) {
+    if (mId == targetId) return shared_from_this();
+    for (auto& child : mChildren) {
+        if (auto found = child->findViewById(targetId)) return found;
+    }
+    return nullptr;
+}
+
 void ViewGroup::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     // Base ViewGroup (used as a static container by LayoutInflater)
     // We shouldn't override children's measured dimensions here since

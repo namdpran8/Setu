@@ -165,8 +165,9 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
         size_t nameLen;
         const char16_t* name16 = parser->getAttributeName(i, &nameLen);
         std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        uint32_t resId = parser->getAttributeNameResID(i);
         
-        if (attrName == "id") {
+        if (attrName == "id" || resId == 0x010100d0) {
             // Check if it's a reference (e.g. @+id/...)
             int type = parser->getAttributeDataType(i);
             if (type == android::Res_value::TYPE_REFERENCE) {
@@ -202,8 +203,9 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
         size_t nameLen;
         const char16_t* name16 = parser->getAttributeName(i, &nameLen);
         std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        uint32_t resId = parser->getAttributeNameResID(i);
         
-        if (attrName == "layout_width") {
+        if (attrName == "layout_width" || resId == 0x010100f4) {
             int type = parser->getAttributeDataType(i);
             uint32_t data = parser->getAttributeData(i);
             if (type == android::Res_value::TYPE_INT_DEC) {
@@ -213,7 +215,7 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
             } else {
                 lp->width = parseDim(i);
             }
-        } else if (attrName == "layout_height") {
+        } else if (attrName == "layout_height" || resId == 0x010100f5) {
             int type = parser->getAttributeDataType(i);
             uint32_t data = parser->getAttributeData(i);
             if (type == android::Res_value::TYPE_INT_DEC) {
@@ -223,13 +225,13 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
             } else {
                 lp->height = parseDim(i);
             }
-        } else if (attrName == "layout_marginLeft" || attrName == "layout_marginStart") {
+        } else if (attrName == "layout_marginLeft" || attrName == "layout_marginStart" || resId == 0x010100f7 || resId == 0x010103b1) {
             lp->leftMargin = parseDim(i);
-        } else if (attrName == "layout_marginTop") {
+        } else if (attrName == "layout_marginTop" || resId == 0x010100f8) {
             lp->topMargin = parseDim(i);
-        } else if (attrName == "layout_marginRight" || attrName == "layout_marginEnd") {
+        } else if (attrName == "layout_marginRight" || attrName == "layout_marginEnd" || resId == 0x010100f9 || resId == 0x010103b2) {
             lp->rightMargin = parseDim(i);
-        } else if (attrName == "layout_marginBottom") {
+        } else if (attrName == "layout_marginBottom" || resId == 0x010100fa) {
             lp->bottomMargin = parseDim(i);
         }
     }

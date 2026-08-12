@@ -17,6 +17,11 @@ View::View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* par
 
 View::View() {}
 
+std::shared_ptr<windroid::view::View> View::findViewById(int targetId) {
+    if (mId == targetId) return shared_from_this();
+    return nullptr;
+}
+
 void View::measure(int widthMeasureSpec, int heightMeasureSpec) {
     onMeasure(widthMeasureSpec, heightMeasureSpec);
 }

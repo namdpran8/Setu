@@ -49,6 +49,8 @@ public:
 
     int getId() const { return mId; }
     void setId(int id) { mId = id; }
+    
+    virtual std::shared_ptr<View> findViewById(int targetId);
 
     std::shared_ptr<LayoutParams> getLayoutParams() const { return mLayoutParams; }
     void setLayoutParams(std::shared_ptr<LayoutParams> params);
