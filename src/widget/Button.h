@@ -7,7 +7,7 @@ namespace widget {
 
 class Button : public TextView {
 public:
-    Button(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes);
+    Button(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes);
     Button();
     virtual ~Button() = default;
 
@@ -22,3 +22,4 @@ private:
 
 } // namespace widget
 } // namespace windroid
+

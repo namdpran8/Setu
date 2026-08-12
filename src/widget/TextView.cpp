@@ -17,8 +17,8 @@ static std::wstring utf8_to_utf16(const std::string& utf8) {
     return wstrTo;
 }
 
-TextView::TextView(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes)
-    : View(resManager, theme, node, defStyleAttr, defStyleRes) {
+TextView::TextView(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes)
+    : View(resManager, theme, parser, defStyleAttr, defStyleRes) {
     
     mTextPaint.setColor(0xFF000000); // Black by default
     mTextPaint.setTextSize(16.0f);
@@ -33,7 +33,7 @@ TextView::TextView(ResourceManager* resManager, Theme* theme, const struct AxmlN
         
         std::vector<uint32_t> styleables = { attr_text, attr_textSize, attr_textColor, attr_gravity };
         TypedArray a(resManager, styleables);
-        a.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
+        a.obtainStyledAttributes(theme, parser, defStyleAttr, defStyleRes);
         
         if (a.hasValue(0)) setText(utf8_to_utf16(a.getString(0)));
         if (a.hasValue(1)) setTextSize((float)a.getDimensionPixelSize(1, 16));
@@ -144,3 +144,5 @@ void TextView::onDraw(graphics::Canvas& canvas) {
 
 } // namespace widget
 } // namespace windroid
+
+

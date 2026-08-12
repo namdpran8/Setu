@@ -8,8 +8,8 @@
 namespace windroid {
 namespace widget {
 
-EditText::EditText(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes)
-    : TextView(resManager, theme, node, defStyleAttr, defStyleRes) {
+EditText::EditText(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes)
+    : TextView(resManager, theme, parser, defStyleAttr, defStyleRes) {
     
     mBackgroundPaint.setColor(0xFFF5F5F5); // Light Gray background
     mBackgroundPaint.setStyle(graphics::Style::FILL);
@@ -25,7 +25,7 @@ EditText::EditText(ResourceManager* resManager, Theme* theme, const struct AxmlN
         static const uint32_t attr_background = 0x010100d4;
         std::vector<uint32_t> styleables = { attr_background };
         TypedArray a(resManager, styleables);
-        a.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
+        a.obtainStyledAttributes(theme, parser, defStyleAttr, defStyleRes);
         
         if (a.hasValue(0)) mBackgroundPaint.setColor(a.getColor(0, 0xFFF5F5F5));
     }
@@ -107,3 +107,5 @@ bool EditText::onKeyEvent(const view::KeyEvent& event) {
 
 } // namespace widget
 } // namespace windroid
+
+

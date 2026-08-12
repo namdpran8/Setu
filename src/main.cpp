@@ -1,7 +1,7 @@
 #include <iostream>
 #include <string>
 #include "apk_extractor/apkextractor.h"
-#include "AxmlPraserer/AxmlParser.h"
+#include "androidfw/ResourceTypes.h"
 #include "dex/DexParser.h"
 #include "dex/MultiDexManager.h"
 #include "utils/Logger.h"
@@ -34,59 +34,76 @@ std::string getApkPathWithDialog() {
     return "";
 }
 
-std::string resolveMainActivity(const AxmlNode* root) {
-    if (!root || root->tag != "manifest") return "";
+std::string resolveMainActivity(android::ResXMLParser* parser) {
+    if (!parser) return "";
     
     std::string packageName = "";
-    for (const auto& attr : root->attributes) {
-        if (attr.name == "package") {
-            packageName = attr.rawValue;
-            break;
-        }
-    }
-    
-    if (packageName.empty()) return "";
-
     std::string mainActivityName = "";
-
-    std::function<void(const AxmlNode*)> searchNode = [&](const AxmlNode* node) {
-        if (node->tag == "activity" || node->tag == "activity-alias") {
-            bool isMain = false;
-            for (const auto& child : node->children) {
-                if (child->tag == "intent-filter") {
-                    for (const auto& intentChild : child->children) {
-                        if (intentChild->tag == "action") {
-                            for (const auto& attr : intentChild->attributes) {
-                                if ((attr.name == "name" || attr.name == "android:name") && 
-                                    attr.rawValue == "android.intent.action.MAIN") {
-                                    isMain = true;
-                                }
+    std::string currentActivity = "";
+    bool isMain = false;
+    
+    android::ResXMLParser::event_code_t event;
+    while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT && event != android::ResXMLParser::END_DOCUMENT) {
+        if (event == android::ResXMLParser::START_TAG) {
+            size_t tagLen;
+            const char16_t* tag16 = parser->getElementName(&tagLen);
+            std::string tag = tag16 ? android::util::Utf16ToUtf8(android::StringPiece16(tag16, tagLen)) : "";
+            
+            if (tag == "manifest") {
+                for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+                    size_t nameLen;
+                    const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+                    std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+                    if (attrName == "package") {
+                        size_t valLen;
+                        const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
+                        if (val16) packageName = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
+                    }
+                }
+            } else if (tag == "activity" || tag == "activity-alias") {
+                currentActivity = "";
+                isMain = false;
+                for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+                    size_t nameLen;
+                    const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+                    std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+                    if (attrName == "name" || attrName == "targetActivity") {
+                        size_t valLen;
+                        const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
+                        if (val16) currentActivity = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
+                    }
+                }
+            } else if (tag == "action") {
+                for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+                    size_t nameLen;
+                    const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+                    std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+                    if (attrName == "name") {
+                        size_t valLen;
+                        const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
+                        if (val16) {
+                            std::string val = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
+                            if (val == "android.intent.action.MAIN") {
+                                isMain = true;
                             }
                         }
                     }
                 }
             }
-            if (isMain) {
-                for (const auto& attr : node->attributes) {
-                    if (node->tag == "activity-alias" && (attr.name == "targetActivity" || attr.name == "android:targetActivity")) {
-                        mainActivityName = attr.rawValue;
-                        break;
-                    }
-                    if (node->tag == "activity" && (attr.name == "name" || attr.name == "android:name")) {
-                        mainActivityName = attr.rawValue;
-                        break;
-                    }
+        } else if (event == android::ResXMLParser::END_TAG) {
+            size_t tagLen;
+            const char16_t* tag16 = parser->getElementName(&tagLen);
+            std::string tag = tag16 ? android::util::Utf16ToUtf8(android::StringPiece16(tag16, tagLen)) : "";
+            
+            if (tag == "activity" || tag == "activity-alias") {
+                if (isMain && !currentActivity.empty()) {
+                    mainActivityName = currentActivity;
+                    break;
                 }
-                Logger::d("Main", "Found MAIN activity/alias candidate: " + mainActivityName);
             }
         }
-        for (const auto& child : node->children) {
-            searchNode(child.get());
-        }
-    };
+    }
     
-    searchNode(root);
-
     if (mainActivityName.empty()) return "";
 
     if (mainActivityName[0] == '.') {
@@ -148,14 +165,17 @@ int main(int argc, char* argv[]) {
     std::vector<uint8_t> axmlBuffer;
     std::string mainActivityClass = "";
     if (extractor.ExtractEntryToMemory("AndroidManifest.xml", axmlBuffer)) {
-        AxmlParser axmlParser;
-        axmlParser.parse(axmlBuffer);
-        
-        mainActivityClass = resolveMainActivity(axmlParser.getRootNode());
-        if (!mainActivityClass.empty()) {
-            Logger::i("Main", "Resolved Main Activity: " + mainActivityClass);
+        android::ResXMLTree tree;
+        if (tree.setTo(axmlBuffer.data(), axmlBuffer.size(), true) == android::NO_ERROR) {
+            android::ResXMLParser parser(tree);
+            mainActivityClass = resolveMainActivity(&parser);
+            if (!mainActivityClass.empty()) {
+                Logger::i("Main", "Resolved Main Activity: " + mainActivityClass);
+            } else {
+                Logger::w("Main", "Failed to resolve Main Activity from AndroidManifest.xml");
+            }
         } else {
-            Logger::w("Main", "Failed to resolve Main Activity from AndroidManifest.xml");
+            Logger::e("Main", "Failed to parse AndroidManifest.xml");
         }
     } else {
         Logger::e("Main", "Could not find AndroidManifest.xml in the APK!");
@@ -197,8 +217,8 @@ int main(int argc, char* argv[]) {
     }
 
     // --- Phase 5: Resource Management ---
-    ResourceManager resManager(&extractor);
-    if (!resManager.init()) {
+    windroid::ResourceManager resManager(&extractor);
+    if (!resManager.init(apkPath)) {
         Logger::e("Main", "Failed to initialize ResourceManager!");
     }
     if (!resManager.loadFrameworkApk("testapk/framework-res.apk")) {
@@ -251,3 +271,6 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
+
+

@@ -8,7 +8,7 @@
 #include "Interpreter.h" // For recursive Interpreter execution
 
 std::unordered_map<std::string, StubFunc> StubRegistry::stubs;
-ResourceManager* StubRegistry::m_resManager = nullptr;
+windroid::ResourceManager* StubRegistry::m_resManager = nullptr;
 MultiDexManager* StubRegistry::m_multiDexManager = nullptr;
 std::unordered_map<int, InterpreterObject*> StubRegistry::clickListeners;
 
@@ -28,7 +28,7 @@ static std::string utf16_to_utf8(const std::wstring& utf16) {
     return utf8;
 }
 
-void StubRegistry::init(ResourceManager* resManager, MultiDexManager* multiDexManager) {
+void StubRegistry::init(windroid::ResourceManager* resManager, MultiDexManager* multiDexManager) {
     m_resManager = resManager;
     m_multiDexManager = multiDexManager;
     registerActivityStubs();
@@ -154,18 +154,16 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                 Logger::d("StubRegistry", "Executed: setContentView(layoutId=" + std::to_string(layoutId) + ")");
                 
                 if (m_resManager) {
-                    auto layoutParser = m_resManager->getLayout(layoutId);
-                    if (layoutParser) {
-                        const AxmlNode* root = layoutParser->getRootNode();
-                        if (root) {
-                            Logger::i("StubRegistry", "Inflating layout with root tag: " + root->tag);
-                            RECT rect;
-                            GetClientRect(WindowManager::getMainWindow(), &rect);
-                            int pW = rect.right > 0 ? rect.right : 400;
-                            int pH = rect.bottom > 0 ? rect.bottom : 800;
-                            auto rootView = windroid::LayoutInflater::inflate(root, m_resManager);
-                            WindowManager::setRootView(rootView);
-                        }
+                    auto layoutTree = m_resManager->getLayout(layoutId);
+                    if (layoutTree) {
+                        android::ResXMLParser parser(*layoutTree);
+                        Logger::i("StubRegistry", "Inflating layout...");
+                        RECT rect;
+                        GetClientRect(WindowManager::getMainWindow(), &rect);
+                        int pW = rect.right > 0 ? rect.right : 400;
+                        int pH = rect.bottom > 0 ? rect.bottom : 800;
+                        auto rootView = windroid::LayoutInflater::inflate(&parser, m_resManager);
+                        WindowManager::setRootView(rootView);
                     }
                 }
             }
@@ -492,23 +490,21 @@ void StubRegistry::registerViewStubs() {
                 int layoutId = args[1].i;
                 Logger::d("StubRegistry", "Executed: LayoutInflater.inflate(layoutId=" + std::to_string(layoutId) + ")");
                 if (m_resManager) {
-                    auto layoutParser = m_resManager->getLayout(layoutId);
-                    if (layoutParser) {
-                        const AxmlNode* root = layoutParser->getRootNode();
-                        if (root) {
-                            Logger::i("StubRegistry", "Inflating layout with root tag: " + root->tag);
-                            RECT rect;
-                            GetClientRect(WindowManager::getMainWindow(), &rect);
-                            int pW = rect.right > 0 ? rect.right : 400;
-                            int pH = rect.bottom > 0 ? rect.bottom : 800;
-                            auto rootView = windroid::LayoutInflater::inflate(root, m_resManager);
-                            WindowManager::setRootView(rootView);
-                            
-                            InterpreterObject* viewObj = new InterpreterObject();
-                            viewObj->className = "Landroid/view/View;";
-                            viewObj->nativeHandle = rootView.get();
-                            if (outReturn) *outReturn = Value::MakeObject(viewObj);
-                        }
+                    auto layoutTree = m_resManager->getLayout(layoutId);
+                    if (layoutTree) {
+                        android::ResXMLParser parser(*layoutTree);
+                        Logger::i("StubRegistry", "Inflating layout...");
+                        RECT rect;
+                        GetClientRect(WindowManager::getMainWindow(), &rect);
+                        int pW = rect.right > 0 ? rect.right : 400;
+                        int pH = rect.bottom > 0 ? rect.bottom : 800;
+                        auto rootView = windroid::LayoutInflater::inflate(&parser, m_resManager);
+                        WindowManager::setRootView(rootView);
+                        
+                        InterpreterObject* viewObj = new InterpreterObject();
+                        viewObj->className = "Landroid/view/View;";
+                        viewObj->nativeHandle = rootView.get();
+                        if (outReturn) *outReturn = Value::MakeObject(viewObj);
                     }
                 }
             } else {
@@ -886,7 +882,7 @@ void StubRegistry::registerViewStubs() {
         if (outReturn) {
             std::string resName = "unknown_resource";
             if (args.size() > 1 && args[1].type == ValueType::INT && m_resManager) {
-                resName = m_resManager->getResourcePath(args[1].i);
+                resName = m_resManager->getString(args[1].i);
             }
             InterpreterObject* strObj = new InterpreterObject();
             strObj->className = "Ljava/lang/String;";
@@ -898,3 +894,6 @@ void StubRegistry::registerViewStubs() {
         return false;
     };
 }
+
+
+

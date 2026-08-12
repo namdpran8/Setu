@@ -1,7 +1,8 @@
+#include "androidfw/Util.h"
 #include "ConstraintLayout.h"
 #include <algorithm>
 #include "../utils/Logger.h"
-#include "../AxmlPraserer/AxmlParser.h"
+#include "androidfw/ResourceTypes.h"
 
 namespace windroid {
 namespace view {
@@ -233,51 +234,72 @@ void ConstraintLayout::onLayout(bool changed, int l, int t, int r, int b) {
     }
 }
 
-std::shared_ptr<View::LayoutParams> ConstraintLayout::generateLayoutParams(const AxmlNode* node) {
+std::shared_ptr<View::LayoutParams> ConstraintLayout::generateLayoutParams(android::ResXMLParser* parser) {
     auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
-    if (!node) return lp;
-    ViewGroup::parseBaseLayoutParams(lp, node);
+    if (!parser) return lp;
+    ViewGroup::parseBaseLayoutParams(lp, parser);
 
-    auto parseConstraintTarget = [&](const AxmlAttribute& a) {
-        if (a.typedValueType == 0x03) { // TYPE_STRING
-            if (a.rawValue == "parent") return 0;
+    auto parseConstraintTarget = [&](uint8_t type, uint32_t data, const std::string& rawValue) {
+        if (type == android::Res_value::TYPE_STRING) {
+            if (rawValue == "parent") return 0;
         }
-        if (a.typedValueData == 0) return 0;
-        return (int)a.typedValueData;
+        if (data == 0) return 0;
+        return (int)data;
     };
 
-    if (node->tag.find("Guideline") != std::string::npos) lp->isGuideline = true;
+    size_t tagLen;
+    const char16_t* tag16 = parser->getElementName(&tagLen);
+    if (tag16) {
+        std::string tagStr = android::util::Utf16ToUtf8(android::StringPiece16(tag16, tagLen));
+        if (tagStr.find("Guideline") != std::string::npos) lp->isGuideline = true;
+    }
 
-    for (const auto& attr : node->attributes) {
-        if (attr.name == "layout_constraintTop_toTopOf") lp->topToTop = parseConstraintTarget(attr);
-        else if (attr.name == "layout_constraintTop_toBottomOf") lp->topToBottom = parseConstraintTarget(attr);
-        else if (attr.name == "layout_constraintBottom_toTopOf") lp->bottomToTop = parseConstraintTarget(attr);
-        else if (attr.name == "layout_constraintBottom_toBottomOf") lp->bottomToBottom = parseConstraintTarget(attr);
-        else if (attr.name == "layout_constraintStart_toStartOf" || attr.name == "layout_constraintLeft_toLeftOf") lp->startToStart = parseConstraintTarget(attr);
-        else if (attr.name == "layout_constraintStart_toEndOf" || attr.name == "layout_constraintLeft_toRightOf") lp->startToEnd = parseConstraintTarget(attr);
-        else if (attr.name == "layout_constraintEnd_toStartOf" || attr.name == "layout_constraintRight_toLeftOf") lp->endToStart = parseConstraintTarget(attr);
-        else if (attr.name == "layout_constraintEnd_toEndOf" || attr.name == "layout_constraintRight_toRightOf") lp->endToEnd = parseConstraintTarget(attr);
-        else if (attr.name == "layout_constraintHorizontal_bias") {
+    for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+        size_t nameLen;
+        const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+        std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        
+        std::string rawValue = "";
+        size_t valLen;
+        const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
+        if (val16) rawValue = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
+        
+        uint8_t type = parser->getAttributeDataType(i);
+        uint32_t data = parser->getAttributeData(i);
+
+        if (attrName == "layout_constraintTop_toTopOf") lp->topToTop = parseConstraintTarget(type, data, rawValue);
+        else if (attrName == "layout_constraintTop_toBottomOf") lp->topToBottom = parseConstraintTarget(type, data, rawValue);
+        else if (attrName == "layout_constraintBottom_toTopOf") lp->bottomToTop = parseConstraintTarget(type, data, rawValue);
+        else if (attrName == "layout_constraintBottom_toBottomOf") lp->bottomToBottom = parseConstraintTarget(type, data, rawValue);
+        else if (attrName == "layout_constraintStart_toStartOf" || attrName == "layout_constraintLeft_toLeftOf") lp->startToStart = parseConstraintTarget(type, data, rawValue);
+        else if (attrName == "layout_constraintStart_toEndOf" || attrName == "layout_constraintLeft_toRightOf") lp->startToEnd = parseConstraintTarget(type, data, rawValue);
+        else if (attrName == "layout_constraintEnd_toStartOf" || attrName == "layout_constraintRight_toLeftOf") lp->endToStart = parseConstraintTarget(type, data, rawValue);
+        else if (attrName == "layout_constraintEnd_toEndOf" || attrName == "layout_constraintRight_toRightOf") lp->endToEnd = parseConstraintTarget(type, data, rawValue);
+        else if (attrName == "layout_constraintHorizontal_bias") {
             union { uint32_t i; float f; } u;
-            u.i = attr.typedValueData;
+            u.i = data;
             lp->horizontalBias = u.f;
         }
-        else if (attr.name == "layout_constraintVertical_bias") {
+        else if (attrName == "layout_constraintVertical_bias") {
             union { uint32_t i; float f; } u;
-            u.i = attr.typedValueData;
+            u.i = data;
             lp->verticalBias = u.f;
         }
-        else if (attr.name == "layout_constraintGuide_percent") {
+        else if (attrName == "layout_constraintGuide_percent") {
             union { uint32_t i; float f; } u;
-            u.i = attr.typedValueData;
+            u.i = data;
             lp->guidePercent = u.f;
         }
-        else if (attr.name == "layout_constraintGuide_begin") lp->guideBegin = (attr.typedValueData >> 8) * 2;
-        else if (attr.name == "layout_constraintGuide_end") lp->guideEnd = (attr.typedValueData >> 8) * 2;
-        else if (attr.name == "orientation") lp->orientation = attr.typedValueData;
+        else if (attrName == "layout_constraintGuide_begin") lp->guideBegin = (data >> 8) * 2;
+        else if (attrName == "layout_constraintGuide_end") lp->guideEnd = (data >> 8) * 2;
+        else if (attrName == "orientation") lp->orientation = data;
     }
     return lp;
 }
 
 } // namespace view
 } // namespace windroid
+
+
+
+

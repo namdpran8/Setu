@@ -1,6 +1,7 @@
+#include "androidfw/Util.h"
 #include "FrameLayout.h"
 #include <algorithm>
-#include "../AxmlPraserer/AxmlParser.h"
+#include "androidfw/ResourceTypes.h"
 
 namespace windroid {
 namespace view {
@@ -87,12 +88,24 @@ void FrameLayout::onLayout(bool changed, int l, int t, int r, int b) {
     }
 }
 
-std::shared_ptr<View::LayoutParams> FrameLayout::generateLayoutParams(const AxmlNode* node) {
+std::shared_ptr<View::LayoutParams> FrameLayout::generateLayoutParams(android::ResXMLParser* parser) {
     auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
-    if (!node) return lp;
-    for (const auto& attr : node->attributes) {
-        if (attr.name == "layout_gravity") {
-            lp->gravity = attr.typedValueData;
+    if (!parser) return lp;
+    for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+        size_t nameLen;
+        const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+        std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        
+        std::string rawValue = "";
+        size_t valLen;
+        const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
+        if (val16) rawValue = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
+        
+        uint8_t type = parser->getAttributeDataType(i);
+        uint32_t data = parser->getAttributeData(i);
+
+        if (attrName == "layout_gravity") {
+            lp->gravity = data;
         }
     }
     return lp;
@@ -100,3 +113,7 @@ std::shared_ptr<View::LayoutParams> FrameLayout::generateLayoutParams(const Axml
 
 } // namespace view
 } // namespace windroid
+
+
+
+

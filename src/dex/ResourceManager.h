@@ -2,34 +2,35 @@
 #include <string>
 #include <cstdint>
 #include <memory>
+#include <vector>
+#include "androidfw/AssetManager2.h"
+#include "androidfw/ApkAssets.h"
+#include "androidfw/ResourceTypes.h"
 #include "../apk_extractor/apkextractor.h"
-#include "ArscParser.h"
-#include "../AxmlPraserer/AxmlParser.h"
-#include <unordered_map>
+
+namespace windroid {
 
 class ResourceManager {
 public:
     ResourceManager(ApkExtractor* extractor);
     ~ResourceManager();
 
-    bool init();
+    bool init(const std::string& apkPath);
     bool loadFrameworkApk(const std::string& path);
 
-    // Gets the path to a resource (e.g. 0x7f0b001c -> "res/layout/activity_main.xml")
-    std::string getResourcePath(uint32_t resId) const;
-    
-    // Extracts and parses an AXML file given its resource ID
-    std::unique_ptr<AxmlParser> getLayout(uint32_t layoutId) const;
+    android::AssetManager2* getAssetManager() { return m_assetManager.get(); }
 
-    // Gets a string value by resource ID (same as getResourcePath, but named appropriately)
-    std::string getString(uint32_t resId) const;
+    // Extracts and parses a binary XML layout given its resource ID
+    std::unique_ptr<android::ResXMLTree> getLayout(uint32_t layoutId);
 
-    // Get a complex bag (style/theme) by resource ID
-    const ArscParser::Bag* getBag(uint32_t resId) const;
+    // Gets a string value by resource ID
+    std::string getString(uint32_t resId);
 
 private:
     ApkExtractor* m_extractor; // Main app extractor
-    std::unique_ptr<ApkExtractor> m_frameworkExtractor; // Framework APK extractor
-
-    std::unordered_map<uint8_t, std::shared_ptr<ArscParser>> m_parsers;
+    std::vector<android::AssetManager2::ApkAssetsPtr> m_apkAssets;
+    std::unique_ptr<android::AssetManager2> m_assetManager;
 };
+
+} // namespace windroid
+

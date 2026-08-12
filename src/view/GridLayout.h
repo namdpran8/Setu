@@ -39,7 +39,7 @@ protected:
     void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
     void onLayout(bool changed, int l, int t, int r, int b) override;
 
-    std::shared_ptr<View::LayoutParams> generateLayoutParams(const AxmlNode* node) override;
+    std::shared_ptr<View::LayoutParams> generateLayoutParams(android::ResXMLParser* parser) override;
 
 private:
     int mRowCount = 0;
@@ -51,3 +51,4 @@ private:
 
 } // namespace view
 } // namespace windroid
+

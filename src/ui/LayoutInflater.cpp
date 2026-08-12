@@ -1,3 +1,4 @@
+#include "androidfw/Util.h"
 #include "LayoutInflater.h"
 #include "../utils/Logger.h"
 #include "../widget/Button.h"
@@ -8,6 +9,7 @@
 #include "../view/RelativeLayout.h"
 #include "../view/ConstraintLayout.h"
 #include "../view/GridLayout.h"
+#include "androidfw/ResourceUtils.h"
 #include <string>
 #include <cwchar>
 
@@ -22,24 +24,39 @@ static std::wstring utf8_to_utf16(const std::string& utf8) {
     return wstrTo;
 }
 
-std::shared_ptr<windroid::view::View> LayoutInflater::inflate(const AxmlNode* node, ResourceManager* resManager, Theme* theme) {
-    if (!node) return nullptr;
-    return inflateRecursive(node, resManager, theme);
+std::shared_ptr<windroid::view::View> LayoutInflater::inflate(android::ResXMLParser* parser, ResourceManager* resManager, Theme* theme) {
+    if (!parser) return nullptr;
+
+    android::ResXMLParser::event_code_t event;
+    while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT && event != android::ResXMLParser::END_DOCUMENT) {
+        if (event == android::ResXMLParser::START_TAG) {
+            return inflateRecursive(parser, nullptr, resManager, theme);
+        }
+    }
+    return nullptr;
 }
 
-std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const AxmlNode* node, ResourceManager* resManager, Theme* theme) {
-    std::string tag = node->tag;
+std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(android::ResXMLParser* parser, std::shared_ptr<windroid::view::ViewGroup> parent, ResourceManager* resManager, Theme* theme) {
+    size_t tagLen;
+    const char16_t* tag16 = parser->getElementName(&tagLen);
+    if (!tag16) return nullptr;
+    
+    std::string tag = android::util::Utf16ToUtf8(android::StringPiece16(tag16, tagLen));
     std::shared_ptr<windroid::view::View> view = nullptr;
 
     if (tag.find("ConstraintLayout") != std::string::npos) {
         view = std::make_shared<windroid::view::ConstraintLayout>();
     } else if (tag.find("GridLayout") != std::string::npos) {
         auto gl = std::make_shared<windroid::view::GridLayout>();
-        for (const auto& attr : node->attributes) {
-            if (attr.name == "columnCount") {
-                gl->setColumnCount(attr.typedValueData);
-            } else if (attr.name == "rowCount") {
-                gl->setRowCount(attr.typedValueData);
+        for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+            size_t nameLen;
+            const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+            std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+            
+            if (attrName == "columnCount") {
+                gl->setColumnCount(parser->getAttributeData(i));
+            } else if (attrName == "rowCount") {
+                gl->setRowCount(parser->getAttributeData(i));
             }
         }
         view = gl;
@@ -52,12 +69,15 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
         } else if (tag.find("TableRow") != std::string::npos) {
             ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
         } else {
-            for (const auto& attr : node->attributes) {
-                if (attr.name == "orientation") {
-                    if (attr.typedValueData == 1 || resolveString(attr, resManager) == "vertical") {
+            ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL); // default
+            for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+                size_t nameLen;
+                const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+                std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+                
+                if (attrName == "orientation") {
+                    if (parser->getAttributeData(i) == 1) { // 1 is vertical in Android
                         ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
-                    } else {
-                        ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
                     }
                     break;
                 }
@@ -69,13 +89,13 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
     } else if (tag.find("RelativeLayout") != std::string::npos) {
         view = std::make_shared<windroid::view::RelativeLayout>();
     } else if (tag.find("TextView") != std::string::npos) {
-        view = std::make_shared<windroid::widget::TextView>(resManager, theme, node, 0, 0);
+        view = std::make_shared<windroid::widget::TextView>(resManager, theme, parser, 0, 0);
     } else if (tag.find("Button") != std::string::npos) {
-        view = std::make_shared<windroid::widget::Button>(resManager, theme, node, 0, 0);
+        view = std::make_shared<windroid::widget::Button>(resManager, theme, parser, 0, 0);
     } else if (tag.find("EditText") != std::string::npos) {
-        view = std::make_shared<windroid::widget::EditText>(resManager, theme, node, 0, 0);
+        view = std::make_shared<windroid::widget::EditText>(resManager, theme, parser, 0, 0);
     } else if (tag.find("Guideline") != std::string::npos || tag.find("Space") != std::string::npos || tag == "View" || tag == "android.view.View") {
-        view = std::make_shared<windroid::view::View>(resManager, theme, node, 0, 0);
+        view = std::make_shared<windroid::view::View>(resManager, theme, parser, 0, 0);
     } else if (tag.find("HorizontalScrollView") != std::string::npos) {
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
@@ -85,46 +105,34 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(const Axm
         ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
         view = ll;
     } else if (tag.find("SlidingUpPanelLayout") != std::string::npos) {
-        // Fallback: Use Vertical LinearLayout so the main content takes the screen
-        // and the sliding panel is pushed down off-screen (since main content is match_parent).
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
         view = ll;
-    } else if (tag.find("ConstraintLayout") != std::string::npos) {
-        view = std::make_shared<windroid::view::ConstraintLayout>();
     } else {
         Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", falling back to FrameLayout");
         view = std::make_shared<windroid::view::FrameLayout>();
     }
 
-    parseViewAttributes(node, view, resManager, theme);
+    parseViewAttributes(parser, view, resManager, theme);
+    parseLayoutParams(parser, view, parent);
 
-    // Parse children if it is a ViewGroup
     auto viewGroup = std::dynamic_pointer_cast<windroid::view::ViewGroup>(view);
-    if (viewGroup) {
-        for (const auto& childNode : node->children) {
-            auto childView = inflateRecursive(childNode.get(), resManager, theme);
-            if (childView) {
-                parseLayoutParams(childNode.get(), childView, viewGroup);
+    
+    int depth = 1;
+    android::ResXMLParser::event_code_t event;
+    while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT && event != android::ResXMLParser::END_DOCUMENT) {
+        if (event == android::ResXMLParser::START_TAG) {
+            auto childView = inflateRecursive(parser, viewGroup, resManager, theme);
+            if (childView && viewGroup) {
                 viewGroup->addView(childView);
             }
+        } else if (event == android::ResXMLParser::END_TAG) {
+            depth--;
+            if (depth == 0) break;
         }
     }
 
     return view;
-}
-
-std::string LayoutInflater::resolveString(const AxmlAttribute& attr, ResourceManager* resManager) {
-    if (attr.typedValueType == 0x03) { // TYPE_STRING
-        if (!attr.rawValue.empty()) {
-            return attr.rawValue;
-        }
-    } else if (attr.typedValueType == 0x01) { // TYPE_REFERENCE
-        if (resManager) {
-            return resManager->getString(attr.typedValueData);
-        }
-    }
-    return std::to_string(attr.typedValueData);
 }
 
 int LayoutInflater::parseDimension(const std::string& dimenStr) {
@@ -152,48 +160,77 @@ int LayoutInflater::parseComplexDimension(uint32_t data) {
     return value; // px or others
 }
 
-void LayoutInflater::parseViewAttributes(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, ResourceManager* resManager, Theme* theme) {
-    for (const auto& attr : node->attributes) {
-        if (attr.name == "id") {
-            view->setId(attr.typedValueData);
-        } else if (attr.name == "visibility") {
-            if (attr.typedValueData == 0) view->setVisibility(windroid::view::View::VISIBLE);
-            else if (attr.typedValueData == 1) view->setVisibility(windroid::view::View::INVISIBLE);
-            else if (attr.typedValueData == 2) view->setVisibility(windroid::view::View::GONE);
+void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::shared_ptr<windroid::view::View> view, ResourceManager* resManager, Theme* theme) {
+    for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+        size_t nameLen;
+        const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+        std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        
+        if (attrName == "id") {
+            // Check if it's a reference (e.g. @+id/...)
+            int type = parser->getAttributeDataType(i);
+            if (type == android::Res_value::TYPE_REFERENCE) {
+                view->setId(parser->getAttributeData(i));
+            }
+        } else if (attrName == "visibility") {
+            int val = parser->getAttributeData(i);
+            if (val == 0) view->setVisibility(windroid::view::View::VISIBLE);
+            else if (val == 1) view->setVisibility(windroid::view::View::INVISIBLE);
+            else if (val == 2) view->setVisibility(windroid::view::View::GONE);
         }
     }
 }
 
-void LayoutInflater::parseLayoutParams(const AxmlNode* node, std::shared_ptr<windroid::view::View> view, std::shared_ptr<windroid::view::ViewGroup> parent) {
+void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::shared_ptr<windroid::view::View> view, std::shared_ptr<windroid::view::ViewGroup> parent) {
     std::shared_ptr<windroid::view::View::LayoutParams> lp;
     if (parent) {
-        lp = parent->generateLayoutParams(node);
+        lp = parent->generateLayoutParams(parser);
     } else {
         lp = std::make_shared<windroid::view::View::LayoutParams>(windroid::view::View::WRAP_CONTENT, windroid::view::View::WRAP_CONTENT);
     }
 
-    auto parseDim = [](const AxmlAttribute& attr) {
-        if (attr.typedValueType == 0x05) return LayoutInflater::parseComplexDimension(attr.typedValueData);
-        return (int)attr.typedValueData;
+    auto parseDim = [&](size_t idx) {
+        int type = parser->getAttributeDataType(idx);
+        uint32_t data = parser->getAttributeData(idx);
+        if (type == android::Res_value::TYPE_DIMENSION) {
+            return LayoutInflater::parseComplexDimension(data);
+        }
+        return (int)data;
     };
 
-    for (const auto& attr : node->attributes) {
-        if (attr.name == "layout_width") {
-            if (attr.typedValueData == 0xFFFFFFFF) lp->width = windroid::view::View::MATCH_PARENT;
-            else if (attr.typedValueData == 0xFFFFFFFE) lp->width = windroid::view::View::WRAP_CONTENT;
-            else lp->width = parseDim(attr);
-        } else if (attr.name == "layout_height") {
-            if (attr.typedValueData == 0xFFFFFFFF) lp->height = windroid::view::View::MATCH_PARENT;
-            else if (attr.typedValueData == 0xFFFFFFFE) lp->height = windroid::view::View::WRAP_CONTENT;
-            else lp->height = parseDim(attr);
-        } else if (attr.name == "layout_marginLeft" || attr.name == "layout_marginStart") {
-            lp->leftMargin = parseDim(attr);
-        } else if (attr.name == "layout_marginTop") {
-            lp->topMargin = parseDim(attr);
-        } else if (attr.name == "layout_marginRight" || attr.name == "layout_marginEnd") {
-            lp->rightMargin = parseDim(attr);
-        } else if (attr.name == "layout_marginBottom") {
-            lp->bottomMargin = parseDim(attr);
+    for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+        size_t nameLen;
+        const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+        std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        
+        if (attrName == "layout_width") {
+            int type = parser->getAttributeDataType(i);
+            uint32_t data = parser->getAttributeData(i);
+            if (type == android::Res_value::TYPE_INT_DEC) {
+                if (data == 0xFFFFFFFF) lp->width = windroid::view::View::MATCH_PARENT;
+                else if (data == 0xFFFFFFFE) lp->width = windroid::view::View::WRAP_CONTENT;
+                else lp->width = (int)data;
+            } else {
+                lp->width = parseDim(i);
+            }
+        } else if (attrName == "layout_height") {
+            int type = parser->getAttributeDataType(i);
+            uint32_t data = parser->getAttributeData(i);
+            if (type == android::Res_value::TYPE_INT_DEC) {
+                if (data == 0xFFFFFFFF) lp->height = windroid::view::View::MATCH_PARENT;
+                else if (data == 0xFFFFFFFE) lp->height = windroid::view::View::WRAP_CONTENT;
+                else lp->height = (int)data;
+            } else {
+                lp->height = parseDim(i);
+            }
+        } else if (attrName == "layout_marginLeft" || attrName == "layout_marginStart") {
+            lp->leftMargin = parseDim(i);
+        } else if (attrName == "layout_marginTop") {
+            lp->topMargin = parseDim(i);
+        } else if (attrName == "layout_marginRight" || attrName == "layout_marginEnd") {
+            lp->rightMargin = parseDim(i);
+        } else if (attrName == "layout_marginBottom") {
+            lp->bottomMargin = parseDim(i);
         }
     }
 
@@ -201,3 +238,6 @@ void LayoutInflater::parseLayoutParams(const AxmlNode* node, std::shared_ptr<win
 }
 
 } // namespace windroid
+
+
+

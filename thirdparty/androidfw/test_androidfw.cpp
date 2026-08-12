@@ -42,8 +42,9 @@ int main() {
             auto name_exp = am.GetResourceName(res_id);
             if (name_exp.has_value()) {
                 const auto& name = name_exp.value();
+                std::string formatted_name = android::ToFormattedResourceString(name);
                 std::cout << "Found resource 0x" << std::hex << res_id 
-                          << " : " << name.package << ":" << name.type << "/" << name.entry << std::endl;
+                          << " : " << formatted_name << std::endl;
                 
                 if (value->type == Res_value::TYPE_STRING) {
                     auto str_exp = am.GetStringPoolForCookie(value->cookie)->stringAt(value->data);

@@ -1,7 +1,8 @@
+#include "androidfw/Util.h"
 #include "ViewGroup.h"
 #include <algorithm>
 #include "MotionEvent.h"
-#include "../AxmlPraserer/AxmlParser.h"
+#include "androidfw/ResourceTypes.h"
 
 namespace windroid {
 namespace view {
@@ -143,46 +144,58 @@ void ViewGroup::measureChildWithMargins(std::shared_ptr<View> child,
     child->measure(childWidthMeasureSpec, childHeightMeasureSpec);
 }
 
-void ViewGroup::parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, const AxmlNode* node) {
-    if (!node || !lp) return;
-    for (const auto& attr : node->attributes) {
-        if (attr.name == "layout_width") {
-            if (attr.typedValueType == 0x03) { // STRING
-                if (attr.rawValue == "match_parent" || attr.rawValue == "fill_parent") lp->width = View::MATCH_PARENT;
-                else if (attr.rawValue == "wrap_content") lp->width = View::WRAP_CONTENT;
-            } else if (attr.typedValueType == 0x10 || attr.typedValueType == 0x11) { // INT
-                if ((int)attr.typedValueData == -1) lp->width = View::MATCH_PARENT;
-                else if ((int)attr.typedValueData == -2) lp->width = View::WRAP_CONTENT;
-                else lp->width = attr.typedValueData;
-            } else if (attr.typedValueType == 0x05) { // DIMENSION
-                lp->width = attr.typedValueData; // Raw for now, should map px
+void ViewGroup::parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, android::ResXMLParser* parser) {
+    if (!parser || !lp) return;
+    for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+        size_t nameLen;
+        const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+        std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        
+        std::string rawValue = "";
+        size_t valLen;
+        const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
+        if (val16) rawValue = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
+        
+        uint8_t type = parser->getAttributeDataType(i);
+        uint32_t data = parser->getAttributeData(i);
+
+        if (attrName == "layout_width") {
+            if (type == 0x03) { // STRING
+                if (rawValue == "match_parent" || rawValue == "fill_parent") lp->width = View::MATCH_PARENT;
+                else if (rawValue == "wrap_content") lp->width = View::WRAP_CONTENT;
+            } else if (type == 0x10 || type == 0x11) { // INT
+                if ((int)data == -1) lp->width = View::MATCH_PARENT;
+                else if ((int)data == -2) lp->width = View::WRAP_CONTENT;
+                else lp->width = data;
+            } else if (type == 0x05) { // DIMENSION
+                lp->width = data; // Raw for now, should map px
             }
-        } else if (attr.name == "layout_height") {
-            if (attr.typedValueType == 0x03) { 
-                if (attr.rawValue == "match_parent" || attr.rawValue == "fill_parent") lp->height = View::MATCH_PARENT;
-                else if (attr.rawValue == "wrap_content") lp->height = View::WRAP_CONTENT;
-            } else if (attr.typedValueType == 0x10 || attr.typedValueType == 0x11) { // INT
-                if ((int)attr.typedValueData == -1) lp->height = View::MATCH_PARENT;
-                else if ((int)attr.typedValueData == -2) lp->height = View::WRAP_CONTENT;
-                else lp->height = attr.typedValueData;
-            } else if (attr.typedValueType == 0x05) { // DIMENSION
-                lp->height = attr.typedValueData;
+        } else if (attrName == "layout_height") {
+            if (type == 0x03) { 
+                if (rawValue == "match_parent" || rawValue == "fill_parent") lp->height = View::MATCH_PARENT;
+                else if (rawValue == "wrap_content") lp->height = View::WRAP_CONTENT;
+            } else if (type == 0x10 || type == 0x11) { // INT
+                if ((int)data == -1) lp->height = View::MATCH_PARENT;
+                else if ((int)data == -2) lp->height = View::WRAP_CONTENT;
+                else lp->height = data;
+            } else if (type == 0x05) { // DIMENSION
+                lp->height = data;
             }
-        } else if (attr.name == "layout_marginLeft" || attr.name == "layout_marginStart") {
-            lp->leftMargin = attr.typedValueData;
-        } else if (attr.name == "layout_marginRight" || attr.name == "layout_marginEnd") {
-            lp->rightMargin = attr.typedValueData;
-        } else if (attr.name == "layout_marginTop") {
-            lp->topMargin = attr.typedValueData;
-        } else if (attr.name == "layout_marginBottom") {
-            lp->bottomMargin = attr.typedValueData;
+        } else if (attrName == "layout_marginLeft" || attrName == "layout_marginStart") {
+            lp->leftMargin = data;
+        } else if (attrName == "layout_marginRight" || attrName == "layout_marginEnd") {
+            lp->rightMargin = data;
+        } else if (attrName == "layout_marginTop") {
+            lp->topMargin = data;
+        } else if (attrName == "layout_marginBottom") {
+            lp->bottomMargin = data;
         }
     }
 }
 
-std::shared_ptr<View::LayoutParams> ViewGroup::generateLayoutParams(const AxmlNode* node) {
+std::shared_ptr<View::LayoutParams> ViewGroup::generateLayoutParams(android::ResXMLParser* parser) {
     auto lp = std::make_shared<View::LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
-    parseBaseLayoutParams(lp, node);
+    parseBaseLayoutParams(lp, parser);
     return lp;
 }
 
@@ -195,3 +208,8 @@ void ViewGroup::dump(int depth) {
 
 } // namespace view
 } // namespace windroid
+
+
+
+
+

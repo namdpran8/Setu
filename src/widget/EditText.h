@@ -7,7 +7,7 @@ namespace widget {
 
 class EditText : public TextView {
 public:
-    EditText(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes);
+    EditText(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes);
     EditText();
     virtual ~EditText() = default;
 
@@ -24,3 +24,4 @@ private:
 
 } // namespace widget
 } // namespace windroid
+

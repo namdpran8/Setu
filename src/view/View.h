@@ -9,10 +9,11 @@
 #include "KeyEvent.h"
 
 // Forward declare Context/Theme so we don't need a heavy include
-class ResourceManager;
-struct AxmlNode;
+
+namespace android { class ResXMLParser; }
 
 namespace windroid {
+class ResourceManager;
 class Theme;
 class TypedArray;
 namespace view {
@@ -42,7 +43,7 @@ public:
         virtual ~LayoutParams() = default;
     };
 
-    View(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes);
+    View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes);
     View();
     virtual ~View() = default;
 
@@ -147,3 +148,5 @@ protected:
 
 } // namespace view
 } // namespace windroid
+
+

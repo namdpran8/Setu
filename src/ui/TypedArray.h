@@ -2,9 +2,9 @@
 #include <cstdint>
 #include <vector>
 #include <string>
-#include "../utils/AndroidRes.h"
+#include "androidfw/ResourceTypes.h"
+#include "androidfw/AssetManager2.h"
 #include "Theme.h"
-#include "../AxmlPraserer/AxmlParser.h"
 
 namespace windroid {
 
@@ -13,9 +13,8 @@ public:
     TypedArray(ResourceManager* resManager, const std::vector<uint32_t>& styleables);
     ~TypedArray();
 
-    // The core 4-step attribute resolution algorithm.
     // Populates this TypedArray with values.
-    void obtainStyledAttributes(const Theme* theme, const AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes);
+    void obtainStyledAttributes(const Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes);
 
     bool hasValue(int index) const;
     bool getBoolean(int index, bool defValue) const;
@@ -28,12 +27,10 @@ public:
 private:
     ResourceManager* m_resManager;
     std::vector<uint32_t> m_styleables;
-    std::vector<Res_value> m_values;
+    std::vector<android::Res_value> m_values;
     std::vector<std::string> m_stringValues;
     std::vector<bool> m_hasValue;
-
-    // Helper to find an attribute in the AXML node by its Resource ID
-    const AxmlAttribute* findAttributeInNode(const AxmlNode* node, uint32_t attrResId) const;
 };
 
 } // namespace windroid
+

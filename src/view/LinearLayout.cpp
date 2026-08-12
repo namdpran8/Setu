@@ -1,6 +1,7 @@
+#include "androidfw/Util.h"
 #include "LinearLayout.h"
 #include <algorithm>
-#include "../AxmlPraserer/AxmlParser.h"
+#include "androidfw/ResourceTypes.h"
 
 namespace windroid {
 namespace view {
@@ -174,17 +175,29 @@ void LinearLayout::onLayout(bool changed, int l, int t, int r, int b) {
     }
 }
 
-std::shared_ptr<View::LayoutParams> LinearLayout::generateLayoutParams(const AxmlNode* node) {
+std::shared_ptr<View::LayoutParams> LinearLayout::generateLayoutParams(android::ResXMLParser* parser) {
     auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
-    if (!node) return lp;
-    ViewGroup::parseBaseLayoutParams(lp, node);
-    for (const auto& attr : node->attributes) {
-        if (attr.name == "layout_weight") {
+    if (!parser) return lp;
+    ViewGroup::parseBaseLayoutParams(lp, parser);
+    for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+        size_t nameLen;
+        const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+        std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        
+        std::string rawValue = "";
+        size_t valLen;
+        const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
+        if (val16) rawValue = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
+        
+        uint8_t type = parser->getAttributeDataType(i);
+        uint32_t data = parser->getAttributeData(i);
+
+        if (attrName == "layout_weight") {
             union { uint32_t i; float f; } u;
-            u.i = attr.typedValueData;
-            lp->weight = (attr.typedValueType == 0x04) ? u.f : (float)attr.typedValueData;
-        } else if (attr.name == "layout_gravity") {
-            lp->gravity = attr.typedValueData;
+            u.i = data;
+            lp->weight = (type == 0x04) ? u.f : (float)data;
+        } else if (attrName == "layout_gravity") {
+            lp->gravity = data;
         }
     }
     return lp;
@@ -192,3 +205,7 @@ std::shared_ptr<View::LayoutParams> LinearLayout::generateLayoutParams(const Axm
 
 } // namespace view
 } // namespace windroid
+
+
+
+

@@ -3,7 +3,7 @@
 #include <vector>
 #include <memory>
 
-struct AxmlNode;
+namespace android { class ResXMLParser; }
 namespace windroid {
 namespace view {
 
@@ -54,8 +54,8 @@ public:
     bool dispatchTouchEvent(MotionEvent& event) override;
     bool dispatchKeyEvent(const KeyEvent& event) override;
 
-    virtual std::shared_ptr<View::LayoutParams> generateLayoutParams(const AxmlNode* node);
-    static void parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, const AxmlNode* node);
+    virtual std::shared_ptr<View::LayoutParams> generateLayoutParams(android::ResXMLParser* parser);
+    static void parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, android::ResXMLParser* parser);
 
 protected:
     void measureChild(std::shared_ptr<View> child, int parentWidthMeasureSpec, int parentHeightMeasureSpec);
@@ -72,3 +72,4 @@ protected:
 
 } // namespace view
 } // namespace windroid
+

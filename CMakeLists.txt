@@ -15,10 +15,8 @@ add_executable(winandroid_runtime
 
     src/main.cpp
     "src/apk_extractor/ApkExtractor.cpp"
-    "src/AxmlPraserer/AxmlParser.cpp"
     "src/dex/DexParser.h" "src/dex/DexParser.cpp"
     "src/dex/MultiDexManager.cpp"
-    "src/dex/ArscParser.cpp"
     "src/dex/ResourceManager.cpp"
     "src/utils/Logger.cpp"
     "src/interpreter/Interpreter.cpp"
@@ -43,4 +41,5 @@ add_executable(winandroid_runtime
     "src/widget/EditText.cpp")
 
 target_include_directories(winandroid_runtime PRIVATE include)
-target_link_libraries(winandroid_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi)
+target_link_libraries(winandroid_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi windroid_androidfw)
+target_compile_options(winandroid_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")

@@ -1,9 +1,10 @@
+#include "androidfw/Util.h"
 #include "RelativeLayout.h"
 #include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include "../AxmlPraserer/AxmlParser.h"
+#include "androidfw/ResourceTypes.h"
 
 namespace windroid {
 namespace view {
@@ -179,19 +180,31 @@ void RelativeLayout::onLayout(bool changed, int l, int t, int r, int b) {
     }
 }
 
-std::shared_ptr<View::LayoutParams> RelativeLayout::generateLayoutParams(const AxmlNode* node) {
+std::shared_ptr<View::LayoutParams> RelativeLayout::generateLayoutParams(android::ResXMLParser* parser) {
     auto lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
-    if (!node) return lp;
-    for (const auto& attr : node->attributes) {
-        if (attr.name == LayoutParams::ABOVE ||
-            attr.name == LayoutParams::BELOW ||
-            attr.name == LayoutParams::LEFT_OF ||
-            attr.name == LayoutParams::RIGHT_OF ||
-            attr.name == LayoutParams::ALIGN_PARENT_LEFT ||
-            attr.name == LayoutParams::ALIGN_PARENT_TOP ||
-            attr.name == LayoutParams::ALIGN_PARENT_RIGHT ||
-            attr.name == LayoutParams::ALIGN_PARENT_BOTTOM) {
-            lp->rules[attr.name] = attr.typedValueData;
+    if (!parser) return lp;
+    for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+        size_t nameLen;
+        const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+        std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+        
+        std::string rawValue = "";
+        size_t valLen;
+        const char16_t* val16 = parser->getAttributeStringValue(i, &valLen);
+        if (val16) rawValue = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
+        
+        uint8_t type = parser->getAttributeDataType(i);
+        uint32_t data = parser->getAttributeData(i);
+
+        if (attrName == LayoutParams::ABOVE ||
+            attrName == LayoutParams::BELOW ||
+            attrName == LayoutParams::LEFT_OF ||
+            attrName == LayoutParams::RIGHT_OF ||
+            attrName == LayoutParams::ALIGN_PARENT_LEFT ||
+            attrName == LayoutParams::ALIGN_PARENT_TOP ||
+            attrName == LayoutParams::ALIGN_PARENT_RIGHT ||
+            attrName == LayoutParams::ALIGN_PARENT_BOTTOM) {
+            lp->rules[attrName] = data;
         }
     }
     return lp;
@@ -199,3 +212,7 @@ std::shared_ptr<View::LayoutParams> RelativeLayout::generateLayoutParams(const A
 
 } // namespace view
 } // namespace windroid
+
+
+
+

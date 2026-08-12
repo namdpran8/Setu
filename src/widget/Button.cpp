@@ -8,8 +8,8 @@
 namespace windroid {
 namespace widget {
 
-Button::Button(ResourceManager* resManager, Theme* theme, const struct AxmlNode* node, uint32_t defStyleAttr, uint32_t defStyleRes)
-    : TextView(resManager, theme, node, defStyleAttr, defStyleRes) {
+Button::Button(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes)
+    : TextView(resManager, theme, parser, defStyleAttr, defStyleRes) {
     
     mGravity = 0x11; // Gravity::CENTER by default for Button
 
@@ -22,7 +22,7 @@ Button::Button(ResourceManager* resManager, Theme* theme, const struct AxmlNode*
         
         std::vector<uint32_t> styleables = { attr_background };
         TypedArray a(resManager, styleables);
-        a.obtainStyledAttributes(theme, node, defStyleAttr, defStyleRes);
+        a.obtainStyledAttributes(theme, parser, defStyleAttr, defStyleRes);
         
         if (a.hasValue(0)) mBackgroundPaint.setColor(a.getColor(0, 0xFFDDDDDD));
     }
@@ -98,3 +98,5 @@ bool Button::onTouchEvent(view::MotionEvent& event) {
 
 } // namespace widget
 } // namespace windroid
+
+
