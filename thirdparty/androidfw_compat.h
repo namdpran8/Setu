@@ -28,6 +28,10 @@ inline bool __builtin_add_overflow(T1 a, T2 b, T3* res) {
 }
 #define lseek64 _lseeki64
 #define S_ISBLK(m) 0
+// TEMP_FAILURE_RETRY: on Linux retries a syscall on EINTR; no EINTR on Windows.
+#ifndef TEMP_FAILURE_RETRY
+#define TEMP_FAILURE_RETRY(exp) (exp)
+#endif
 #include <process.h>
 #include <stdint.h>
 #include <sys/stat.h>

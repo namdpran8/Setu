@@ -28,7 +28,7 @@
 namespace android {
 
 const uint32_t PACKED_ROOT = 0; // to represent the root locale
-const uint32_t MAX_PARENT_DEPTH = getMaxAncestorTreeDepth();
+constexpr uint32_t MAX_PARENT_DEPTH = 3; // matches getMaxAncestorTreeDepth()
 
 uint32_t findParent(uint32_t packed_locale, const char* script) {
     if (hasRegion(packed_locale)) {

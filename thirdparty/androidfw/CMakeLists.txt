@@ -1,5 +1,6 @@
 add_library(windroid_androidfw STATIC
     ApkAssets.cpp
+    Asset.cpp
     AssetManager2.cpp
     AssetsProvider.cpp
     AttributeResolution.cpp
@@ -7,11 +8,17 @@ add_library(windroid_androidfw STATIC
     ConfigDescription.cpp
     Idmap.cpp
     LoadedArsc.cpp
+    LocaleData.cpp
+    LocaleDataLookup.cpp
+    misc.cpp
     ResourceTypes.cpp
     ResourceUtils.cpp
+    StreamingZipInflater.cpp
     StringPool.cpp
     TypeWrappers.cpp
     Util.cpp
+    ZipFileRO.cpp
+    ZipUtils.cpp
 )
 target_include_directories(windroid_androidfw PUBLIC "${CMAKE_SOURCE_DIR}/thirdparty/androidfw" "${CMAKE_SOURCE_DIR}/thirdparty/include_compat" incfs_support/include)
 target_compile_options(windroid_androidfw PRIVATE /FI"${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")

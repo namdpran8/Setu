@@ -54,12 +54,14 @@ FileType getFileType(const char* fileName)
             return kFileTypeRegular;
         else if (S_ISDIR(sb.st_mode))
             return kFileTypeDirectory;
+#ifndef _WIN32
         else if (S_ISCHR(sb.st_mode))
             return kFileTypeCharDev;
         else if (S_ISBLK(sb.st_mode))
             return kFileTypeBlockDev;
         else if (S_ISFIFO(sb.st_mode))
             return kFileTypeFifo;
+#endif
 #if defined(S_ISLNK)
         else if (S_ISLNK(sb.st_mode))
             return kFileTypeSymlink;

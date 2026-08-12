@@ -25,12 +25,10 @@ namespace android {
 constexpr size_t SCRIPT_LENGTH = 4;
 
 constexpr inline uint32_t packLocale(const char* language, const char* region) {
-    const unsigned char* lang = reinterpret_cast<const unsigned char*>(language);
-    const unsigned char* reg = reinterpret_cast<const unsigned char*>(region);
-    return (static_cast<uint32_t>(lang[0]) << 24u) |
-            (static_cast<uint32_t>(lang[1]) << 16u) |
-            (static_cast<uint32_t>(reg[0]) << 8u) |
-            static_cast<uint32_t>(reg[1]);
+    return (static_cast<uint32_t>(static_cast<uint8_t>(language[0])) << 24u) |
+            (static_cast<uint32_t>(static_cast<uint8_t>(language[1])) << 16u) |
+            (static_cast<uint32_t>(static_cast<uint8_t>(region[0])) << 8u) |
+            static_cast<uint32_t>(static_cast<uint8_t>(region[1]));
 }
 
 constexpr inline uint32_t dropRegion(uint32_t packed_locale) {
@@ -42,11 +40,10 @@ constexpr inline bool hasRegion(uint32_t packed_locale) {
 }
 
 constexpr inline uint32_t packScript(const char* script) {
-    const unsigned char* s = reinterpret_cast<const unsigned char*>(script);
-    return ((static_cast<uint32_t>(s[0]) << 24u) |
-            (static_cast<uint32_t>(s[1]) << 16u) |
-            (static_cast<uint32_t>(s[2]) <<  8u) |
-            static_cast<uint32_t>(s[3]));
+    return ((static_cast<uint32_t>(static_cast<uint8_t>(script[0])) << 24u) |
+            (static_cast<uint32_t>(static_cast<uint8_t>(script[1])) << 16u) |
+            (static_cast<uint32_t>(static_cast<uint8_t>(script[2])) <<  8u) |
+            static_cast<uint32_t>(static_cast<uint8_t>(script[3])));
 }
 
 /**

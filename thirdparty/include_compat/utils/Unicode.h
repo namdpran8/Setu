@@ -21,7 +21,10 @@ inline char16_t* utf8_to_utf16(const uint8_t* src, size_t srcLen, char16_t* dst,
         if (dstLen > 0) dst[0] = 0;
         return dst;
     }
-    int len = MultiByteToWideChar(CP_UTF8, 0, (LPCCH)src, (int)srcLen, (LPWSTR)dst, (int)dstLen);
+    int len = MultiByteToWideChar(CP_UTF8, 0, (LPCCH)src, (int)srcLen, (LPWSTR)dst, (int)dstLen - 1);
+    if (len >= 0 && len < (int)dstLen) {
+        dst[len] = 0;
+    }
     return dst + len;
 }
 
@@ -35,7 +38,10 @@ inline void utf16_to_utf8(const char16_t* src, size_t srcLen, char* dst, size_t 
         if (dstLen > 0) dst[0] = '\0';
         return;
     }
-    WideCharToMultiByte(CP_UTF8, 0, (LPCWCH)src, (int)srcLen, dst, (int)dstLen, NULL, NULL);
+    int len = WideCharToMultiByte(CP_UTF8, 0, (LPCWCH)src, (int)srcLen, dst, (int)dstLen - 1, NULL, NULL);
+    if (len >= 0 && len < (int)dstLen) {
+        dst[len] = '\0';
+    }
 }
 
 inline int strncmp16(const char16_t* s1, const char16_t* s2, size_t n) {

@@ -19,6 +19,12 @@ template <typename T> class sp {
 public:
     sp(T* p = nullptr) : mPtr(p) { if (mPtr) mPtr->incStrong(this); }
     sp(const sp<T>& o) : mPtr(o.mPtr) { if (mPtr) mPtr->incStrong(this); }
+
+    // Converting constructor: allows sp<U> -> sp<T> when U* is convertible to T*
+    // (e.g. sp<ApkAssets> -> sp<const ApkAssets>)
+    template <typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
+    sp(const sp<U>& o) : mPtr(o.get()) { if (mPtr) mPtr->incStrong(this); }
+
     ~sp() { if (mPtr) mPtr->decStrong(this); }
     
     T* get() const { return mPtr; }
@@ -45,6 +51,15 @@ public:
         if (o.mPtr) o.mPtr->incStrong(this);
         if (mPtr) mPtr->decStrong(this);
         mPtr = o.mPtr;
+        return *this;
+    }
+
+    // Converting assignment operator
+    template <typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
+    sp<T>& operator=(const sp<U>& o) {
+        if (o.get()) o.get()->incStrong(this);
+        if (mPtr) mPtr->decStrong(this);
+        mPtr = o.get();
         return *this;
     }
 };
