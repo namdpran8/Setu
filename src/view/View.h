@@ -128,6 +128,26 @@ public:
     graphics::RenderNode* getRenderNode() const { return mRenderNode.get(); }
     void updateRenderNode();
 
+    int getPaddingLeft() const { return mPaddingLeft; }
+    int getPaddingTop() const { return mPaddingTop; }
+    int getPaddingRight() const { return mPaddingRight; }
+    int getPaddingBottom() const { return mPaddingBottom; }
+
+    void setPadding(int left, int top, int right, int bottom) {
+        mPaddingLeft = left;
+        mPaddingTop = top;
+        mPaddingRight = right;
+        mPaddingBottom = bottom;
+        requestLayout();
+    }
+
+    int getMinimumWidth() const { return mMinWidth; }
+    int getMinimumHeight() const { return mMinHeight; }
+    void setMinimumWidth(int minWidth) { mMinWidth = minWidth; requestLayout(); }
+    void setMinimumHeight(int minHeight) { mMinHeight = minHeight; requestLayout(); }
+
+    void invalidate();
+
 protected:
     int mId = 0;
     int mLeft = 0;
@@ -137,6 +157,14 @@ protected:
 
     int mMeasuredWidth = 0;
     int mMeasuredHeight = 0;
+    
+    int mPaddingLeft = 0;
+    int mPaddingTop = 0;
+    int mPaddingRight = 0;
+    int mPaddingBottom = 0;
+    
+    int mMinWidth = 0;
+    int mMinHeight = 0;
 
     ViewGroup* mParent = nullptr;
 

@@ -2,6 +2,8 @@
 #include "../utils/Logger.h"
 #include "androidfw/ResourceUtils.h"
 
+#include "../ui/Theme.h"
+
 namespace windroid {
 
 ResourceManager::ResourceManager(ApkExtractor* extractor) 
@@ -9,6 +11,18 @@ ResourceManager::ResourceManager(ApkExtractor* extractor)
 }
 
 ResourceManager::~ResourceManager() {
+}
+
+bool ResourceManager::resolveValue(android::AssetManager2::SelectedValue& in_out_value, Theme* theme) {
+    if (!m_assetManager) return false;
+
+    if (theme && theme->getTheme()) {
+        auto res = theme->getTheme()->ResolveAttributeReference(in_out_value);
+        return res.has_value();
+    } else {
+        auto res = m_assetManager->ResolveReference(in_out_value);
+        return res.has_value();
+    }
 }
 
 bool ResourceManager::init(const std::string& apkPath) {

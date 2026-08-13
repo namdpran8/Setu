@@ -132,6 +132,12 @@ int main(int argc, char* argv[]) {
        \/                 \/               \/  
     )");
     Logger::i("Main", "Windroid Runtime - APK Inspector Started");
+    char executablePath[MAX_PATH] = {};
+    DWORD executablePathLength = GetModuleFileNameA(nullptr, executablePath, MAX_PATH);
+    Logger::i("Main", "Build: Windroid C++20 development build");
+    if (executablePathLength > 0 && executablePathLength < MAX_PATH) {
+        Logger::i("Main", "Executable: " + std::string(executablePath, executablePathLength));
+    }
     Logger::i("Main", "Fun fact: Dalvik was named after a fishing village in Iceland! \xF0\x9F\x90\xA7");
 
     std::string apkPath = "";
@@ -224,7 +230,7 @@ int main(int argc, char* argv[]) {
     if (!resManager.init(apkPath)) {
         Logger::e("Main", "Failed to initialize ResourceManager!");
     }
-    if (!resManager.loadFrameworkApk("testapk/framework-res.apk")) {
+    if (!resManager.loadFrameworkApk("C:\\Users\\namde\\Documents\\Windroid\\testapk\\framework-res.apk")) {
         Logger::w("Main", "Failed to load framework-res.apk. Framework attributes will not resolve.");
     }
 

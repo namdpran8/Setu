@@ -5,6 +5,8 @@
 #include "../dex/ResourceManager.h"
 #include "../view/ViewGroup.h"
 #include "../widget/TextView.h"
+#include "../widget/Button.h"
+#include "../widget/EditText.h"
 #include "Interpreter.h" // For recursive Interpreter execution
 
 std::unordered_map<std::string, StubFunc> StubRegistry::stubs;
@@ -26,6 +28,39 @@ static std::string utf16_to_utf8(const std::wstring& utf16) {
     std::string utf8(size_needed, 0);
     WideCharToMultiByte(CP_UTF8, 0, &utf16[0], (int)utf16.size(), &utf8[0], size_needed, NULL, NULL);
     return utf8;
+}
+
+static std::string getAndroidClassName(const windroid::view::View* view) {
+    if (dynamic_cast<const windroid::widget::EditText*>(view)) return "Landroid/widget/EditText;";
+    if (dynamic_cast<const windroid::widget::Button*>(view)) return "Landroid/widget/Button;";
+    if (dynamic_cast<const windroid::widget::TextView*>(view)) return "Landroid/widget/TextView;";
+    if (dynamic_cast<const windroid::view::ViewGroup*>(view)) return "Landroid/view/ViewGroup;";
+    return "Landroid/view/View;";
+}
+
+static bool findRequiredView(const std::vector<Value>& args, Value* outReturn) {
+    // Generated ViewBinding helpers are static: args[0] is the root and args[1] is the required ID.
+    if (args.size() < 2 || args[0].type != ValueType::OBJECT || !args[0].obj || args[1].type != ValueType::INT) {
+        Logger::e("StubRegistry", "View binding helper received invalid arguments.");
+        if (outReturn) *outReturn = Value::MakeNull();
+        return true;
+    }
+
+    auto* rootObject = static_cast<InterpreterObject*>(args[0].obj);
+    auto* rootView = rootObject ? static_cast<windroid::view::View*>(rootObject->nativeHandle) : nullptr;
+    const int targetId = args[1].i;
+    auto foundView = rootView ? rootView->findViewById(targetId) : nullptr;
+    if (!foundView) {
+        Logger::e("StubRegistry", "Missing required view with ID: " + std::to_string(targetId));
+        if (outReturn) *outReturn = Value::MakeNull();
+        return true;
+    }
+
+    auto* viewObject = new InterpreterObject();
+    viewObject->className = getAndroidClassName(foundView.get());
+    viewObject->nativeHandle = foundView.get();
+    if (outReturn) *outReturn = Value::MakeObject(viewObject);
+    return false;
 }
 
 void StubRegistry::init(windroid::ResourceManager* resManager, MultiDexManager* multiDexManager) {
@@ -195,7 +230,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                 
                 if (childView) {
                     InterpreterObject* viewObj = new InterpreterObject();
-                    viewObj->className = "Landroid/view/View;";
+                    viewObj->className = getAndroidClassName(childView);
                     viewObj->nativeHandle = childView;
                     if (outReturn) *outReturn = Value::MakeObject(viewObj);
                     Logger::d("StubRegistry", "findViewById found matching View!");
@@ -539,26 +574,10 @@ void StubRegistry::registerViewStubs() {
         return false;
     };
     
-    // ViewBinding generated findChildViewById stub
+    // ViewBinding generated findChildViewById stub. Keep these exact signatures; do not
+    // use broad package matching because obfuscation is app-specific.
     stubs["Lq1/b;->g(Landroid/view/View;I)Landroid/view/View;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        if (args.size() >= 3 && args[1].type == ValueType::OBJECT && args[1].obj && args[2].type == ValueType::INT) {
-            InterpreterObject* viewObj = (InterpreterObject*)args[1].obj;
-            windroid::view::View* rootView = (windroid::view::View*)viewObj->nativeHandle;
-            int targetId = args[2].i;
-            
-            if (rootView) {
-                auto foundView = rootView->findViewById(targetId);
-                if (foundView) {
-                    InterpreterObject* newViewObj = new InterpreterObject();
-                    newViewObj->className = "Landroid/view/View;";
-                    newViewObj->nativeHandle = foundView.get();
-                    if (outReturn) *outReturn = Value::MakeObject(newViewObj);
-                    return false;
-                }
-            }
-        }
-        if (outReturn) *outReturn = Value::MakeNull();
-        return false;
+        return findRequiredView(args, outReturn);
     };
 
     stubs["Landroid/view/View;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;

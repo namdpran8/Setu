@@ -6,10 +6,12 @@
 #include "../widget/EditText.h"
 #include "../view/LinearLayout.h"
 #include "../view/FrameLayout.h"
+#include "../view/OverlayPanelLayout.h"
 #include "../view/RelativeLayout.h"
 #include "../view/ConstraintLayout.h"
 #include "../view/GridLayout.h"
 #include "androidfw/ResourceUtils.h"
+#include "WindowManager.h"
 #include <string>
 #include <cwchar>
 
@@ -44,9 +46,9 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(android::
     std::string tag = android::util::Utf16ToUtf8(android::StringPiece16(tag16, tagLen));
     std::shared_ptr<windroid::view::View> view = nullptr;
 
-    if (tag.find("ConstraintLayout") != std::string::npos) {
+    if (tag == "ConstraintLayout" || tag == "androidx.constraintlayout.widget.ConstraintLayout") {
         view = std::make_shared<windroid::view::ConstraintLayout>();
-    } else if (tag.find("GridLayout") != std::string::npos) {
+    } else if (tag == "GridLayout" || tag == "android.widget.GridLayout" || tag == "androidx.gridlayout.widget.GridLayout") {
         auto gl = std::make_shared<windroid::view::GridLayout>();
         for (size_t i = 0; i < parser->getAttributeCount(); i++) {
             size_t nameLen;
@@ -60,7 +62,8 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(android::
             }
         }
         view = gl;
-    } else if (tag.find("LinearLayout") != std::string::npos || tag.find("TableLayout") != std::string::npos || tag.find("TableRow") != std::string::npos) {
+    } else if (tag == "LinearLayout" || tag == "android.widget.LinearLayout" || tag == "TableLayout" ||
+               tag == "android.widget.TableLayout" || tag == "TableRow" || tag == "android.widget.TableRow") {
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         
         // Check orientation
@@ -84,32 +87,31 @@ std::shared_ptr<windroid::view::View> LayoutInflater::inflateRecursive(android::
             }
         }
         view = ll;
-    } else if (tag.find("FrameLayout") != std::string::npos) {
+    } else if (tag == "FrameLayout" || tag == "android.widget.FrameLayout") {
         view = std::make_shared<windroid::view::FrameLayout>();
-    } else if (tag.find("RelativeLayout") != std::string::npos) {
+    } else if (tag == "RelativeLayout" || tag == "android.widget.RelativeLayout") {
         view = std::make_shared<windroid::view::RelativeLayout>();
-    } else if (tag.find("TextView") != std::string::npos) {
+    } else if (tag == "TextView" || tag == "android.widget.TextView") {
         view = std::make_shared<windroid::widget::TextView>(resManager, theme, parser, 0, 0);
-    } else if (tag.find("Button") != std::string::npos) {
+    } else if (tag == "Button" || tag == "android.widget.Button") {
         view = std::make_shared<windroid::widget::Button>(resManager, theme, parser, 0, 0);
-    } else if (tag.find("EditText") != std::string::npos) {
+    } else if (tag == "EditText" || tag == "android.widget.EditText") {
         view = std::make_shared<windroid::widget::EditText>(resManager, theme, parser, 0, 0);
-    } else if (tag.find("Guideline") != std::string::npos || tag.find("Space") != std::string::npos || tag == "View" || tag == "android.view.View") {
+    } else if (tag == "Guideline" || tag == "androidx.constraintlayout.widget.Guideline" ||
+               tag == "Space" || tag == "android.widget.Space" || tag == "View" || tag == "android.view.View") {
         view = std::make_shared<windroid::view::View>(resManager, theme, parser, 0, 0);
-    } else if (tag.find("HorizontalScrollView") != std::string::npos) {
+    } else if (tag == "HorizontalScrollView" || tag == "android.widget.HorizontalScrollView") {
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         ll->setOrientation(windroid::view::LinearLayout::Orientation::HORIZONTAL);
         view = ll;
-    } else if (tag.find("RecyclerView") != std::string::npos || tag.find("ScrollView") != std::string::npos) {
+    } else if (tag == "ScrollView" || tag == "android.widget.ScrollView" || tag == "androidx.recyclerview.widget.RecyclerView") {
         auto ll = std::make_shared<windroid::view::LinearLayout>();
         ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
         view = ll;
-    } else if (tag.find("SlidingUpPanelLayout") != std::string::npos) {
-        auto ll = std::make_shared<windroid::view::LinearLayout>();
-        ll->setOrientation(windroid::view::LinearLayout::Orientation::VERTICAL);
-        view = ll;
+    } else if (tag == "com.sothree.slidinguppanel.SlidingUpPanelLayout" || tag == "SlidingUpPanelLayout") {
+        view = std::make_shared<windroid::view::OverlayPanelLayout>();
     } else {
-        Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", falling back to FrameLayout");
+        Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", using FrameLayout fallback");
         view = std::make_shared<windroid::view::FrameLayout>();
     }
 
@@ -139,9 +141,9 @@ int LayoutInflater::parseDimension(const std::string& dimenStr) {
     if (dimenStr.empty()) return 0;
     try {
         if (dimenStr.find("dip") != std::string::npos || dimenStr.find("dp") != std::string::npos) {
-            return std::stoi(dimenStr) * 2; // naive density multiplier
+            return (int)(std::stof(dimenStr) * WindowManager::getDensity());
         } else if (dimenStr.find("sp") != std::string::npos) {
-            return std::stoi(dimenStr) * 2;
+            return (int)(std::stof(dimenStr) * WindowManager::getScaledDensity());
         } else if (dimenStr.find("px") != std::string::npos) {
             return std::stoi(dimenStr);
         }
@@ -154,8 +156,10 @@ int LayoutInflater::parseDimension(const std::string& dimenStr) {
 int LayoutInflater::parseComplexDimension(uint32_t data) {
     int value = (int)(data >> 8);
     int unit = data & 0x0F;
-    if (unit == 1 || unit == 2) { // dp or sp
-        return value * 2;
+    if (unit == 1) { // dp
+        return (int)(value * WindowManager::getDensity());
+    } else if (unit == 2) { // sp
+        return (int)(value * WindowManager::getScaledDensity());
     }
     return value; // px or others
 }
@@ -178,6 +182,83 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
             if (val == 0) view->setVisibility(windroid::view::View::VISIBLE);
             else if (val == 1) view->setVisibility(windroid::view::View::INVISIBLE);
             else if (val == 2) view->setVisibility(windroid::view::View::GONE);
+        } else if (attrName == "padding" || resId == 0x010100d4) {
+            int type = parser->getAttributeDataType(i);
+            int p = 0;
+            if (type == android::Res_value::TYPE_DIMENSION) {
+                p = parseComplexDimension(parser->getAttributeData(i));
+            } else {
+                size_t strLen = 0;
+                const char16_t* str16 = parser->getAttributeStringValue(i, &strLen);
+                if (str16) p = parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
+            }
+            view->setPadding(p, p, p, p);
+        } else if (attrName == "paddingLeft" || attrName == "paddingStart" || resId == 0x010100d6 || resId == 0x010103b3) {
+            int type = parser->getAttributeDataType(i);
+            int p = 0;
+            if (type == android::Res_value::TYPE_DIMENSION) {
+                p = parseComplexDimension(parser->getAttributeData(i));
+            } else {
+                size_t strLen = 0;
+                const char16_t* str16 = parser->getAttributeStringValue(i, &strLen);
+                if (str16) p = parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
+            }
+            view->setPadding(p, view->getPaddingTop(), view->getPaddingRight(), view->getPaddingBottom());
+        } else if (attrName == "paddingTop" || resId == 0x010100d7) {
+            int type = parser->getAttributeDataType(i);
+            int p = 0;
+            if (type == android::Res_value::TYPE_DIMENSION) {
+                p = parseComplexDimension(parser->getAttributeData(i));
+            } else {
+                size_t strLen = 0;
+                const char16_t* str16 = parser->getAttributeStringValue(i, &strLen);
+                if (str16) p = parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
+            }
+            view->setPadding(view->getPaddingLeft(), p, view->getPaddingRight(), view->getPaddingBottom());
+        } else if (attrName == "paddingRight" || attrName == "paddingEnd" || resId == 0x010100d8 || resId == 0x010103b4) {
+            int type = parser->getAttributeDataType(i);
+            int p = 0;
+            if (type == android::Res_value::TYPE_DIMENSION) {
+                p = parseComplexDimension(parser->getAttributeData(i));
+            } else {
+                size_t strLen = 0;
+                const char16_t* str16 = parser->getAttributeStringValue(i, &strLen);
+                if (str16) p = parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
+            }
+            view->setPadding(view->getPaddingLeft(), view->getPaddingTop(), p, view->getPaddingBottom());
+        } else if (attrName == "paddingBottom" || resId == 0x010100d9) {
+            int type = parser->getAttributeDataType(i);
+            int p = 0;
+            if (type == android::Res_value::TYPE_DIMENSION) {
+                p = parseComplexDimension(parser->getAttributeData(i));
+            } else {
+                size_t strLen = 0;
+                const char16_t* str16 = parser->getAttributeStringValue(i, &strLen);
+                if (str16) p = parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
+            }
+            view->setPadding(view->getPaddingLeft(), view->getPaddingTop(), view->getPaddingRight(), p);
+        } else if (attrName == "minWidth" || resId == 0x0101013f) {
+            int type = parser->getAttributeDataType(i);
+            int p = 0;
+            if (type == android::Res_value::TYPE_DIMENSION) {
+                p = parseComplexDimension(parser->getAttributeData(i));
+            } else {
+                size_t strLen = 0;
+                const char16_t* str16 = parser->getAttributeStringValue(i, &strLen);
+                if (str16) p = parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
+            }
+            view->setMinimumWidth(p);
+        } else if (attrName == "minHeight" || resId == 0x01010140) {
+            int type = parser->getAttributeDataType(i);
+            int p = 0;
+            if (type == android::Res_value::TYPE_DIMENSION) {
+                p = parseComplexDimension(parser->getAttributeData(i));
+            } else {
+                size_t strLen = 0;
+                const char16_t* str16 = parser->getAttributeStringValue(i, &strLen);
+                if (str16) p = parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
+            }
+            view->setMinimumHeight(p);
         }
     }
 }

@@ -37,11 +37,22 @@ public:
     // C++ View Hierarchy root
     static void setRootView(std::shared_ptr<windroid::view::View> rootView);
     static std::shared_ptr<windroid::view::View> getRootView();
+    static void dumpRootViewAfterLayout();
+
+    static float getDensity() { return s_density; }
+    static void setDensity(float density) { s_density = density; }
+    
+    static float getScaledDensity() { return s_scaledDensity; }
+    static void setScaledDensity(float scaledDensity) { s_scaledDensity = scaledDensity; }
 
 private:
     static std::shared_ptr<windroid::view::View> s_rootView;
+    static bool s_rootViewDumpPending;
     static std::function<void(int)> s_clickCallback;
     static HWND s_mainWindow;
+    
+    static float s_density;
+    static float s_scaledDensity;
     
     // Direct2D / DirectX resources
     static Microsoft::WRL::ComPtr<ID3D11Device> s_d3dDevice;

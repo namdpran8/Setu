@@ -7,8 +7,8 @@ namespace windroid {
 namespace view {
 
 void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-    int totalWidth = 0;
-    int totalHeight = 0;
+    int totalWidth = mPaddingLeft + mPaddingRight;
+    int totalHeight = mPaddingTop + mPaddingBottom;
     float totalWeight = 0.0f;
     
     int widthMode = getMode(widthMeasureSpec);
@@ -137,8 +137,8 @@ void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 }
 
 void LinearLayout::onLayout(bool changed, int l, int t, int r, int b) {
-    int currentX = 0;
-    int currentY = 0;
+    int currentX = mPaddingLeft;
+    int currentY = mPaddingTop;
 
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::GONE) continue;
@@ -154,9 +154,9 @@ void LinearLayout::onLayout(bool changed, int l, int t, int r, int b) {
             int childTop = currentY + lp->topMargin;
             int verticalGravity = lp->gravity & 0x70;
             if (verticalGravity == 0x10) { // CENTER_VERTICAL
-                childTop = currentY + (b - t - ch - lp->topMargin - lp->bottomMargin) / 2 + lp->topMargin;
+                childTop = currentY + (b - t - ch - lp->topMargin - lp->bottomMargin - mPaddingTop - mPaddingBottom) / 2 + lp->topMargin;
             } else if (verticalGravity == 0x50) { // BOTTOM
-                childTop = currentY + (b - t) - ch - lp->bottomMargin;
+                childTop = currentY + (b - t - mPaddingTop - mPaddingBottom) - ch - lp->bottomMargin;
             }
             child->layout(currentX, childTop, currentX + cw, childTop + ch);
             currentX += cw + lp->rightMargin;
@@ -165,9 +165,9 @@ void LinearLayout::onLayout(bool changed, int l, int t, int r, int b) {
             int childLeft = currentX + lp->leftMargin;
             int horizontalGravity = lp->gravity & 0x07;
             if (horizontalGravity == 0x01) { // CENTER_HORIZONTAL
-                childLeft = currentX + (r - l - cw - lp->leftMargin - lp->rightMargin) / 2 + lp->leftMargin;
+                childLeft = currentX + (r - l - cw - lp->leftMargin - lp->rightMargin - mPaddingLeft - mPaddingRight) / 2 + lp->leftMargin;
             } else if (horizontalGravity == 0x05) { // RIGHT
-                childLeft = currentX + (r - l) - cw - lp->rightMargin;
+                childLeft = currentX + (r - l - mPaddingLeft - mPaddingRight) - cw - lp->rightMargin;
             }
             child->layout(childLeft, currentY, childLeft + cw, currentY + ch);
             currentY += ch + lp->bottomMargin;

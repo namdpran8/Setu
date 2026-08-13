@@ -38,6 +38,8 @@ void View::layout(int l, int t, int r, int b) {
 }
 
 void View::draw(graphics::Canvas& canvas) {
+    if (mVisibility != VISIBLE) return;
+
     canvas.save();
     canvas.translate((float)mLeft, (float)mTop);
     
@@ -83,6 +85,16 @@ void View::requestLayout() {
     mIsLayoutRequested = true;
     if (mParent) {
         mParent->requestLayout();
+    }
+}
+
+void View::invalidate() {
+    // Basic invalidation: clear render node and let parent know
+    if (mRenderNode) {
+        mRenderNode->clear();
+    }
+    if (mParent) {
+        mParent->invalidate();
     }
 }
 

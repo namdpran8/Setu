@@ -14,6 +14,7 @@ void Choreographer::doFrame(std::shared_ptr<View> decorView, graphics::Direct2DC
 
     // 2. Layout Pass
     decorView->layout(0, 0, decorView->getMeasuredWidth(), decorView->getMeasuredHeight());
+    WindowManager::dumpRootViewAfterLayout();
 
     // 3. Draw Pass (Update Display List)
     decorView->updateRenderNode();

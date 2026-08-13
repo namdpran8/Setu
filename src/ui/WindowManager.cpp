@@ -13,6 +13,9 @@ static bool s_showBsod = false;
 HWND WindowManager::s_mainWindow = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
 std::shared_ptr<windroid::view::View> WindowManager::s_rootView = nullptr;
+bool WindowManager::s_rootViewDumpPending = false;
+float WindowManager::s_density = 2.0f; // Default 2.0 (xhdpi) for now
+float WindowManager::s_scaledDensity = 2.0f;
 
 Microsoft::WRL::ComPtr<ID3D11Device> WindowManager::s_d3dDevice;
 Microsoft::WRL::ComPtr<ID3D11DeviceContext> WindowManager::s_d3dContext;
@@ -34,6 +37,7 @@ void WindowManager::triggerClickCallback(int controlId) {
 
 void WindowManager::setRootView(std::shared_ptr<windroid::view::View> rootView) {
     s_rootView = rootView;
+    s_rootViewDumpPending = s_rootView != nullptr;
     if (s_mainWindow) {
         InvalidateRect(s_mainWindow, nullptr, FALSE);
     }
@@ -41,6 +45,14 @@ void WindowManager::setRootView(std::shared_ptr<windroid::view::View> rootView) 
 
 std::shared_ptr<windroid::view::View> WindowManager::getRootView() {
     return s_rootView;
+}
+
+void WindowManager::dumpRootViewAfterLayout() {
+    if (!s_rootViewDumpPending || !s_rootView) return;
+    s_rootViewDumpPending = false;
+    Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP AFTER ROOT LAYOUT ---");
+    s_rootView->dump(0);
+    Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP END ---");
 }
 
 void WindowManager::clearWindow() {
