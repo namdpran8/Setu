@@ -3,7 +3,7 @@
 #include "../graphics/Direct2DCanvas.h"
 #include <memory>
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 class Choreographer {
@@ -20,4 +20,4 @@ private:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu

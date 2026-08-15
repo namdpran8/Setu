@@ -1,4 +1,4 @@
-add_library(windroid_zlib STATIC
+add_library(setu_zlib STATIC
     adler32.c
     compress.c
     crc32.c
@@ -15,4 +15,4 @@ add_library(windroid_zlib STATIC
     uncompr.c
     zutil.c
 )
-target_include_directories(windroid_zlib PUBLIC .)
+target_include_directories(setu_zlib PUBLIC .)

@@ -8,7 +8,7 @@
 #include "androidfw/ResourceTypes.h"
 #include "../apk_extractor/apkextractor.h"
 
-namespace windroid {
+namespace setu {
 
 class ResourceManager {
 public:
@@ -35,5 +35,5 @@ private:
     std::unique_ptr<android::AssetManager2> m_assetManager;
 };
 
-} // namespace windroid
+} // namespace setu
 

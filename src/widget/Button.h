@@ -2,7 +2,7 @@
 #include "TextView.h"
 #include <functional>
 
-namespace windroid {
+namespace setu {
 namespace widget {
 
 class Button : public TextView {
@@ -21,5 +21,5 @@ private:
 };
 
 } // namespace widget
-} // namespace windroid
+} // namespace setu
 

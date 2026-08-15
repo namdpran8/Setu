@@ -6,7 +6,7 @@
 #include "../ui/TypedArray.h"
 #include <wrl/client.h>
 
-namespace windroid {
+namespace setu {
 namespace widget {
 
 static std::wstring utf8_to_utf16(const std::string& utf8) {
@@ -143,6 +143,6 @@ void TextView::onDraw(graphics::Canvas& canvas) {
 }
 
 } // namespace widget
-} // namespace windroid
+} // namespace setu
 
 

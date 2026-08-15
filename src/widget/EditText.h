@@ -2,7 +2,7 @@
 #include "TextView.h"
 #include "../graphics/Paint.h"
 
-namespace windroid {
+namespace setu {
 namespace widget {
 
 class EditText : public TextView {
@@ -23,5 +23,5 @@ private:
 };
 
 } // namespace widget
-} // namespace windroid
+} // namespace setu
 

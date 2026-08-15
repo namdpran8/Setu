@@ -4,7 +4,7 @@
 #include <memory>
 
 namespace android { class ResXMLParser; }
-namespace windroid {
+namespace setu {
 namespace view {
 
 class ViewGroup : public View {
@@ -73,5 +73,5 @@ protected:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 

@@ -5,7 +5,7 @@
 #include "MotionEvent.h"
 #include "../utils/Logger.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 View::View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes) {
@@ -17,7 +17,7 @@ View::View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* par
 
 View::View() {}
 
-std::shared_ptr<windroid::view::View> View::findViewById(int targetId) {
+std::shared_ptr<setu::view::View> View::findViewById(int targetId) {
     if (mId == targetId) return shared_from_this();
     return nullptr;
 }
@@ -144,7 +144,7 @@ void View::dump(int depth) {
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 
 
 

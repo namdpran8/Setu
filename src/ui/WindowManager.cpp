@@ -12,7 +12,7 @@ static bool s_showBsod = false;
 
 HWND WindowManager::s_mainWindow = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
-std::shared_ptr<windroid::view::View> WindowManager::s_rootView = nullptr;
+std::shared_ptr<setu::view::View> WindowManager::s_rootView = nullptr;
 bool WindowManager::s_rootViewDumpPending = false;
 float WindowManager::s_density = 2.0f; // Default 2.0 (xhdpi) for now
 float WindowManager::s_scaledDensity = 2.0f;
@@ -35,7 +35,7 @@ void WindowManager::triggerClickCallback(int controlId) {
     }
 }
 
-void WindowManager::setRootView(std::shared_ptr<windroid::view::View> rootView) {
+void WindowManager::setRootView(std::shared_ptr<setu::view::View> rootView) {
     s_rootView = rootView;
     s_rootViewDumpPending = s_rootView != nullptr;
     if (s_mainWindow) {
@@ -43,7 +43,7 @@ void WindowManager::setRootView(std::shared_ptr<windroid::view::View> rootView) 
     }
 }
 
-std::shared_ptr<windroid::view::View> WindowManager::getRootView() {
+std::shared_ptr<setu::view::View> WindowManager::getRootView() {
     return s_rootView;
 }
 
@@ -194,9 +194,9 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             if (wParam == 1) {
                 Logger::i("IdleGhost", "Are you still there? (Ghost Touch)");
                 if (s_rootView) {
-                    windroid::view::MotionEvent eventDown(windroid::view::MotionEvent::Action::DOWN, 100, 100);
+                    setu::view::MotionEvent eventDown(setu::view::MotionEvent::Action::DOWN, 100, 100);
                     s_rootView->dispatchTouchEvent(eventDown);
-                    windroid::view::MotionEvent eventUp(windroid::view::MotionEvent::Action::UP, 100, 100);
+                    setu::view::MotionEvent eventUp(setu::view::MotionEvent::Action::UP, 100, 100);
                     s_rootView->dispatchTouchEvent(eventUp);
                     InvalidateRect(hwnd, nullptr, FALSE);
                 }
@@ -215,7 +215,7 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             if (s_rootView) {
                 float x = (float)LOWORD(lParam);
                 float y = (float)HIWORD(lParam);
-                windroid::view::MotionEvent event(windroid::view::MotionEvent::Action::DOWN, x, y);
+                setu::view::MotionEvent event(setu::view::MotionEvent::Action::DOWN, x, y);
                 s_rootView->dispatchTouchEvent(event);
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
@@ -225,7 +225,7 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             if (s_rootView) {
                 float x = (float)LOWORD(lParam);
                 float y = (float)HIWORD(lParam);
-                windroid::view::MotionEvent event(windroid::view::MotionEvent::Action::UP, x, y);
+                setu::view::MotionEvent event(setu::view::MotionEvent::Action::UP, x, y);
                 s_rootView->dispatchTouchEvent(event);
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
@@ -251,10 +251,10 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     s_rootView->dump(0);
                     Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP END ---");
                 } else if (wParam == VK_F9) {
-                    MessageBoxA(hwnd, "You found the hidden Windroid Easter Egg!\n\nDalvik says hello from the grave... \xE2\x98\xA0\xEF\xB8\x8F", "Secret Discovered!", MB_OK | MB_ICONINFORMATION);
+                    MessageBoxA(hwnd, "You found the hidden Setu Easter Egg!\n\nDalvik says hello from the grave... \xE2\x98\xA0\xEF\xB8\x8F", "Secret Discovered!", MB_OK | MB_ICONINFORMATION);
                     Logger::i("EasterEgg", "User pressed F9! Pshhh...");
                 }
-                windroid::view::KeyEvent event(windroid::view::KeyEvent::Action::DOWN, (int)wParam, 0);
+                setu::view::KeyEvent event(setu::view::KeyEvent::Action::DOWN, (int)wParam, 0);
                 if (s_rootView->dispatchKeyEvent(event)) {
                     // Handled
                 }
@@ -263,7 +263,7 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         }
         case WM_CHAR: {
             if (s_rootView) {
-                windroid::view::KeyEvent event(windroid::view::KeyEvent::Action::DOWN, 0, (wchar_t)wParam);
+                setu::view::KeyEvent event(setu::view::KeyEvent::Action::DOWN, 0, (wchar_t)wParam);
                 if (s_rootView->dispatchKeyEvent(event)) {
                     // Handled
                 }
@@ -304,8 +304,8 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     s_swapChain->Present(1, 0);
                 }
             } else if (s_rootView) {
-                windroid::graphics::Direct2DCanvas canvas(s_d2dContext.Get(), s_dWriteFactory.Get());
-                windroid::view::Choreographer::getInstance().doFrame(s_rootView, canvas, rect.right, rect.bottom);
+                setu::graphics::Direct2DCanvas canvas(s_d2dContext.Get(), s_dWriteFactory.Get());
+                setu::view::Choreographer::getInstance().doFrame(s_rootView, canvas, rect.right, rect.bottom);
             }
             EndPaint(hwnd, &ps);
             return 0;
@@ -333,7 +333,7 @@ bool WindowManager::init() {
     wc.cbSize = sizeof(WNDCLASSEX);
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
-    wc.lpszClassName = "WindroidMainWindow";
+    wc.lpszClassName = "SetuMainWindow";
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     
@@ -346,7 +346,7 @@ bool WindowManager::init() {
     wcGroup.cbSize = sizeof(WNDCLASSEX);
     wcGroup.lpfnWndProc = ViewGroupProc;
     wcGroup.hInstance = hInstance;
-    wcGroup.lpszClassName = "WindroidViewGroup";
+    wcGroup.lpszClassName = "SetuViewGroup";
     wcGroup.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH); // Transparent
     wcGroup.hCursor = LoadCursor(nullptr, IDC_ARROW);
     
@@ -357,8 +357,8 @@ bool WindowManager::init() {
     
     s_mainWindow = CreateWindowEx(
         0,
-        "WindroidMainWindow",
-        "Windroid Runtime (Powered by Caffeine & Tears)",
+        "SetuMainWindow",
+        "Setu Runtime (Powered by Caffeine & Tears)",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
         540, 1170, // Average modern phone aspect ratio
@@ -379,6 +379,9 @@ bool WindowManager::init() {
     }
     
     SetTimer(s_mainWindow, 1, 600000, nullptr); // 10 minute idle timer
+
+    ShowWindow(s_mainWindow, SW_SHOW);
+    UpdateWindow(s_mainWindow);
     
     Logger::i("WindowManager", "Initialized main window and Direct2D successfully.");
     return true;

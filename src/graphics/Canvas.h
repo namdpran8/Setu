@@ -3,7 +3,7 @@
 #include "Paint.h"
 #include <string>
 
-namespace windroid {
+namespace setu {
 namespace graphics {
 
 class RenderNode;
@@ -32,4 +32,4 @@ public:
 };
 
 } // namespace graphics
-} // namespace windroid
+} // namespace setu

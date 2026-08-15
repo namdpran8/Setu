@@ -1,6 +1,6 @@
 #include "Paint.h"
 
-namespace windroid {
+namespace setu {
 namespace graphics {
 
 Paint::Paint()
@@ -52,4 +52,4 @@ bool Paint::isAntiAlias() const {
 }
 
 } // namespace graphics
-} // namespace windroid
+} // namespace setu

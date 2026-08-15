@@ -6,7 +6,7 @@
 #include "androidfw/AssetManager2.h"
 #include "Theme.h"
 
-namespace windroid {
+namespace setu {
 
 class TypedArray {
 public:
@@ -32,5 +32,5 @@ private:
     std::vector<bool> m_hasValue;
 };
 
-} // namespace windroid
+} // namespace setu
 

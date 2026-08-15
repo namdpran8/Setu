@@ -5,7 +5,7 @@
 #include "androidfw/AttributeResolution.h"
 #include "androidfw/ResourceUtils.h"
 
-namespace windroid {
+namespace setu {
 
 TypedArray::TypedArray(ResourceManager* resManager, const std::vector<uint32_t>& styleables)
     : m_resManager(resManager), m_styleables(styleables) {
@@ -53,7 +53,10 @@ void TypedArray::obtainStyledAttributes(const Theme* theme, ::android::ResXMLPar
             ::android::AssetManager2::SelectedValue val;
             val.type = type;
             val.data = outValues[i * ::android::STYLE_NUM_ENTRIES + ::android::STYLE_DATA];
-            val.cookie = outValues[i * ::android::STYLE_NUM_ENTRIES + ::android::STYLE_ASSET_COOKIE];
+            
+            int32_t javaCookie = outValues[i * ::android::STYLE_NUM_ENTRIES + ::android::STYLE_ASSET_COOKIE];
+            val.cookie = (javaCookie != -1) ? (javaCookie - 1) : ::android::kInvalidCookie;
+            
             val.flags = 0;
             val.resid = outValues[i * ::android::STYLE_NUM_ENTRIES + ::android::STYLE_RESOURCE_ID];
 
@@ -69,17 +72,30 @@ void TypedArray::obtainStyledAttributes(const Theme* theme, ::android::ResXMLPar
             m_hasValue[i] = true;
             
             if (val.type == ::android::Res_value::TYPE_STRING) {
-                if (m_resManager && m_resManager->getAssetManager()) {
-                    auto pool = m_resManager->getAssetManager()->GetStringPoolForCookie(val.cookie);
-                    if (pool) {
-                        auto str_exp = pool->stringAt(val.data);
-                        if (str_exp.has_value()) {
-                            m_stringValues[i] = ::android::util::Utf16ToUtf8(str_exp.value());
-                        } else {
-                            auto str8_exp = pool->string8At(val.data);
-                            if (str8_exp.has_value()) {
-                                m_stringValues[i] = std::string(str8_exp.value());
+                if (val.cookie != ::android::kInvalidCookie) {
+                    if (m_resManager && m_resManager->getAssetManager()) {
+                        auto pool = m_resManager->getAssetManager()->GetStringPoolForCookie(val.cookie);
+                        if (pool) {
+                            auto str_exp = pool->stringAt(val.data);
+                            if (str_exp.has_value()) {
+                                m_stringValues[i] = ::android::util::Utf16ToUtf8(str_exp.value());
+                            } else {
+                                auto str8_exp = pool->string8At(val.data);
+                                if (str8_exp.has_value()) {
+                                    m_stringValues[i] = std::string(str8_exp.value());
+                                }
                             }
+                        }
+                    }
+                } else if (parser != nullptr) {
+                    const ::android::ResStringPool& pool = parser->getStrings();
+                    auto str_exp = pool.stringAt(val.data);
+                    if (str_exp.has_value()) {
+                        m_stringValues[i] = ::android::util::Utf16ToUtf8(str_exp.value());
+                    } else {
+                        auto str8_exp = pool.string8At(val.data);
+                        if (str8_exp.has_value()) {
+                            m_stringValues[i] = std::string(str8_exp.value());
                         }
                     }
                 }
@@ -162,12 +178,12 @@ std::string TypedArray::getString(int index) const {
     uint8_t type = m_values[index].dataType;
     uint32_t data = m_values[index].data;
     
-    if (type == ::android::Res_value::TYPE_STRING || type == ::android::Res_value::TYPE_REFERENCE) {
+    if (type == ::android::Res_value::TYPE_REFERENCE) {
         if (m_resManager) return m_resManager->getString(data);
     }
     
     return std::to_string(data);
 }
 
-} // namespace windroid
+} // namespace setu
 

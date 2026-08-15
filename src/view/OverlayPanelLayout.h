@@ -2,7 +2,7 @@
 
 #include "ViewGroup.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 // A foundational stacking container for panel widgets. It deliberately has no
@@ -19,4 +19,4 @@ public:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu

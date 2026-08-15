@@ -4,7 +4,7 @@
 
 #include "../ui/Theme.h"
 
-namespace windroid {
+namespace setu {
 
 ResourceManager::ResourceManager(ApkExtractor* extractor) 
     : m_extractor(extractor) {
@@ -45,6 +45,7 @@ bool ResourceManager::init(const std::string& apkPath) {
 }
 
 bool ResourceManager::loadFrameworkApk(const std::string& path) {
+    Logger::i("ResourceManager", "Attempting to load framework APK from: " + path);
     auto apkAssets = android::ApkAssets::Load(path, android::PROPERTY_SYSTEM);
     if (!apkAssets) {
         Logger::e("ResourceManager", "Failed to load framework ApkAssets from: " + path);
@@ -56,7 +57,7 @@ bool ResourceManager::loadFrameworkApk(const std::string& path) {
 
     std::span<const android::AssetManager2::ApkAssetsPtr> span_assets(m_apkAssets.data(), m_apkAssets.size()); m_assetManager->SetApkAssets(span_assets);
     
-    Logger::i("ResourceManager", "Successfully loaded framework APK.");
+    Logger::i("ResourceManager", "Successfully loaded framework APK from: " + path);
     return true;
 }
 
@@ -140,7 +141,7 @@ std::unique_ptr<android::ResXMLTree> ResourceManager::getLayout(uint32_t layoutI
     return tree;
 }
 
-} // namespace windroid
+} // namespace setu
 
 
 

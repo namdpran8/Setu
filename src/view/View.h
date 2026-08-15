@@ -12,7 +12,7 @@
 
 namespace android { class ResXMLParser; }
 
-namespace windroid {
+namespace setu {
 class ResourceManager;
 class Theme;
 class TypedArray;
@@ -177,6 +177,6 @@ protected:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 
 

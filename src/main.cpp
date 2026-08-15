@@ -25,7 +25,7 @@ std::string getApkPathWithDialog() {
     ofn.lpstrFilter = "APK Files\0*.apk\0All Files\0*.*\0";
     ofn.lpstrFile = filename;
     ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrTitle = "Select an APK to run with Windroid";
+    ofn.lpstrTitle = "Select an APK to run with Setu";
     ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
     
     if (GetOpenFileNameA(&ofn)) {
@@ -124,17 +124,16 @@ std::string resolveMainActivity(android::ResXMLParser* parser) {
 int main(int argc, char* argv[]) {
     // Let's get it started, ha, let's get it started in here.
     Logger::i("Main", R"(
- __      __.__            .___         .__    .___ 
-/  \    /  \  | \    \   \__| _/______  |__| __| _/ 
-\   \/\/   /  |  | \ \/ / __ |\_  __ \ |  |/ __ |  
- \        /|  |  |  \  / / / |  | \/ |  / /_/ |  
-  \__/\  / |__|  |__/\____ |__|    |__\____ |  
-       \/                 \/               \/  
+   _____      __       
+  / ___/___  / /___  __
+  \__ \/ _ \/ __/ / / /
+ ___/ /  __/ /_/ /_/ / 
+/____/\___/\__/\__,_/  
     )");
-    Logger::i("Main", "Windroid Runtime - APK Inspector Started");
+    Logger::i("Main", "Setu Runtime - APK Inspector Started");
     char executablePath[MAX_PATH] = {};
     DWORD executablePathLength = GetModuleFileNameA(nullptr, executablePath, MAX_PATH);
-    Logger::i("Main", "Build: Windroid C++20 development build");
+    Logger::i("Main", "Build: Setu C++20 development build");
     if (executablePathLength > 0 && executablePathLength < MAX_PATH) {
         Logger::i("Main", "Executable: " + std::string(executablePath, executablePathLength));
     }
@@ -226,12 +225,16 @@ int main(int argc, char* argv[]) {
     }
 
     // --- Phase 5: Resource Management ---
-    windroid::ResourceManager resManager(&extractor);
+    setu::ResourceManager resManager(&extractor);
     if (!resManager.init(apkPath)) {
         Logger::e("Main", "Failed to initialize ResourceManager!");
     }
-    if (!resManager.loadFrameworkApk("C:\\Users\\namde\\Documents\\Windroid\\testapk\\framework-res.apk")) {
+    
+    Logger::i("Main", "Attempting to load framework-res.apk in Main phase...");
+    if (!resManager.loadFrameworkApk("C:\\Users\\namde\\Documents\\Setu\\testapk\\framework-res.apk")) {
         Logger::w("Main", "Failed to load framework-res.apk. Framework attributes will not resolve.");
+    } else {
+        Logger::i("Main", "Framework APK loaded successfully in Main phase.");
     }
 
     // ---------------------------------------------------------

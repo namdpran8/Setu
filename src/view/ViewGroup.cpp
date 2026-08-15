@@ -4,7 +4,7 @@
 #include "MotionEvent.h"
 #include "androidfw/ResourceTypes.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 std::shared_ptr<View> ViewGroup::findViewById(int targetId) {
@@ -215,7 +215,7 @@ void ViewGroup::dump(int depth) {
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 
 
 

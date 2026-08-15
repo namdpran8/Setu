@@ -1,7 +1,7 @@
 #include "Choreographer.h"
 #include "../ui/WindowManager.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 void Choreographer::doFrame(std::shared_ptr<View> decorView, graphics::Direct2DCanvas& canvas, int windowWidth, int windowHeight) {
@@ -32,4 +32,4 @@ void Choreographer::doFrame(std::shared_ptr<View> decorView, graphics::Direct2DC
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu

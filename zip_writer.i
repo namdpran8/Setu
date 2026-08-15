@@ -1,10 +1,10 @@
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
-#line 1 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
+#line 1 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 #pragma once
 
 
 
-#line 6 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 6 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 
@@ -6951,7 +6951,7 @@ struct __finddata64_t
 #pragma warning(pop) 
 #line 13 "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.22621.0\\ucrt\\io.h"
 #line 14 "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.22621.0\\ucrt\\io.h"
-#line 10 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 10 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\limits"
 
 
@@ -19368,7 +19368,7 @@ public:
 #pragma pack(pop)
 #line 1020 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\limits"
 #line 1021 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\limits"
-#line 11 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 11 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 template <typename T1, typename T2, typename T3>
 inline bool __builtin_mul_overflow(T1 a, T2 b, T3* res) {
@@ -21041,7 +21041,7 @@ __declspec(dllimport) void __cdecl _endthreadex(
 
 #pragma warning(pop) 
 #line 376 "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.22621.0\\ucrt\\process.h"
-#line 32 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 32 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\stdint.h"
 
 
@@ -21181,30 +21181,30 @@ typedef unsigned long long uintmax_t;
 #pragma warning(pop) 
 
 #line 139 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\stdint.h"
-#line 33 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 33 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 
 
 
-#line 39 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 39 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
-#line 42 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 42 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
-#line 45 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 45 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
-#line 48 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
-
-
-
+#line 48 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 
-#line 55 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
-#line 56 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+
+
+
+#line 55 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
+#line 56 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 #pragma warning(disable : 4068) 
@@ -21216,7 +21216,7 @@ typedef int mode_t;
 typedef __int64 ssize_t;
 
 
-#line 68 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 68 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 typedef __int64 off64_t;
 
 
@@ -21224,16 +21224,13 @@ typedef __int64 off64_t;
 
 
 
-#line 76 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 76 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
-#line 79 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 79 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
-#line 82 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
-
-
-
+#line 82 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 
@@ -21242,7 +21239,10 @@ typedef __int64 off64_t;
 
 
 
-#line 94 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+
+
+
+#line 94 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 
@@ -21251,34 +21251,31 @@ typedef __int64 off64_t;
 
 
 
-#line 103 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
-#line 104 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 103 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
+#line 104 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 
 
-#line 109 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
-
-
-
-
-
-#line 115 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
-
-
-
-#line 119 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
+#line 109 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 
 
 
-
-#line 126 "C:/Users/namde/Documents/Windroid/thirdparty/androidfw_compat.h"
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
+#line 115 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
 
 
 
+#line 119 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
+
+
+
+
+
+
+#line 126 "C:/Users/namde/Documents/Setu/thirdparty/androidfw_compat.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
 
 
 
@@ -21294,7 +21291,10 @@ typedef __int64 off64_t;
 
 
 
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+
+
+
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
 
 
 
@@ -22047,14 +22047,14 @@ extern "C++" { namespace std {
 
 #line 100 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\ctime"
 #line 101 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\ctime"
-#line 21 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+#line 21 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
 
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\include_compat\\gtest/gtest_prod.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\include_compat\\gtest/gtest_prod.h"
 #pragma once
 
 
-#line 5 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\include_compat\\gtest/gtest_prod.h"
-#line 23 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+#line 5 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\include_compat\\gtest/gtest_prod.h"
+#line 23 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\memory"
 
 
@@ -54066,7 +54066,7 @@ public:
 #pragma pack(pop)
 #line 4600 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\memory"
 #line 4601 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\memory"
-#line 24 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+#line 24 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\string"
 
 
@@ -61392,7 +61392,7 @@ template <class _Elem, class _Ty>
 #pragma pack(pop)
 #line 547 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\string"
 #line 548 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\string"
-#line 25 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+#line 25 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\string_view"
 
 
@@ -61416,7 +61416,7 @@ template <class _Elem, class _Ty>
 #line 21 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\string_view"
 #line 22 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\string_view"
 #line 23 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\string_view"
-#line 26 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+#line 26 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\vector"
 
 
@@ -66024,9 +66024,9 @@ struct [[nodiscard]] _Clear_guard {
 #pragma pack(pop)
 #line 4200 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\vector"
 #line 4201 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\vector"
-#line 27 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+#line 27 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
 
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
 
 
@@ -66072,8 +66072,8 @@ struct [[nodiscard]] _Clear_guard {
 
 
 
-#line 47 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
-#line 48 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 47 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 48 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
 
 
@@ -66125,10 +66125,10 @@ char(&ArraySizeHelper(T(&array)[N]))[N];
 
 
 
-#line 100 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 100 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
 
-#line 103 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 103 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
 
 
@@ -66179,22 +66179,22 @@ void UNUSED(const T&...) {
 
 
 
-#line 154 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 154 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
 
 
 
-#line 159 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 159 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
-#line 161 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 161 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
-#line 163 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 163 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
-#line 165 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 165 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
 
-#line 167 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/macros.h"
-#line 29 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/off64_t.h"
+#line 167 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/macros.h"
+#line 29 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/off64_t.h"
 
 
 
@@ -66216,8 +66216,8 @@ void UNUSED(const T&...) {
 
 
 
-#line 23 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/off64_t.h"
-#line 30 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
+#line 23 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/off64_t.h"
+#line 30 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\include\\ziparchive/zip_writer.h"
 
 struct z_stream_s;
 typedef struct z_stream_s z_stream;
@@ -66384,13 +66384,13 @@ class ZipWriter {
 
   ;
 };
-#line 20 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
+#line 20 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
 
 
 
-#line 24 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
+#line 24 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
 
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 
@@ -66427,7 +66427,7 @@ class ZipWriter {
 
 
 
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66608,25 +66608,25 @@ class ZipWriter {
 
 
 
-#line 182 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 182 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
-#line 185 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 185 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
-#line 188 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 188 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
 
-#line 193 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 193 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
 
 
 
-#line 200 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 200 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66651,20 +66651,20 @@ class ZipWriter {
 
 
 
-#line 225 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 225 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
-#line 228 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 228 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
-#line 231 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 231 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
-#line 234 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 234 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 238 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 238 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66677,8 +66677,8 @@ class ZipWriter {
 
 
 
-#line 251 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 252 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 251 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 252 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66690,23 +66690,14 @@ class ZipWriter {
 
 
 
-#line 264 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 264 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
      typedef size_t z_size_t;
 
 
-#line 269 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 269 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
-#line 271 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-
-
-
-
-
-
-
-#line 279 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 280 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 271 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66714,8 +66705,17 @@ class ZipWriter {
 
 
 
+#line 279 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 280 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
-#line 289 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+
+
+
+
+
+
+
+#line 289 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66737,8 +66737,8 @@ class ZipWriter {
 
 
 
-#line 311 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 312 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 311 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 312 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66801,7 +66801,7 @@ class ZipWriter {
 
 
 
-#line 375 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 375 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66813,25 +66813,25 @@ class ZipWriter {
 
 
 
-#line 387 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 387 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 391 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 391 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
-#line 394 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 394 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
-#line 397 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 397 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 401 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 401 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 typedef unsigned char  Byte;  
-#line 405 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 405 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 typedef unsigned int   uInt;  
 typedef unsigned long  uLong; 
 
@@ -66840,7 +66840,7 @@ typedef unsigned long  uLong;
 
 
    typedef Byte   Bytef;
-#line 414 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 414 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 typedef char   charf;
 typedef int    intf;
 typedef uInt   uIntf;
@@ -66854,7 +66854,7 @@ typedef uLong  uLongf;
 
 
 
-#line 428 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 428 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66864,28 +66864,28 @@ typedef uLong  uLongf;
 
 
 
-#line 438 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 439 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 438 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 439 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
    typedef unsigned z_crc_t;
 
 
-#line 445 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 445 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 449 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 449 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 453 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 453 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
 
-#line 458 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 459 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 458 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 459 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66919,15 +66919,15 @@ __pragma(pack(push, 8)) extern "C" {
 } __pragma(pack(pop))
 
 #pragma warning(pop) 
-#line 463 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 464 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 465 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 463 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 464 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 465 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
 
-#line 470 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 471 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 470 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 471 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66937,13 +66937,13 @@ __pragma(pack(push, 8)) extern "C" {
 
 
 
-#line 481 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 481 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
 
-#line 487 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 488 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 487 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 488 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -66953,42 +66953,42 @@ __pragma(pack(push, 8)) extern "C" {
 
 
 
-#line 498 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 499 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 498 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 499 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 503 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 503 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 507 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 507 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 511 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 511 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
 
 
-#line 517 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 517 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 521 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 521 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
-#line 525 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 525 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
-#line 527 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 527 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
 
 
-#line 533 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 533 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
 
 
@@ -67005,15 +67005,15 @@ __pragma(pack(push, 8)) extern "C" {
 
 
 
-#line 550 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
+#line 550 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
 
-#line 552 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\zconf.h"
-#line 38 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
-#line 39 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 552 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\zconf.h"
+#line 38 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
+#line 39 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 extern "C" {
-#line 43 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 43 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 
@@ -68523,7 +68523,7 @@ extern z_size_t  gzfwrite(voidpc buf, z_size_t size,
 extern int  gzprintf(gzFile file, const char *format, ...);
 
 
-#line 1553 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 1553 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 
@@ -68770,7 +68770,7 @@ extern void  gzclearerr(gzFile file);
 
 
 
-#line 1800 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 1800 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
                         
 
@@ -68916,7 +68916,7 @@ extern int  inflateBackInit_(z_streamp strm, int windowBits,
 
 
 
-#line 1946 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 1946 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 
@@ -68940,7 +68940,7 @@ extern int  gzgetc_(gzFile file);
 
 
 
-#line 1970 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 1970 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 
@@ -68985,7 +68985,7 @@ extern int  gzgetc_(gzFile file);
 
 
 
-#line 2015 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 2015 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
    extern gzFile  gzopen(const char *, const char *);
    extern long long  gzseek(gzFile, long long, int);
    extern long long  gztell(gzFile);
@@ -68993,7 +68993,7 @@ extern int  gzgetc_(gzFile file);
    extern uLong  adler32_combine(uLong, uLong, long long);
    extern uLong  crc32_combine(uLong, uLong, long long);
    extern uLong  crc32_combine_gen(long long);
-#line 2023 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 2023 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 
@@ -69001,7 +69001,7 @@ extern int  gzgetc_(gzFile file);
 
 
 
-#line 2031 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 2031 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 extern const char   *  zError(int);
@@ -69015,28 +69015,28 @@ extern int             deflateResetKeep(z_streamp);
 
 extern gzFile          gzopen_w(const wchar_t *path,
                                         const char *mode);
-#line 2045 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 2045 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 extern int             gzvprintf(gzFile file,
                                            const char *format,
                                            va_list va);
-#line 2051 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
-#line 2052 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 2051 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
+#line 2052 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
 
 }
-#line 2056 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
+#line 2056 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
 
-#line 2058 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\zlib\\.\\zlib.h"
-#line 26 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
-
-
+#line 2058 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\zlib\\.\\zlib.h"
+#line 26 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
 
 
 
 
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+
+
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 
 
 
@@ -69099,7 +69099,7 @@ extern int             gzvprintf(gzFile file,
 
 
 
-#line 64 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+#line 64 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\functional"
 
@@ -79391,7 +79391,7 @@ namespace ranges {
 #pragma pack(pop)
 #line 3454 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\functional"
 #line 3455 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\functional"
-#line 66 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+#line 66 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\ostream"
 
@@ -90484,9 +90484,9 @@ basic_ostream<_Elem, _Traits>& flush_emit(basic_ostream<_Elem, _Traits>& _Ostr) 
 #pragma pack(pop)
 #line 346 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\ostream"
 #line 347 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\ostream"
-#line 68 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+#line 68 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/errno_restorer.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/errno_restorer.h"
 
 
 
@@ -90529,7 +90529,7 @@ class ErrnoRestorer {
 
 }  
 }  
-#line 70 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+#line 70 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 
 
 
@@ -90540,7 +90540,7 @@ class ErrnoRestorer {
 
 
 
-#line 81 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+#line 81 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 
 namespace android {
 namespace base {
@@ -90621,7 +90621,7 @@ class LogdLogger {
 
 
 
-#line 162 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+#line 162 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 void InitLogging(char* argv[],
                  LogFunction&& logger = StderrLogger,
                  AbortFunction&& aborter = DefaultAborter);
@@ -90664,7 +90664,7 @@ AbortFunction SetAborter(AbortFunction&& aborter);
 
 
 
-#line 205 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+#line 205 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 
 
 
@@ -90802,7 +90802,7 @@ AbortFunction SetAborter(AbortFunction&& aborter);
 static constexpr bool kEnableDChecks = false;
 
 
-#line 343 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libbase\\include\\android-base/logging.h"
+#line 343 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libbase\\include\\android-base/logging.h"
 
 
 
@@ -90966,9 +90966,9 @@ std::ostream& operator<<(std::ostream& stream, const std::string* string_pointer
 #pragma clang diagnostic pop
 
 }  
-#line 33 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
+#line 33 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
 
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\entry_name_utils-inl.h"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\entry_name_utils-inl.h"
 
 
 
@@ -91033,9 +91033,9 @@ inline bool IsValidEntryName(const uint8_t* entry_name, const size_t length) {
   return true;
 }
 
-#line 66 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\entry_name_utils-inl.h"
-#line 35 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
-#line 1 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_archive_common.h"
+#line 66 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\entry_name_utils-inl.h"
+#line 35 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
+#line 1 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_archive_common.h"
 
 
 
@@ -91399,7 +91399,7 @@ __declspec(dllimport) uintmax_t __cdecl _wcstoumax_l(
 
 #pragma warning(pop) 
 #line 342 "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.22621.0\\ucrt\\inttypes.h"
-#line 23 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_archive_common.h"
+#line 23 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_archive_common.h"
 
 #line 1 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\optional"
 
@@ -92628,7 +92628,7 @@ struct hash<optional<_Ty>>
 #line 1055 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\optional"
 #line 1056 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\optional"
 #line 1057 "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Tools\\MSVC\\14.51.36231\\include\\optional"
-#line 25 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_archive_common.h"
+#line 25 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_archive_common.h"
 
 
 
@@ -92888,8 +92888,8 @@ static const uint32_t kGPBDDFlagMask = 0x0008;
 
 static const uint32_t kMaxCommentLen = 65535;
 
-#line 285 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_archive_common.h"
-#line 36 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
+#line 285 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_archive_common.h"
+#line 36 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
 
 
 
@@ -93057,7 +93057,7 @@ static void CopyFromFileEntry(const ZipWriter::FileEntry& src, bool use_data_des
   dst->compression_method = src.compression_method;
   dst->last_mod_time = src.last_mod_time;
   dst->last_mod_date = src.last_mod_date;
-  if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(src.path.size(), std::numeric_limits<uint16_t>::max()); ((!(_values.lhs.v <= _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 203, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "src.path.size()" << " " << "<=" << " " << "std::numeric_limits<uint16_t>::max()" << " (" "src.path.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "std::numeric_limits<uint16_t>::max()" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
+  if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(src.path.size(), std::numeric_limits<uint16_t>::max()); ((!(_values.lhs.v <= _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 203, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "src.path.size()" << " " << "<=" << " " << "std::numeric_limits<uint16_t>::max()" << " (" "src.path.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "std::numeric_limits<uint16_t>::max()" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
   dst->file_name_length = static_cast<uint16_t>(src.path.size());
   dst->extra_field_length = src.padding_length;
 }
@@ -93170,7 +93170,7 @@ int32_t ZipWriter::DiscardLastEntry() {
 }
 
 int32_t ZipWriter::GetLastEntry(FileEntry* out_entry) {
-  (((out_entry != nullptr)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 316, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "out_entry != nullptr" << " ";
+  (((out_entry != nullptr)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 316, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "out_entry != nullptr" << " ";
 
   if (files_.empty()) {
     return kInvalidState;
@@ -93180,7 +93180,7 @@ int32_t ZipWriter::GetLastEntry(FileEntry* out_entry) {
 }
 
 int32_t ZipWriter::PrepareDeflate(int compression_level) {
-  (((state_ == State::kWritingZip)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 326, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "state_ == State::kWritingZip" << " ";
+  (((state_ == State::kWritingZip)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 326, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "state_ == State::kWritingZip" << " ";
 
   
   z_stream_ = std::unique_ptr<z_stream, void (*)(z_stream*)>(new z_stream(), DeleteZStream);
@@ -93188,21 +93188,21 @@ int32_t ZipWriter::PrepareDeflate(int compression_level) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wold-style-cast"
   int zerr = deflateInit2_((z_stream_.get()),(compression_level),(8),(-15),(8), (0), "1.3.2.1-motley", (int)sizeof(z_stream));
-#line 335 "C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc"
+#line 335 "C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc"
 #pragma GCC diagnostic pop
 
   if (zerr != 0) {
     if (zerr == (-6)) {
-      ((((::android::base::ShouldLog(([&]() { using ::android::base::VERBOSE; using ::android::base::DEBUG; using ::android::base::INFO; using ::android::base::WARNING; using ::android::base::ERROR; using ::android::base::FATAL_WITHOUT_ABORT; using ::android::base::FATAL; return (ERROR); }()), nullptr)) != 0) || false) && (true) && ::android::base::ErrnoRestorer()) && ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 339, ([&]() { using ::android::base::VERBOSE; using ::android::base::DEBUG; using ::android::base::INFO; using ::android::base::WARNING; using ::android::base::ERROR; using ::android::base::FATAL_WITHOUT_ABORT; using ::android::base::FATAL; return (ERROR); }()), nullptr, -1) .stream() << "Installed zlib is not compatible with linked version (" << "1.3.2.1-motley" << ")";
+      ((((::android::base::ShouldLog(([&]() { using ::android::base::VERBOSE; using ::android::base::DEBUG; using ::android::base::INFO; using ::android::base::WARNING; using ::android::base::ERROR; using ::android::base::FATAL_WITHOUT_ABORT; using ::android::base::FATAL; return (ERROR); }()), nullptr)) != 0) || false) && (true) && ::android::base::ErrnoRestorer()) && ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 339, ([&]() { using ::android::base::VERBOSE; using ::android::base::DEBUG; using ::android::base::INFO; using ::android::base::WARNING; using ::android::base::ERROR; using ::android::base::FATAL_WITHOUT_ABORT; using ::android::base::FATAL; return (ERROR); }()), nullptr, -1) .stream() << "Installed zlib is not compatible with linked version (" << "1.3.2.1-motley" << ")";
       return HandleError(kZlibError);
     } else {
-      ((((::android::base::ShouldLog(([&]() { using ::android::base::VERBOSE; using ::android::base::DEBUG; using ::android::base::INFO; using ::android::base::WARNING; using ::android::base::ERROR; using ::android::base::FATAL_WITHOUT_ABORT; using ::android::base::FATAL; return (ERROR); }()), nullptr)) != 0) || false) && (true) && ::android::base::ErrnoRestorer()) && ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 342, ([&]() { using ::android::base::VERBOSE; using ::android::base::DEBUG; using ::android::base::INFO; using ::android::base::WARNING; using ::android::base::ERROR; using ::android::base::FATAL_WITHOUT_ABORT; using ::android::base::FATAL; return (ERROR); }()), nullptr, -1) .stream() << "deflateInit2 failed (zerr=" << zerr << ")";
+      ((((::android::base::ShouldLog(([&]() { using ::android::base::VERBOSE; using ::android::base::DEBUG; using ::android::base::INFO; using ::android::base::WARNING; using ::android::base::ERROR; using ::android::base::FATAL_WITHOUT_ABORT; using ::android::base::FATAL; return (ERROR); }()), nullptr)) != 0) || false) && (true) && ::android::base::ErrnoRestorer()) && ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 342, ([&]() { using ::android::base::VERBOSE; using ::android::base::DEBUG; using ::android::base::INFO; using ::android::base::WARNING; using ::android::base::ERROR; using ::android::base::FATAL_WITHOUT_ABORT; using ::android::base::FATAL; return (ERROR); }()), nullptr, -1) .stream() << "deflateInit2 failed (zerr=" << zerr << ")";
       return HandleError(kZlibError);
     }
   }
 
   z_stream_->next_out = buffer_.data();
-  if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(buffer_.size(), kBufSize); ((!(_values.lhs.v == _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 348, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "buffer_.size()" << " " << "==" << " " << "kBufSize" << " (" "buffer_.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "kBufSize" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
+  if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(buffer_.size(), kBufSize); ((!(_values.lhs.v == _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 348, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "buffer_.size()" << " " << "==" << " " << "kBufSize" << " (" "buffer_.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "kBufSize" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
   z_stream_->avail_out = static_cast<uint32_t>(buffer_.size());
   return kNoError;
 }
@@ -93236,7 +93236,7 @@ int32_t ZipWriter::WriteBytes(const void* data, size_t len) {
 }
 
 int32_t ZipWriter::StoreBytes(FileEntry* file, const void* data, uint32_t len) {
-  (((state_ == State::kWritingEntry)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 382, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "state_ == State::kWritingEntry" << " ";
+  (((state_ == State::kWritingEntry)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 382, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "state_ == State::kWritingEntry" << " ";
 
   if (fwrite(data, 1, len, file_) != len) {
     return HandleError(kIoError);
@@ -93247,10 +93247,10 @@ int32_t ZipWriter::StoreBytes(FileEntry* file, const void* data, uint32_t len) {
 }
 
 int32_t ZipWriter::CompressBytes(FileEntry* file, const void* data, uint32_t len) {
-  (((state_ == State::kWritingEntry)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 393, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "state_ == State::kWritingEntry" << " ";
-  (((z_stream_)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 394, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_" << " ";
-  (((z_stream_->next_out != nullptr)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 395, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->next_out != nullptr" << " ";
-  (((z_stream_->avail_out != 0)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 396, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->avail_out != 0" << " ";
+  (((state_ == State::kWritingEntry)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 393, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "state_ == State::kWritingEntry" << " ";
+  (((z_stream_)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 394, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_" << " ";
+  (((z_stream_->next_out != nullptr)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 395, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->next_out != nullptr" << " ";
+  (((z_stream_->avail_out != 0)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 396, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->avail_out != 0" << " ";
 
   
   z_stream_->next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(data));
@@ -93274,7 +93274,7 @@ int32_t ZipWriter::CompressBytes(FileEntry* file, const void* data, uint32_t len
 
       
       z_stream_->next_out = buffer_.data();
-      if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(buffer_.size(), kBufSize); ((!(_values.lhs.v == _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 420, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "buffer_.size()" << " " << "==" << " " << "kBufSize" << " (" "buffer_.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "kBufSize" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
+      if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(buffer_.size(), kBufSize); ((!(_values.lhs.v == _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 420, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "buffer_.size()" << " " << "==" << " " << "kBufSize" << " (" "buffer_.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "kBufSize" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
       z_stream_->avail_out = static_cast<uint32_t>(buffer_.size());
     }
   }
@@ -93282,16 +93282,16 @@ int32_t ZipWriter::CompressBytes(FileEntry* file, const void* data, uint32_t len
 }
 
 int32_t ZipWriter::FlushCompressedBytes(FileEntry* file) {
-  (((state_ == State::kWritingEntry)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 428, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "state_ == State::kWritingEntry" << " ";
-  (((z_stream_)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 429, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_" << " ";
-  (((z_stream_->next_out != nullptr)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 430, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->next_out != nullptr" << " ";
-  (((z_stream_->avail_out != 0)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 431, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->avail_out != 0" << " ";
+  (((state_ == State::kWritingEntry)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 428, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "state_ == State::kWritingEntry" << " ";
+  (((z_stream_)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 429, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_" << " ";
+  (((z_stream_->next_out != nullptr)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 430, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->next_out != nullptr" << " ";
+  (((z_stream_->avail_out != 0)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 431, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->avail_out != 0" << " ";
 
   
   
   int zerr;
   while ((zerr = deflate(z_stream_.get(), 4)) == 0) {
-    (((z_stream_->avail_out == 0)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 437, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->avail_out == 0" << " ";
+    (((z_stream_->avail_out == 0)) != 0) || (false) || ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 437, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " "z_stream_->avail_out == 0" << " ";
     size_t write_bytes = z_stream_->next_out - buffer_.data();
     if (fwrite(buffer_.data(), 1, write_bytes, file_) != write_bytes) {
       return HandleError(kIoError);
@@ -93300,7 +93300,7 @@ int32_t ZipWriter::FlushCompressedBytes(FileEntry* file) {
     current_offset_ += write_bytes;
 
     z_stream_->next_out = buffer_.data();
-    if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(buffer_.size(), kBufSize); ((!(_values.lhs.v == _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 446, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "buffer_.size()" << " " << "==" << " " << "kBufSize" << " (" "buffer_.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "kBufSize" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
+    if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(buffer_.size(), kBufSize); ((!(_values.lhs.v == _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 446, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "buffer_.size()" << " " << "==" << " " << "kBufSize" << " (" "buffer_.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "kBufSize" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
     z_stream_->avail_out = static_cast<uint32_t>(buffer_.size());
   }
   if (zerr != 1) {
@@ -93391,10 +93391,10 @@ int32_t ZipWriter::Finish() {
     cdr.compressed_size = file.compressed_size;
     cdr.uncompressed_size = file.uncompressed_size;
     
-    if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(file.path.size(), std::numeric_limits<uint16_t>::max()); ((!(_values.lhs.v <= _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 537, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "file.path.size()" << " " << "<=" << " " << "std::numeric_limits<uint16_t>::max()" << " (" "file.path.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "std::numeric_limits<uint16_t>::max()" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
+    if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(file.path.size(), std::numeric_limits<uint16_t>::max()); ((!(_values.lhs.v <= _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 537, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "file.path.size()" << " " << "<=" << " " << "std::numeric_limits<uint16_t>::max()" << " (" "file.path.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "std::numeric_limits<uint16_t>::max()" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
     cdr.file_name_length = static_cast<uint16_t>(file.path.size());
     
-    if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(file.local_file_header_offset, std::numeric_limits<uint32_t>::max()); ((!(_values.lhs.v <= _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 540, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "file.local_file_header_offset" << " " << "<=" << " " << "std::numeric_limits<uint32_t>::max()" << " (" "file.local_file_header_offset" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "std::numeric_limits<uint32_t>::max()" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
+    if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(file.local_file_header_offset, std::numeric_limits<uint32_t>::max()); ((!(_values.lhs.v <= _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 540, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "file.local_file_header_offset" << " " << "<=" << " " << "std::numeric_limits<uint32_t>::max()" << " (" "file.local_file_header_offset" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "std::numeric_limits<uint32_t>::max()" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
     cdr.local_file_header_offset = static_cast<uint32_t>(file.local_file_header_offset);
     if (fwrite(&cdr, sizeof(cdr), 1, file_) != 1) {
       return HandleError(kIoError);
@@ -93412,7 +93412,7 @@ int32_t ZipWriter::Finish() {
   er.disk_num = 0;
   er.cd_start_disk = 0;
   
-  if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(files_.size(), std::numeric_limits<uint16_t>::max()); ((!(_values.lhs.v <= _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Windroid\\thirdparty\\libziparchive\\zip_writer.cc", 558, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "files_.size()" << " " << "<=" << " " << "std::numeric_limits<uint16_t>::max()" << " (" "files_.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "std::numeric_limits<uint16_t>::max()" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
+  if (::android::base::kEnableDChecks) for (auto _values = ::android::base::MakeEagerEvaluator(files_.size(), std::numeric_limits<uint16_t>::max()); ((!(_values.lhs.v <= _values.rhs.v)) != 0); )  ::android::base::LogMessage("C:\\Users\\namde\\Documents\\Setu\\thirdparty\\libziparchive\\zip_writer.cc", 558, ::android::base::FATAL, nullptr, -1) .stream() << "Check failed: " << "files_.size()" << " " << "<=" << " " << "std::numeric_limits<uint16_t>::max()" << " (" "files_.size()" "=" << ::android::base::LogNullGuard<decltype(_values.lhs.v)>::Guard(_values.lhs.v) << ", " "std::numeric_limits<uint16_t>::max()" "=" << ::android::base::LogNullGuard<decltype(_values.rhs.v)>::Guard(_values.rhs.v) << ") ";
   er.num_records_on_disk = static_cast<uint16_t>(files_.size());
   er.num_records = static_cast<uint16_t>(files_.size());
   if (current_offset_ > std::numeric_limits<uint32_t>::max()) {

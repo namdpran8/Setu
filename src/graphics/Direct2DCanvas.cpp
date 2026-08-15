@@ -1,6 +1,6 @@
 #include "Direct2DCanvas.h"
 
-namespace windroid {
+namespace setu {
 namespace graphics {
 
 Direct2DCanvas::Direct2DCanvas(ID2D1DeviceContext* context, IDWriteFactory* dwriteFactory)
@@ -9,6 +9,21 @@ Direct2DCanvas::Direct2DCanvas(ID2D1DeviceContext* context, IDWriteFactory* dwri
     mContext->GetTransform(&initialState.transform);
     mStateStack.push_back(initialState);
 }
+
+/*
+I know what I did
+I know what I said
+But that doesn’t mean I don’t care
+And maybe you’re right I’ll have my regrets
+But right now with you standing there
+What’s killing me the most
+Is how you look at me different
+I didn’t want to go
+But it don’t make a difference
+Now you been saying you don’t believe inBelieve in love without leaving 
+And what’s killing me the mostIs I know that I’m the reason
+:- The Reason (Acoustic) - HARIZ 
+*/
 
 void Direct2DCanvas::save() {
     State s;
@@ -148,4 +163,4 @@ void Direct2DCanvas::drawRenderNode(RenderNode* node) {
 }
 
 } // namespace graphics
-} // namespace windroid
+} // namespace setu

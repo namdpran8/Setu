@@ -4,7 +4,7 @@
 #include <cmath>
 #include "androidfw/ResourceTypes.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 GridLayout::GridLayout() {}
@@ -305,7 +305,7 @@ std::shared_ptr<View::LayoutParams> GridLayout::generateLayoutParams(android::Re
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 
 
 

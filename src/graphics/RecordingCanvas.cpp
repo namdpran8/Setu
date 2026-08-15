@@ -1,6 +1,6 @@
 #include "RecordingCanvas.h"
 
-namespace windroid {
+namespace setu {
 namespace graphics {
 
 RecordingCanvas::RecordingCanvas(RenderNode* node) : mNode(node) {
@@ -51,4 +51,4 @@ void RecordingCanvas::drawRenderNode(RenderNode* node) {
 }
 
 } // namespace graphics
-} // namespace windroid
+} // namespace setu

@@ -11,7 +11,7 @@ AOSP's codebase relies heavily on standard library algorithms (like `std::inplac
 - **`CombinedIterator` Refinements**: We introduced rvalue-reference `swap` overloads so that MSVC could successfully swap `Theme::Entry` struct-of-arrays nodes during `std::inplace_merge`.
 
 ### 2. Isolated Compilation
-We created a dedicated `windroid_androidfw` static library target in CMake and successfully compiled all 13 required source files. This was the most complex C++ hurdle of the project, as it required resolving cascading dependencies down to the bare `cutils`/`utils` compatibility layers we built in Phase 1.
+We created a dedicated `setu_androidfw` static library target in CMake and successfully compiled all 13 required source files. This was the most complex C++ hurdle of the project, as it required resolving cascading dependencies down to the bare `cutils`/`utils` compatibility layers we built in Phase 1.
 
 ### 3. Standalone Verification Test
 We authored `test_androidfw.cpp` to initialize a bare `AssetManager2` instance, load the `openclalc.apk`, and query resources.
@@ -28,4 +28,4 @@ Found resource 0x7f010000 : c o m . d a r k e m p i r e 7 8 . o p e n c a l c u 
 
 **Conclusion:** `AssetManager2` is successfully reading the memory-mapped `resources.arsc` directly from the APK archive, parsing the binary structure, and resolving package and resource namespaces. 
 
-Phase 3 is complete. The system is ready to be wired into `Windroid`'s `LayoutInflater` in Phase 4.
+Phase 3 is complete. The system is ready to be wired into `Setu`'s `LayoutInflater` in Phase 4.

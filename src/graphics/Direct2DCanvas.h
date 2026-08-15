@@ -7,7 +7,7 @@
 #include <wrl/client.h>
 #include <vector>
 
-namespace windroid {
+namespace setu {
 namespace graphics {
 
 class Direct2DCanvas : public Canvas {
@@ -47,4 +47,4 @@ private:
 };
 
 } // namespace graphics
-} // namespace windroid
+} // namespace setu

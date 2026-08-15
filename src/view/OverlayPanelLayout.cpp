@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 void OverlayPanelLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -45,4 +45,4 @@ void OverlayPanelLayout::onLayout(bool changed, int l, int t, int r, int b) {
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu

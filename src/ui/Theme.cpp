@@ -1,7 +1,7 @@
 #include "Theme.h"
 #include "../utils/Logger.h"
 
-namespace windroid {
+namespace setu {
 
 Theme::Theme(ResourceManager* resManager) : m_resManager(resManager) {
     if (m_resManager && m_resManager->getAssetManager()) {
@@ -22,5 +22,5 @@ void Theme::applyStyle(uint32_t styleResId, bool force) {
     }
 }
 
-} // namespace windroid
+} // namespace setu
 

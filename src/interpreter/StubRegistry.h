@@ -6,7 +6,7 @@
 #include "Value.h"
 #include "InterpreterState.h"
 
-namespace windroid { class ResourceManager; }
+namespace setu { class ResourceManager; }
 class MultiDexManager;
 
 // StubFunc signature: takes InterpreterState, args array, and an output Value pointer for returns.
@@ -15,7 +15,7 @@ using StubFunc = std::function<bool(InterpreterState* state, const std::vector<V
 
 class StubRegistry {
 public:
-    static void init(windroid::ResourceManager* resManager, MultiDexManager* multiDexManager);
+    static void init(setu::ResourceManager* resManager, MultiDexManager* multiDexManager);
     static bool invoke(const std::string& methodSignature, InterpreterState* state, const std::vector<Value>& args, Value* outReturn);
     static bool isStubbed(const std::string& methodSignature);
     
@@ -25,7 +25,7 @@ public:
 
 private:
     static std::unordered_map<std::string, StubFunc> stubs;
-    static windroid::ResourceManager* m_resManager;
+    static setu::ResourceManager* m_resManager;
     static MultiDexManager* m_multiDexManager;
     static std::unordered_map<int, InterpreterObject*> clickListeners;
     

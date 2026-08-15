@@ -7,7 +7,7 @@
 int main(int argc, char** argv) {
     android::base::InitLogging(argv, android::base::StderrLogger);
     android::base::SetMinimumLogSeverity(android::base::VERBOSE);
-    const char* apk_path = "C:/Users/namde/Documents/Windroid/testapk/openclalc.apk";
+    const char* apk_path = "C:/Users/namde/Documents/Setu/testapk/openclalc.apk";
     
     ZipArchiveHandle handle;
     int32_t err = OpenArchive(apk_path, &handle);

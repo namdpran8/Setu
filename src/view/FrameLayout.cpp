@@ -3,7 +3,7 @@
 #include <algorithm>
 #include "androidfw/ResourceTypes.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 void FrameLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -112,7 +112,7 @@ std::shared_ptr<View::LayoutParams> FrameLayout::generateLayoutParams(android::R
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 
 
 

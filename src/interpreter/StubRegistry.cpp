@@ -10,7 +10,7 @@
 #include "Interpreter.h" // For recursive Interpreter execution
 
 std::unordered_map<std::string, StubFunc> StubRegistry::stubs;
-windroid::ResourceManager* StubRegistry::m_resManager = nullptr;
+setu::ResourceManager* StubRegistry::m_resManager = nullptr;
 MultiDexManager* StubRegistry::m_multiDexManager = nullptr;
 std::unordered_map<int, InterpreterObject*> StubRegistry::clickListeners;
 
@@ -30,11 +30,11 @@ static std::string utf16_to_utf8(const std::wstring& utf16) {
     return utf8;
 }
 
-static std::string getAndroidClassName(const windroid::view::View* view) {
-    if (dynamic_cast<const windroid::widget::EditText*>(view)) return "Landroid/widget/EditText;";
-    if (dynamic_cast<const windroid::widget::Button*>(view)) return "Landroid/widget/Button;";
-    if (dynamic_cast<const windroid::widget::TextView*>(view)) return "Landroid/widget/TextView;";
-    if (dynamic_cast<const windroid::view::ViewGroup*>(view)) return "Landroid/view/ViewGroup;";
+static std::string getAndroidClassName(const setu::view::View* view) {
+    if (dynamic_cast<const setu::widget::EditText*>(view)) return "Landroid/widget/EditText;";
+    if (dynamic_cast<const setu::widget::Button*>(view)) return "Landroid/widget/Button;";
+    if (dynamic_cast<const setu::widget::TextView*>(view)) return "Landroid/widget/TextView;";
+    if (dynamic_cast<const setu::view::ViewGroup*>(view)) return "Landroid/view/ViewGroup;";
     return "Landroid/view/View;";
 }
 
@@ -47,7 +47,7 @@ static bool findRequiredView(const std::vector<Value>& args, Value* outReturn) {
     }
 
     auto* rootObject = static_cast<InterpreterObject*>(args[0].obj);
-    auto* rootView = rootObject ? static_cast<windroid::view::View*>(rootObject->nativeHandle) : nullptr;
+    auto* rootView = rootObject ? static_cast<setu::view::View*>(rootObject->nativeHandle) : nullptr;
     const int targetId = args[1].i;
     auto foundView = rootView ? rootView->findViewById(targetId) : nullptr;
     if (!foundView) {
@@ -63,7 +63,7 @@ static bool findRequiredView(const std::vector<Value>& args, Value* outReturn) {
     return false;
 }
 
-void StubRegistry::init(windroid::ResourceManager* resManager, MultiDexManager* multiDexManager) {
+void StubRegistry::init(setu::ResourceManager* resManager, MultiDexManager* multiDexManager) {
     m_resManager = resManager;
     m_multiDexManager = multiDexManager;
     registerActivityStubs();
@@ -76,43 +76,46 @@ bool StubRegistry::isStubbed(const std::string& methodSignature) {
     if (methodSignature.find("->startActivity(Landroid/content/Intent;)V") != std::string::npos) return true;
     if (methodSignature.find("->setContentView(I)V") != std::string::npos) return true;
     if (methodSignature.find("->findViewById(I)Landroid/view/View;") != std::string::npos) return true;
-    if (methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter") != std::string::npos ||
-        methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue") != std::string::npos) return true;
+    if (methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter") == 0 ||
+        methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullExpressionValue") == 0) return true;
         
+    size_t arrowPos = methodSignature.find("->");
+    std::string cls = (arrowPos != std::string::npos) ? methodSignature.substr(0, arrowPos + 1) : methodSignature;
+    
     // Common basic SDK classes we don't want to fail on yet
-    if (methodSignature.find("Ljava/lang/Object;") != std::string::npos) return true;
-    if (methodSignature.find("Ljava/lang/Class;") != std::string::npos) return true;
-    if (methodSignature.find("Ljava/lang/Thread;") != std::string::npos) return true;
-    if (methodSignature.find("Ljava/lang/StringBuilder;") != std::string::npos) return true;
-    if (methodSignature.find("Ljava/util/") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/content/Context;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/content/SharedPreferences") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/app/Activity;->getWindow") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/view/Window;") != std::string::npos) return true;
-    if (methodSignature.find("Landroidx/fragment/app/FragmentManager") != std::string::npos) return true;
-    if (methodSignature.find("Landroidx/fragment/app/FragmentTransaction") != std::string::npos) return true;
-    if (methodSignature.find("Landroidx/fragment/app/FragmentActivity;->getSupportFragmentManager") != std::string::npos) return true;
-    if (methodSignature.find("Landroidx/lifecycle/") != std::string::npos) return true;
-    if (methodSignature.find("Ljava/lang/Enum;") != std::string::npos) return true;
-    if (methodSignature.find("Ljava/lang/Integer;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/graphics/Rect;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/animation/LayoutTransition;") != std::string::npos) return true;
-    if (methodSignature.find("Ljava/lang/IllegalStateException;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/widget/OverScroller;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/widget/ImageView;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/view/View;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/view/ViewGroup;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/widget/TextView;") != std::string::npos) return true;
-    if (methodSignature.find("Lj0/w;") != std::string::npos) return true;
-    if (methodSignature.find("Lz1/g;") != std::string::npos) return true;
-    if (methodSignature.find("Ln0/a;") != std::string::npos) return true;
-    if (methodSignature.find("Lu0/c;") != std::string::npos) return true;
-    if (methodSignature.find("Lg/F;") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/os/Build$VERSION;") != std::string::npos) return true;
-    if (methodSignature.find("Lx0/b;") != std::string::npos) return true;
-    if (methodSignature.find("Landroidx/recyclerview/") != std::string::npos) return true;
-    if (methodSignature.find("Landroid/util/SparseArray;") != std::string::npos) return true;
-    if (methodSignature.find("Ljava/lang/ThreadLocal;") != std::string::npos) return true;
+    if (cls == "Ljava/lang/Object;") return true;
+    if (cls == "Ljava/lang/Class;") return true;
+    if (cls == "Ljava/lang/Thread;") return true;
+    if (cls == "Ljava/lang/StringBuilder;") return true;
+    if (cls.find("Ljava/util/") == 0) return true;
+    if (cls == "Landroid/content/Context;") return true;
+    if (cls.find("Landroid/content/SharedPreferences") == 0) return true;
+    if (methodSignature.find("Landroid/app/Activity;->getWindow") == 0) return true;
+    if (cls == "Landroid/view/Window;") return true;
+    if (cls.find("Landroidx/fragment/app/FragmentManager") == 0) return true;
+    if (cls.find("Landroidx/fragment/app/FragmentTransaction") == 0) return true;
+    if (methodSignature.find("Landroidx/fragment/app/FragmentActivity;->getSupportFragmentManager") == 0) return true;
+    if (cls.find("Landroidx/lifecycle/") == 0) return true;
+    if (cls == "Ljava/lang/Enum;") return true;
+    if (cls == "Ljava/lang/Integer;") return true;
+    if (cls == "Landroid/graphics/Rect;") return true;
+    if (cls == "Landroid/animation/LayoutTransition;") return true;
+    if (cls == "Ljava/lang/IllegalStateException;") return true;
+    if (cls == "Landroid/widget/OverScroller;") return true;
+    if (cls == "Landroid/widget/ImageView;") return true;
+    if (cls == "Landroid/view/View;") return true;
+    if (cls == "Landroid/view/ViewGroup;") return true;
+    if (cls == "Landroid/widget/TextView;") return true;
+    if (cls == "Lj0/w;") return true;
+    if (cls == "Lz1/g;") return true;
+    if (cls == "Ln0/a;") return true;
+    if (cls == "Lu0/c;") return true;
+    if (cls == "Lg/F;") return true;
+    if (cls.find("Landroid/os/Build$VERSION;") == 0) return true;
+    if (cls == "Lx0/b;") return true;
+    if (cls.find("Landroidx/recyclerview/") == 0) return true;
+    if (cls == "Landroid/util/SparseArray;") return true;
+    if (cls == "Ljava/lang/ThreadLocal;") return true;
     
     return false;
 }
@@ -198,7 +201,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                         GetClientRect(WindowManager::getMainWindow(), &rect);
                         int pW = rect.right > 0 ? rect.right : 400;
                         int pH = rect.bottom > 0 ? rect.bottom : 800;
-                        auto rootView = windroid::LayoutInflater::inflate(&parser, m_resManager);
+                        auto rootView = setu::LayoutInflater::inflate(&parser, m_resManager);
                         WindowManager::setRootView(rootView);
                     }
                 }
@@ -211,12 +214,12 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                 int id = args[1].i;
                 Logger::d("StubRegistry", "Executed: findViewById(id=" + std::to_string(id) + ")");
                 
-                windroid::view::View* childView = nullptr;
-                std::function<windroid::view::View*(windroid::view::View*, int)> findViewRecursive = [&](windroid::view::View* parent, int searchId) -> windroid::view::View* {
+                setu::view::View* childView = nullptr;
+                std::function<setu::view::View*(setu::view::View*, int)> findViewRecursive = [&](setu::view::View* parent, int searchId) -> setu::view::View* {
                     if (!parent) return nullptr;
                     if (parent->getId() == searchId) return parent;
                     
-                    auto viewGroup = dynamic_cast<windroid::view::ViewGroup*>(parent);
+                    auto viewGroup = dynamic_cast<setu::view::ViewGroup*>(parent);
                     if (viewGroup) {
                         for (size_t i = 0; i < viewGroup->getChildCount(); ++i) {
                             auto found = findViewRecursive(viewGroup->getChildAt(i).get(), searchId);
@@ -279,6 +282,24 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
         }
         if (methodSignature.find("Landroid/content/Context;->getPackageName") != std::string::npos) {
             if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+        // getString(int resId) is inherited from Context - any Activity/Fragment subclass may call it
+        // under its own class name, so we need a wildcard fallback here.
+        if (methodSignature.find("->getString(I)Ljava/lang/String;") != std::string::npos) {
+            if (args.size() >= 2 && args[1].type == ValueType::INT && m_resManager) {
+                int resId = args[1].i;
+                std::string strVal = m_resManager->getString(resId);
+                InterpreterObject* strObj = new InterpreterObject();
+                strObj->className = "Ljava/lang/String;";
+                InterpreterObject* inner = new InterpreterObject();
+                inner->className = strVal;
+                strObj->fields["string_value"] = Value::MakeObject(inner);
+                if (outReturn) *outReturn = Value::MakeObject(strObj);
+                Logger::d("StubRegistry", "Executed: getString(id=" + std::to_string(resId) + ") -> '" + strVal + "'");
+            } else {
+                if (outReturn) *outReturn = Value::MakeNull();
+            }
             return false;
         }
         if (methodSignature.find("Landroid/content/Context;->getSharedPreferences") != std::string::npos) {
@@ -344,18 +365,18 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             return false;
         }
 
-        if (methodSignature.find("Landroidx/lifecycle/") != std::string::npos) {
+        if (methodSignature.find("Landroidx/lifecycle/") == 0) {
             if (outReturn) *outReturn = Value::MakeNull();
             return false;
         }
 
-        if (methodSignature.find("Landroidx/fragment/app/FragmentActivity;->getSupportFragmentManager") != std::string::npos ||
-            methodSignature.find("Landroid/app/Activity;->getFragmentManager") != std::string::npos) {
+        if (methodSignature.find("Landroidx/fragment/app/FragmentActivity;->getSupportFragmentManager") == 0 ||
+            methodSignature.find("Landroid/app/Activity;->getFragmentManager") == 0) {
             if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
             return false;
         }
 
-        if (methodSignature.find("Landroid/content/res/Resources;->getResourceName") != std::string::npos) {
+        if (methodSignature.find("Landroid/content/res/Resources;->getResourceName") == 0) {
             if (outReturn) *outReturn = Value::MakeNull();
             return false;
         }
@@ -399,13 +420,13 @@ void StubRegistry::registerActivityStubs() {
 }
 
 void StubRegistry::registerViewStubs() {
-    static std::vector<std::shared_ptr<windroid::view::View>> s_dynamicViews;
+    static std::vector<std::shared_ptr<setu::view::View>> s_dynamicViews;
     
     // Basic dynamic view creation helper
     auto dynamicViewInit = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn, const std::string& className) -> bool {
         if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            auto view = std::make_shared<windroid::view::ViewGroup>(); // generic for now
+            auto view = std::make_shared<setu::view::ViewGroup>(); // generic for now
             s_dynamicViews.push_back(view);
             viewObj->nativeHandle = view.get();
             Logger::d("StubRegistry", "Created dynamic view: " + className);
@@ -431,7 +452,7 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/view/View;->setId(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            windroid::view::View* view = (windroid::view::View*)viewObj->nativeHandle;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
             int id = args[1].i;
             if (view) {
                 view->setId(id);
@@ -464,7 +485,7 @@ void StubRegistry::registerViewStubs() {
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
             if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::OBJECT && args[1].obj) {
                 InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-                windroid::widget::TextView* view = (windroid::widget::TextView*)viewObj->nativeHandle;
+                setu::widget::TextView* view = (setu::widget::TextView*)viewObj->nativeHandle;
                 InterpreterObject* strObj = (InterpreterObject*)args[1].obj;
                 
                 std::string strVal;
@@ -486,7 +507,7 @@ void StubRegistry::registerViewStubs() {
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
             if (args.size() >= 1 && args[0].type == ValueType::OBJECT && args[0].obj) {
                 InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-                windroid::widget::TextView* view = (windroid::widget::TextView*)viewObj->nativeHandle;
+                setu::widget::TextView* view = (setu::widget::TextView*)viewObj->nativeHandle;
                 if (view) {
                     std::string strVal = utf16_to_utf8(view->getText());
                     InterpreterObject* strObj = new InterpreterObject();
@@ -535,7 +556,7 @@ void StubRegistry::registerViewStubs() {
                         GetClientRect(WindowManager::getMainWindow(), &rect);
                         int pW = rect.right > 0 ? rect.right : 400;
                         int pH = rect.bottom > 0 ? rect.bottom : 800;
-                        auto rootView = windroid::LayoutInflater::inflate(&parser, m_resManager);
+                        auto rootView = setu::LayoutInflater::inflate(&parser, m_resManager);
                         WindowManager::setRootView(rootView);
                         
                         InterpreterObject* viewObj = new InterpreterObject();
@@ -554,7 +575,7 @@ void StubRegistry::registerViewStubs() {
     auto setOnClickListenerStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::OBJECT) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            windroid::view::View* view = viewObj ? (windroid::view::View*)viewObj->nativeHandle : nullptr;
+            setu::view::View* view = viewObj ? (setu::view::View*)viewObj->nativeHandle : nullptr;
             InterpreterObject* listener = (InterpreterObject*)args[1].obj;
             
             int controlId = view ? view->getId() : 0;
@@ -731,13 +752,13 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/widget/EditText;->getText()Landroid/text/Editable;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (args.size() >= 1 && args[0].type == ValueType::OBJECT && args[0].obj) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
-            windroid::view::View* view = (windroid::view::View*)viewObj->nativeHandle;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
             if (view) {
                 std::string text = "stubbed_text";
-                windroid::widget::TextView* tv = dynamic_cast<windroid::widget::TextView*>(view);
+                setu::widget::TextView* tv = dynamic_cast<setu::widget::TextView*>(view);
                 if (tv) {
                     std::wstring wtext = tv->getText();
-                    text = std::string(wtext.begin(), wtext.end());
+                    text = utf16_to_utf8(wtext);
                 }
                 
                 InterpreterObject* editableObj = new InterpreterObject();
@@ -864,7 +885,7 @@ void StubRegistry::registerViewStubs() {
         if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::OBJECT && args[1].obj) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
             InterpreterObject* strObj = (InterpreterObject*)args[1].obj;
-            windroid::view::View* view = (windroid::view::View*)viewObj->nativeHandle;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
             
             std::string text = "stubbed";
             auto it = strObj->fields.find("string_value");
@@ -873,7 +894,7 @@ void StubRegistry::registerViewStubs() {
             }
             
             if (view) {
-                auto textView = dynamic_cast<windroid::widget::TextView*>(view);
+                auto textView = dynamic_cast<setu::widget::TextView*>(view);
                 if (textView) {
                     int size_needed = MultiByteToWideChar(CP_UTF8, 0, &text[0], (int)text.size(), NULL, 0);
                     std::wstring wstrTo(size_needed, 0);

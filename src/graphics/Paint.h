@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace windroid {
+namespace setu {
 namespace graphics {
 
 enum class Style {
@@ -40,4 +40,4 @@ private:
 };
 
 } // namespace graphics
-} // namespace windroid
+} // namespace setu

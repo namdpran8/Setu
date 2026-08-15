@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 class ConstraintLayout : public ViewGroup {
@@ -65,5 +65,5 @@ private:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 

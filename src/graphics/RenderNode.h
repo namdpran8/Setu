@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-namespace windroid {
+namespace setu {
 namespace graphics {
 
 // Base class for all recorded drawing operations
@@ -134,4 +134,4 @@ private:
 };
 
 } // namespace graphics
-} // namespace windroid
+} // namespace setu

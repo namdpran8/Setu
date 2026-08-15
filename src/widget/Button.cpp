@@ -5,7 +5,7 @@
 #include "../ui/WindowManager.h"
 #include "../utils/Logger.h"
 
-namespace windroid {
+namespace setu {
 namespace widget {
 
 Button::Button(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes)
@@ -97,6 +97,6 @@ bool Button::onTouchEvent(view::MotionEvent& event) {
 }
 
 } // namespace widget
-} // namespace windroid
+} // namespace setu
 
 

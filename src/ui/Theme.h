@@ -4,7 +4,7 @@
 #include "androidfw/AssetManager2.h"
 #include "../dex/ResourceManager.h"
 
-namespace windroid {
+namespace setu {
 
 class Theme {
 public:
@@ -22,4 +22,4 @@ private:
     std::unique_ptr<android::Theme> m_theme;
 };
 
-} // namespace windroid
+} // namespace setu

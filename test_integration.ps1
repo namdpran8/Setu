@@ -1,8 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
     [string]$ApkPath,
-    [string]$ExecutablePath = ".\\build\\Release\\winandroid_runtime.exe",
-    [string]$LogPath = ".\\logs\\windroid-integration.log",
+    [string]$ExecutablePath = ".\\build\\Release\\setu_runtime.exe",
+    [string]$LogPath = ".\\logs\\setu-integration.log",
     [int]$StartupTimeoutSeconds = 12
 )
 

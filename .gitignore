@@ -375,3 +375,8 @@ dexdump.txt
 x64/
 x86/
 ...
+
+# Submodules/External repos
+ART-DEX/
+art-refs_heads_main-runtime-interpreter/
+base-refs_heads_main-core-java-android-view/

@@ -2,7 +2,7 @@
 #include "Canvas.h"
 #include "RenderNode.h"
 
-namespace windroid {
+namespace setu {
 namespace graphics {
 
 // A canvas that records operations into a RenderNode instead of drawing immediately
@@ -32,4 +32,4 @@ private:
 };
 
 } // namespace graphics
-} // namespace windroid
+} // namespace setu

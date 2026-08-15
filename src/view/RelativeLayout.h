@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 class RelativeLayout : public ViewGroup {
@@ -40,5 +40,5 @@ private:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 

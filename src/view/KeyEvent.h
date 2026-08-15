@@ -1,6 +1,6 @@
 #pragma once
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 class KeyEvent {
@@ -21,4 +21,4 @@ private:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu

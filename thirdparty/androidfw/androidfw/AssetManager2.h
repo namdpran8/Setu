@@ -423,10 +423,7 @@ class AssetManager2 {
   //
   // NOTE: FindEntry takes care of ensuring that structs within FindEntryResult have been properly
   // bounds-checked. Callers of FindEntry are free to trust the data if this method succeeds.
-  base::expected<FindEntryResult, NullOrIOError> FindEntry(uint32_t resid,
-                                                           uint16_t density_override,
-                                                           bool stop_at_first_match,
-                                                           bool ignore_configuration) const;
+  base::expected<FindEntryResult, NullOrIOError> FindEntry(uint32_t resid, uint16_t density_override, bool stop_at_first_match, bool ignore_configuration ) const;
 
   base::expected<FindEntryResult, NullOrIOError> FindEntryInternal(
       const PackageGroup& package_group, uint8_t type_idx, uint16_t entry_idx,

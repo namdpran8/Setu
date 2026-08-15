@@ -1,8 +1,8 @@
-# Windroid
+# Setu
 
-**Windroid** is a highly experimental, custom Android runtime for Windows built from scratch in C++. 
+**Setu** is a highly experimental, custom Android runtime for Windows built from scratch in C++. 
 
-Rather than running Android inside a heavy hardware emulator or a Linux subsystem, Windroid runs Android application packages (`.apk` files) **natively on Windows** without virtualization. It achieves this by directly interpreting Dalvik bytecode (`.dex`), extracting binary XML layouts (`.xml`/`resources.arsc`), and bridging Android framework calls directly to native Win32 UI components in real-time.
+Rather than running Android inside a heavy hardware emulator or a Linux subsystem, Setu runs Android application packages (`.apk` files) **natively on Windows** without virtualization. It achieves this by directly interpreting Dalvik bytecode (`.dex`), extracting binary XML layouts (`.xml`/`resources.arsc`), and bridging Android framework calls directly to native Win32 UI components in real-time.
 
 ---
 
@@ -21,14 +21,14 @@ Rather than running Android inside a heavy hardware emulator or a Linux subsyste
 
 1. **APK Parser (`Main.cpp`)**: Unzips the provided `.apk`, extracts `classes.dex`, compiled XMLs, and resource files.
 2. **Interpreter (`Interpreter.cpp`)**: The heart of the runtime. It sets up `InterpreterState` (registers, stack) and steps through DEX opcodes. It handles object instantiation, virtual method invocation, and static field resolution.
-3. **Stub Registry (`StubRegistry.cpp`)**: Since Windroid does not ship with a 2GB Java runtime, all calls to `android.os.*`, `androidx.*`, or `java.*` are intercepted. The registry provides C++ lambda functions that simulate these calls (e.g., converting Android Intents to Win32 window transitions).
+3. **Stub Registry (`StubRegistry.cpp`)**: Since Setu does not ship with a 2GB Java runtime, all calls to `android.os.*`, `androidx.*`, or `java.*` are intercepted. The registry provides C++ lambda functions that simulate these calls (e.g., converting Android Intents to Win32 window transitions).
 4. **Layout Inflater (`LayoutInflater.cpp`)**: Reads the AXML layout nodes requested by the APK and uses the Win32 API (`CreateWindowEx`) to physically render native Windows UI elements matching the Android layout design.
 
 ---
 
 ## 🛠️ Build Instructions
 
-Windroid is built using **CMake** and C++17. It requires a Windows environment due to its heavy reliance on the native Win32 API for rendering.
+Setu is built using **CMake** and C++17. It requires a Windows environment due to its heavy reliance on the native Win32 API for rendering.
 
 1. **Prerequisites:** 
    - Windows 10/11
@@ -38,7 +38,7 @@ Windroid is built using **CMake** and C++17. It requires a Windows environment d
    - Open the project directory in Visual Studio.
    - Wait for CMake to generate the cache.
    - Select the `x64-Debug` or `x64-Release` build configuration.
-   - Build `winandroid_runtime.exe`.
+   - Build `setu_runtime.exe`.
 3. **Run:**
    - By default, the executable expects a `testapk/` directory containing a target `test.apk`.
    - The runtime will parse the APK, draw the main window, and start interpreting the `MainActivity` bytecode. Logs are automatically dumped into the `logs/` folder.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(winandroid_runtime LANGUAGES CXX)
+project(setu_runtime LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ add_subdirectory(thirdparty/libziparchive)
 add_subdirectory(thirdparty/fmt)
 add_subdirectory(thirdparty/androidfw)
 
-add_executable(winandroid_runtime
+add_executable(setu_runtime
 
     src/main.cpp
     "src/apk_extractor/ApkExtractor.cpp"
@@ -41,6 +41,6 @@ add_executable(winandroid_runtime
     "src/widget/Button.cpp"
     "src/widget/EditText.cpp")
 
-target_include_directories(winandroid_runtime PRIVATE include)
-target_link_libraries(winandroid_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi windroid_androidfw)
-target_compile_options(winandroid_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
+target_include_directories(setu_runtime PRIVATE include)
+target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw)
+target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")

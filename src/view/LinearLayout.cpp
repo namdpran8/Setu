@@ -3,7 +3,7 @@
 #include <algorithm>
 #include "androidfw/ResourceTypes.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -204,7 +204,7 @@ std::shared_ptr<View::LayoutParams> LinearLayout::generateLayoutParams(android::
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 
 
 

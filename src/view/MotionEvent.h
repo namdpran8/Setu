@@ -1,6 +1,6 @@
 #pragma once
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 class MotionEvent {
@@ -32,4 +32,4 @@ private:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu

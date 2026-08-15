@@ -1,7 +1,7 @@
 #pragma once
 #include "ViewGroup.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 class FrameLayout : public ViewGroup {
@@ -23,5 +23,5 @@ public:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 

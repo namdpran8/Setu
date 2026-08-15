@@ -4,7 +4,7 @@
 #include "../utils/Logger.h"
 #include "androidfw/ResourceTypes.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
@@ -298,7 +298,7 @@ std::shared_ptr<View::LayoutParams> ConstraintLayout::generateLayoutParams(andro
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 
 
 

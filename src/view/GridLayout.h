@@ -3,7 +3,7 @@
 #include <vector>
 #include <memory>
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 class GridLayout : public ViewGroup {
@@ -50,5 +50,5 @@ private:
 };
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 

@@ -3,7 +3,7 @@
 #include "../graphics/Paint.h"
 #include <string>
 
-namespace windroid {
+namespace setu {
 namespace widget {
 
 class TextView : public view::View {
@@ -28,5 +28,5 @@ protected:
 };
 
 } // namespace widget
-} // namespace windroid
+} // namespace setu
 

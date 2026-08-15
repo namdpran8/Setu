@@ -4,11 +4,9 @@
 #include "../utils/Logger.h"
 using namespace std;
 
-DexParser::DexParser() {
-}
+DexParser::DexParser() {}
 
-DexParser::~DexParser() {
-}
+DexParser::~DexParser() {}
 
 bool DexParser::parse(const std::vector<uint8_t>& dexBuffer) {
     if (dexBuffer.size() < sizeof(DexHeader)) {

@@ -29,11 +29,12 @@ uint8_t Interpreter::fetchOpcode(const std::vector<uint8_t>& bytecode, uint32_t&
 }
 
 Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode, 
-                               const DexParser* currentDex, 
-                               const MultiDexManager* multiDexManager,
-                               const std::vector<Value>& args,
-                               uint16_t registers_size,
-                               uint16_t ins_size) {
+                                 const DexParser* currentDex, 
+                                 const MultiDexManager* multiDexManager,
+                                 const std::vector<Value>& args,
+                                 uint16_t registers_size,
+                                 uint16_t ins_size) {
+    
     if (bytecode.empty()) {
         Logger::w("Interpreter", "Cannot execute empty bytecode!");
         return Value::MakeNull();
@@ -49,6 +50,8 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
             state.registers[firstParamRegister + i] = args[i];
         }
     }
+    //amsdhakmsldjakjsdhaois ahsfkjdsfnas  dasddsdsawsdawdcsa da
+  
 
     Logger::i("Interpreter", "Starting bytecode execution loop...");
     
@@ -428,14 +431,33 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 uint8_t a = safe8(bytecode, state.pc) & 0x0F;
                 uint8_t b = (safe8(bytecode, state.pc) >> 4) & 0x0F;
                 uint16_t typeIdx = safe16(bytecode, state.pc + 1);
+                std::string expectedType = currentDex ? currentDex->getTypeString(typeIdx) : "";
                 
                 int result = 0;
                 if (state.registers[b].type == ValueType::OBJECT && state.registers[b].obj != nullptr) {
-                    result = 1; // For now, assume true for all non-null objects to let stubs pass
+                    InterpreterObject* actualObj = static_cast<InterpreterObject*>(state.registers[b].obj);
+                    std::string actualType = actualObj->className;
+                    if (expectedType == actualType || expectedType == "Ljava/lang/Object;") {
+                        result = 1;
+                    } else if (actualType == "Lcom/darkempire78/opencalculator/activities/MainActivity;") {
+                        if (expectedType.find("Activity") != std::string::npos || expectedType.find("Context") != std::string::npos) {
+                            result = 1;
+                        }
+                    } else if (actualType.find("Activity") != std::string::npos && expectedType.find("Context") != std::string::npos) {
+                        result = 1;
+                    } else if (actualType.find("TextView") != std::string::npos && expectedType.find("View") != std::string::npos) {
+                        result = 1;
+                    } else if (actualType.find("EditText") != std::string::npos && expectedType.find("TextView") != std::string::npos) {
+                        result = 1;
+                    } else if (actualType.find("Button") != std::string::npos && expectedType.find("View") != std::string::npos) {
+                        result = 1;
+                    } else if (expectedType == "Ljava/lang/CharSequence;" && actualType == "java.lang.String") {
+                        result = 1;
+                    }
                 }
                 
                 state.registers[a] = Value::MakeInt(result);
-                Logger::d("Interpreter", "[0x20] instance-of v" + std::to_string(a) + " = v" + std::to_string(b) + " instanceof type@" + std::to_string(typeIdx) + " -> " + std::to_string(result));
+                Logger::d("Interpreter", "[0x20] instance-of v" + std::to_string(a) + " = v" + std::to_string(b) + " instanceof " + expectedType + " -> " + std::to_string(result));
                 state.pc += 3;
                 break;
             }
@@ -894,10 +916,17 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     } else {
                         auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(methodSig);
                         if (!bcResult.bytecode.empty() && bcDex) {
-                            Logger::d("Interpreter", "Executing DEX bytecode for: " + methodSig);
-                            // Recursive execution!
-                            Interpreter nestedVm;
-                            state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, bcDex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                            static thread_local int callDepth = 0;
+                            if (callDepth > 16) {
+                                Logger::e("Interpreter", "FATAL: Stack overflow! Looping method: " + methodSig);
+                                state.methodReturnVal = Value::MakeNull();
+                            } else {
+                                Logger::d("Interpreter", "Executing DEX bytecode for: " + methodSig);
+                                callDepth++;
+                                Interpreter nestedVm;
+                                state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, bcDex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                                callDepth--;
+                            }
                             executedBytecode = true;
                         }
                     }

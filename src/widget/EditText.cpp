@@ -5,7 +5,7 @@
 #include "../ui/TypedArray.h"
 #include "../view/KeyEvent.h"
 
-namespace windroid {
+namespace setu {
 namespace widget {
 
 EditText::EditText(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes)
@@ -106,6 +106,6 @@ bool EditText::onKeyEvent(const view::KeyEvent& event) {
 }
 
 } // namespace widget
-} // namespace windroid
+} // namespace setu
 
 

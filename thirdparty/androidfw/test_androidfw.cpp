@@ -14,7 +14,7 @@ using namespace android;
 int main() {
     std::cout << "test_androidfw starting..." << std::endl;
     
-    ApkAssetsPtr apk = ApkAssets::Load("C:\\Users\\namde\\Documents\\Windroid\\testapk\\openclalc.apk");
+    ApkAssetsPtr apk = ApkAssets::Load("C:\\Users\\namde\\Documents\\Setu\\testapk\\openclalc.apk");
     if (!apk) {
         std::cerr << "Failed to load APK!" << std::endl;
         return 1;

@@ -6,7 +6,7 @@
 #include <vector>
 #include "androidfw/ResourceTypes.h"
 
-namespace windroid {
+namespace setu {
 namespace view {
 
 static std::vector<std::shared_ptr<View>> getSortedChildren(const std::vector<std::shared_ptr<View>>& children) {
@@ -211,7 +211,7 @@ std::shared_ptr<View::LayoutParams> RelativeLayout::generateLayoutParams(android
 }
 
 } // namespace view
-} // namespace windroid
+} // namespace setu
 
 
 
