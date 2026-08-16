@@ -300,6 +300,61 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             } else {
                 if (outReturn) *outReturn = Value::MakeNull();
             }
+        }
+        if (methodSignature.find("Ljava/lang/Object;-><init>()V") != std::string::npos) {
+            return false;
+        }
+        
+        if (methodSignature.find("Landroid/widget/EditText;->addTextChangedListener(Landroid/text/TextWatcher;)V") != std::string::npos) {
+            return false;
+        }
+
+        if (methodSignature.find("Landroid/widget/RadioButton;->setChecked(Z)V") != std::string::npos) {
+            if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+                auto* btn = static_cast<setu::widget::Button*>(static_cast<InterpreterObject*>(args[0].obj)->nativeHandle);
+                if (btn) {
+                    // Just log it or add a placeholder since setChecked isn't fully implemented on Button yet
+                    Logger::i("StubRegistry", "RadioButton.setChecked(" + std::to_string(args[1].i) + ")");
+                }
+            }
+            return false;
+        }
+        
+        if (methodSignature.find("Landroid/preference/PreferenceManager;->getDefaultSharedPreferences") != std::string::npos) {
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        }
+
+        if (methodSignature.find("Lcom/google/android/material/textfield/TextInputLayout;->setHint") != std::string::npos) {
+            return false;
+        }
+
+        if (methodSignature.find("Landroid/content/Context;->getString(I)Ljava/lang/String;") != std::string::npos ||
+            methodSignature.find("getString(I)Ljava/lang/String;") != std::string::npos) {
+            if (args.size() > 1 && m_resManager) {
+                int resId = args[1].i;
+                std::string strVal = m_resManager->getString(resId);
+                
+                InterpreterObject* strObj = new InterpreterObject();
+                strObj->className = "Ljava/lang/String;";
+                InterpreterObject* inner = new InterpreterObject();
+                inner->className = strVal;
+                strObj->fields["string_value"] = Value::MakeObject(inner);
+                if (outReturn) *outReturn = Value::MakeObject(strObj);
+                Logger::d("StubRegistry", "Executed: getString(id=" + std::to_string(resId) + ") -> '" + strVal + "'");
+            } else {
+                if (outReturn) *outReturn = Value::MakeNull();
+            }
+            return false;
+        }
+        if (methodSignature.find("Landroid/content/res/Resources;->getDimension(I)F") != std::string::npos) {
+            if (args.size() > 1 && m_resManager) {
+                int resId = args[1].i;
+                float dimen = m_resManager->resolveDimension(resId);
+                if (outReturn) *outReturn = Value::MakeFloat(dimen);
+            } else {
+                if (outReturn) *outReturn = Value::MakeFloat(0.0f);
+            }
             return false;
         }
         if (methodSignature.find("Landroid/content/Context;->getSharedPreferences") != std::string::npos) {

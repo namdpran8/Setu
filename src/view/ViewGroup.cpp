@@ -37,6 +37,9 @@ void ViewGroup::dispatchDraw(graphics::Canvas& canvas) {
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::VISIBLE) {
             child->updateRenderNode();
+            
+            // Note: View::draw already records canvas.translate(mLeft, mTop) in the child's RenderNode,
+            // so drawing the RenderNode here natively applies the translation relative to this ViewGroup.
             canvas.drawRenderNode(child->getRenderNode());
         }
     }

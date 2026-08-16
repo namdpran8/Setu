@@ -85,6 +85,16 @@ std::string ResourceManager::getString(uint32_t resId) {
     return "";
 }
 
+float ResourceManager::resolveDimension(uint32_t resId) {
+    if (!m_assetManager) return 0.0f;
+    auto res = m_assetManager->GetResource(resId);
+    if (!res.has_value()) return 0.0f;
+    
+    // TODO: implement proper complexToDimension conversion based on metrics
+    // For now, we return 0.0f to avoid crashing or warnings.
+    return 0.0f;
+}
+
 std::unique_ptr<android::ResXMLTree> ResourceManager::getLayout(uint32_t layoutId) {
     if (!m_assetManager) return nullptr;
 

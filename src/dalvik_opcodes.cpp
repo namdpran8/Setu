@@ -1,3 +1,9 @@
+/*
+ * NOTE: This file (dalvik_opcodes.cpp) was used in the initial phase as a standalone reference.
+ * The actual, currently used interpreter loop is located in:
+ * C:\Users\namde\Documents\Windroid\src\interpreter\Interpreter.cpp
+ */
+
 #include <cstdint>
 #include <cstring>
 #include <iostream>
@@ -62,38 +68,38 @@ inline void SetRegDouble(VMState& state, uint8_t reg, double val) {
 
 // String & Class Resolution
 // Used for const-string and const-class opcodes to resolve DEX pool indices into C++ object wrappers
-extern void* VM_ResolveString(VMState& state, uint32_t string_idx);
-extern void* VM_ResolveClass(VMState& state, uint32_t type_idx);
+void* VM_ResolveString(VMState& state, uint32_t string_idx) { return nullptr; }
+void* VM_ResolveClass(VMState& state, uint32_t type_idx) { return nullptr; }
 
 // Monitor (Synchronization)
 // Hook into Win32 CriticalSections, Mutexes, or std::mutex for monitor-enter/exit
-extern void VM_MonitorEnter(VMState& state, void* obj);
-extern void VM_MonitorExit(VMState& state, void* obj);
+void VM_MonitorEnter(VMState& state, void* obj) {}
+void VM_MonitorExit(VMState& state, void* obj) {}
 
 // Object Instantiation & Type Checks
 // Map type_idx to your native C++ classes and allocate them
-extern void* VM_CheckCast(VMState& state, void* obj, uint32_t type_idx); // Throws ClassCastException if fails
-extern uint32_t VM_InstanceOf(VMState& state, void* obj, uint32_t type_idx); // Returns 1 if true, 0 if false
-extern void* VM_NewInstance(VMState& state, uint32_t type_idx);
-extern void* VM_NewArray(VMState& state, uint32_t type_idx, int32_t length);
-extern int32_t VM_ArrayLength(VMState& state, void* array_obj);
+void* VM_CheckCast(VMState& state, void* obj, uint32_t type_idx) { return nullptr; } // Throws ClassCastException if fails
+uint32_t VM_InstanceOf(VMState& state, void* obj, uint32_t type_idx) { return 0; } // Returns 1 if true, 0 if false
+void* VM_NewInstance(VMState& state, uint32_t type_idx) { return nullptr; }
+void* VM_NewArray(VMState& state, uint32_t type_idx, int32_t length) { return nullptr; }
+int32_t VM_ArrayLength(VMState& state, void* array_obj) { return 0; }
 
 // Method Invocation
 // Bridge Dalvik invoke-* instructions to your native C++ functions (e.g. android::view::View::measure)
-extern void VM_InvokeMethod(VMState& state, uint32_t method_idx, const uint32_t* args, uint32_t arg_count, int invoke_type);
+void VM_InvokeMethod(VMState& state, uint32_t method_idx, const uint32_t* args, uint32_t arg_count, int invoke_type) {}
 
 // Field and Array Access (Needs your internal Object/Array layout)
 // These map to iget/iput/sget/sput and aget/aput
-extern uint64_t VM_GetFieldPrimitive(VMState& state, void* obj, uint32_t field_idx);
-extern void* VM_GetFieldObject(VMState& state, void* obj, uint32_t field_idx);
-extern void VM_SetFieldPrimitive(VMState& state, void* obj, uint32_t field_idx, uint64_t val);
-extern void VM_SetFieldObject(VMState& state, void* obj, uint32_t field_idx, void* val);
+uint64_t VM_GetFieldPrimitive(VMState& state, void* obj, uint32_t field_idx) { return 0; }
+void* VM_GetFieldObject(VMState& state, void* obj, uint32_t field_idx) { return nullptr; }
+void VM_SetFieldPrimitive(VMState& state, void* obj, uint32_t field_idx, uint64_t val) {}
+void VM_SetFieldObject(VMState& state, void* obj, uint32_t field_idx, void* val) {}
 
 // Array Access
-extern uint64_t VM_ArrayGetPrimitive(VMState& state, void* array_obj, int32_t index);
-extern void* VM_ArrayGetObject(VMState& state, void* array_obj, int32_t index);
-extern void VM_ArrayPutPrimitive(VMState& state, void* array_obj, int32_t index, uint64_t val);
-extern void VM_ArrayPutObject(VMState& state, void* array_obj, int32_t index, void* val);
+uint64_t VM_ArrayGetPrimitive(VMState& state, void* array_obj, int32_t index) { return 0; }
+void* VM_ArrayGetObject(VMState& state, void* array_obj, int32_t index) { return nullptr; }
+void VM_ArrayPutPrimitive(VMState& state, void* array_obj, int32_t index, uint64_t val) {}
+void VM_ArrayPutObject(VMState& state, void* array_obj, int32_t index, void* val) {}
 
 
 void ExecuteInstruction(VMState& state, uint8_t opcode) {
@@ -344,9 +350,17 @@ void ExecuteInstruction(VMState& state, uint8_t opcode) {
         // 0x27..0x2A: Exceptions and jumps
         // ==========================================
         case 0x27: { // throw vAA (11x)
-            state.exception_register = (void*)(uintptr_t)state.registers[READ_U8(0)];
-            VM_LOG("throw exception");
-            // Break from interpreter loop or find catch block
+            uint8_t vAA = READ_U8(0);
+            state.exception_register = (void*)(uintptr_t)state.registers[vAA];
+            
+            if (state.exception_register) {
+                VM_LOG("throw exception");
+            } else {
+                VM_LOG("throw NullPointerException");
+                // state.exception_register = createNullPointerException(); // Helper needed
+            }
+            // In a full interpreter loop, you would unwind to the caller here
+            // e.g., isRunning = false; return;
             state.pc += 1;
             break;
         }
@@ -371,37 +385,75 @@ void ExecuteInstruction(VMState& state, uint8_t opcode) {
         // ==========================================
         case 0x2B: { // packed-switch vAA, +BBBBBBBB (31t)
             uint8_t vAA = READ_U8(0);
+            int32_t switchValue = (int32_t)state.registers[vAA];
             int32_t offset = READ_S32(1);
-            const uint16_t* payload = (const uint16_t*)(state.bytecode + (state.pc - 1 + offset * 2));
-            if (payload[0] == 0x0100) { // IDENT
-                uint16_t size = payload[1];
-                int32_t first_key = payload[2] | (payload[3] << 16);
-                const int32_t* targets = (const int32_t*)&payload[4];
-                int32_t val = state.registers[vAA];
-                if (val >= first_key && val < first_key + size) {
-                    state.pc += (targets[val - first_key] * 2) - 1;
-                    break; // Branch taken
+            
+            // Payload is located at (opcode address + offset * 2)
+            uint32_t payloadAddr = (state.pc - 1) + (offset * 2);
+            
+            // Format: ident(0x0100), size(uint16), first_key(int32), targets(int32[])
+            // Reading unaligned bytes safely
+            uint16_t ident = (uint16_t)(state.bytecode[payloadAddr] | (state.bytecode[payloadAddr + 1] << 8));
+            if (ident == 0x0100) {
+                int32_t targetsSize = (int32_t)(state.bytecode[payloadAddr + 2] | (state.bytecode[payloadAddr + 3] << 8));
+                int32_t firstKey = (int32_t)(state.bytecode[payloadAddr + 4] | 
+                                            (state.bytecode[payloadAddr + 5] << 8) | 
+                                            (state.bytecode[payloadAddr + 6] << 16) | 
+                                            (state.bytecode[payloadAddr + 7] << 24));
+                
+                uint32_t targetsOffset = payloadAddr + 8;
+                int32_t index = switchValue - firstKey;
+                
+                int32_t targetOffset = 0;
+                if (index >= 0 && index < targetsSize) {
+                    uint32_t targetAddr = targetsOffset + (index * 4);
+                    targetOffset = (int32_t)(state.bytecode[targetAddr] | 
+                                            (state.bytecode[targetAddr + 1] << 8) | 
+                                            (state.bytecode[targetAddr + 2] << 16) | 
+                                            (state.bytecode[targetAddr + 3] << 24));
+                    VM_LOG("packed-switch v" << (int)vAA << "=" << switchValue << " -> branch taken (offset " << targetOffset << ")");
+                    state.pc = (state.pc - 1) + (targetOffset * 2);
+                    break;
                 }
             }
+            VM_LOG("packed-switch v" << (int)vAA << "=" << switchValue << " -> default");
             state.pc += 5; // Default behavior
             break;
         }
         case 0x2C: { // sparse-switch vAA, +BBBBBBBB (31t)
             uint8_t vAA = READ_U8(0);
+            int32_t switchValue = (int32_t)state.registers[vAA];
             int32_t offset = READ_S32(1);
-            const uint16_t* payload = (const uint16_t*)(state.bytecode + (state.pc - 1 + offset * 2));
-            if (payload[0] == 0x0200) {
-                uint16_t size = payload[1];
-                const int32_t* keys = (const int32_t*)&payload[2];
-                const int32_t* targets = keys + size;
-                int32_t val = state.registers[vAA];
-                for (uint16_t i = 0; i < size; i++) {
-                    if (keys[i] == val) {
-                        state.pc += (targets[i] * 2) - 1;
+            
+            uint32_t payloadAddr = (state.pc - 1) + (offset * 2);
+            
+            uint16_t ident = (uint16_t)(state.bytecode[payloadAddr] | (state.bytecode[payloadAddr + 1] << 8));
+            if (ident == 0x0200) {
+                int32_t targetsSize = (int32_t)(state.bytecode[payloadAddr + 2] | (state.bytecode[payloadAddr + 3] << 8));
+                
+                uint32_t keysOffset = payloadAddr + 4;
+                uint32_t targetsOffset = keysOffset + (targetsSize * 4);
+                
+                for (int i = 0; i < targetsSize; ++i) {
+                    uint32_t keyAddr = keysOffset + (i * 4);
+                    int32_t key = (int32_t)(state.bytecode[keyAddr] | 
+                                            (state.bytecode[keyAddr + 1] << 8) | 
+                                            (state.bytecode[keyAddr + 2] << 16) | 
+                                            (state.bytecode[keyAddr + 3] << 24));
+                                            
+                    if (key == switchValue) {
+                        uint32_t targetAddr = targetsOffset + (i * 4);
+                        int32_t targetOffset = (int32_t)(state.bytecode[targetAddr] | 
+                                                        (state.bytecode[targetAddr + 1] << 8) | 
+                                                        (state.bytecode[targetAddr + 2] << 16) | 
+                                                        (state.bytecode[targetAddr + 3] << 24));
+                        VM_LOG("sparse-switch v" << (int)vAA << "=" << switchValue << " -> branch taken (offset " << targetOffset << ")");
+                        state.pc = (state.pc - 1) + (targetOffset * 2);
                         goto sparse_branch_taken;
                     }
                 }
             }
+            VM_LOG("sparse-switch v" << (int)vAA << "=" << switchValue << " -> default");
             state.pc += 5; // Default
 sparse_branch_taken:
             break;

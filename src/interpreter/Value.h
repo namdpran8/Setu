@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <mutex>
 
 enum class ValueType {
     NULL_TYPE,
@@ -18,8 +19,24 @@ struct MockView {
     std::string debugTag; // e.g. "view_id_0x7f0a001a"
 };
 
-// Forward declare ArrayObject
+// Forward declarations
 struct ArrayObject;
+struct Value;
+
+// Represents a real Java object (e.g. for click listeners)
+struct InterpreterObject {
+    std::string className;
+    std::unordered_map<std::string, Value> fields;
+    void* nativeHandle = nullptr;
+    std::recursive_mutex monitor;
+};
+
+// Represents an array in our VM
+struct ArrayObject {
+    uint16_t elementTypeIndex;
+    std::vector<Value> elements;
+    std::recursive_mutex monitor;
+};
 
 struct Value {
     ValueType type;
@@ -70,15 +87,4 @@ public:
     }
 };
 
-// Represents an array in our VM
-struct ArrayObject {
-    uint16_t elementTypeIndex;
-    std::vector<Value> elements;
-};
 
-// Represents a real Java object (e.g. for click listeners)
-struct InterpreterObject {
-    std::string className;
-    std::unordered_map<std::string, Value> fields;
-    void* nativeHandle = nullptr;
-};

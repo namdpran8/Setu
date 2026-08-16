@@ -231,7 +231,7 @@ int main(int argc, char* argv[]) {
     }
     
     Logger::i("Main", "Attempting to load framework-res.apk in Main phase...");
-    if (!resManager.loadFrameworkApk("C:\\Users\\namde\\Documents\\Setu\\testapk\\framework-res.apk")) {
+    if (!resManager.loadFrameworkApk("C:\\Users\\namde\\Documents\\Windroid\\testapk\\framework-res.apk")) {
         Logger::w("Main", "Failed to load framework-res.apk. Framework attributes will not resolve.");
     } else {
         Logger::i("Main", "Framework APK loaded successfully in Main phase.");

@@ -20,6 +20,14 @@ bool MultiDexManager::addDex(std::vector<uint8_t> dexBuffer) {
 }
 
 Value MultiDexManager::getStaticFieldValue(const std::string& className, const std::string& fieldName) const {
+    // First check the mutation cache
+    std::string key = className + "->" + fieldName;
+    auto it = m_staticFields.find(key);
+    if (it != m_staticFields.end()) {
+        return it->second;
+    }
+    
+    // Fall back to parsing from DEX
     for (const auto& dex : m_dexFiles) {
         Value val = dex->getStaticFieldValueByName(className, fieldName);
         if (val.type != ValueType::UNINITIALIZED) {
@@ -30,6 +38,12 @@ Value MultiDexManager::getStaticFieldValue(const std::string& className, const s
     // If not found in any loaded DEX
     Logger::w("MultiDexManager", "Field " + className + "->" + fieldName + " not found in ANY loaded DEX file!");
     return Value::MakeNull();
+}
+
+void MultiDexManager::setStaticFieldValue(const std::string& className, const std::string& fieldName, const Value& val) {
+    std::string key = className + "->" + fieldName;
+    m_staticFields[key] = val;
+    Logger::d("MultiDexManager", "setStaticFieldValue: " + key);
 }
 
 std::pair<DexParser::MethodBytecodeResult, const DexParser*> MultiDexManager::getMethodBytecode(const std::string& methodSignature) const {

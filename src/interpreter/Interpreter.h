@@ -4,7 +4,7 @@
 #include <string>
 #include "InterpreterState.h"
 #include "../dex/DexParser.h"
-#include "../dex/MultiDexManager.h" // Forward declaration
+#include "../dex/MultiDexManager.h"
 
 class Interpreter {
 public:
@@ -13,10 +13,10 @@ public:
 
     // Executes a raw array of Dalvik bytecode instructions
     // dexParser is used to resolve strings and method names for logging/dispatch
-    // multiDexManager is used to resolve cross-DEX dependencies
+    // multiDexManager is used to resolve cross-DEX dependencies (mutable for static field writes)
     Value executeMethod(const std::vector<uint8_t>& bytecode, 
                         const DexParser* currentDex = nullptr, 
-                        const MultiDexManager* multiDexManager = nullptr,
+                        MultiDexManager* multiDexManager = nullptr,
                         const std::vector<Value>& args = {},
                         uint16_t registers_size = 0,
                         uint16_t ins_size = 0);

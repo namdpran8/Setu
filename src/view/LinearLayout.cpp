@@ -7,170 +7,155 @@ namespace setu {
 namespace view {
 
 void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-    int totalWidth = mPaddingLeft + mPaddingRight;
-    int totalHeight = mPaddingTop + mPaddingBottom;
-    float totalWeight = 0.0f;
-    
     int widthMode = getMode(widthMeasureSpec);
     int widthSize = getSize(widthMeasureSpec);
     int heightMode = getMode(heightMeasureSpec);
     int heightSize = getSize(heightMeasureSpec);
-
-    // Pass 1: Measure unweighted children
+    
+    bool isVertical = (mOrientation == Orientation::VERTICAL);
+    
+    int totalWeight = 0;
+    int usedSize = 0;
+    int maxOrthogonal = 0;
+    
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::GONE) continue;
-
+        
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         if (!lp) lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
-
-        int childWidthSpec = 0;
-        int childHeightSpec = 0;
         
-        // Handle horizontal
-        if (mOrientation == Orientation::HORIZONTAL) {
-            if (lp->weight > 0.0f) {
-                totalWeight += lp->weight;
-                continue; // ALWAYS defer measurement for weighted children
-            }
-            if (lp->width == View::MATCH_PARENT) {
-                int mode = (widthMode == View::MEASURE_SPEC_EXACTLY) ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST;
-                childWidthSpec = View::makeMeasureSpec(widthSize, mode);
-            } else if (lp->width == View::WRAP_CONTENT) {
-                childWidthSpec = View::makeMeasureSpec(widthSize, View::MEASURE_SPEC_AT_MOST);
-            } else {
-                childWidthSpec = View::makeMeasureSpec(lp->width, View::MEASURE_SPEC_EXACTLY);
-            }
+        int childWidthSpec, childHeightSpec;
+        
+        if (isVertical) {
+            childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_AT_MOST);
             
             if (lp->height == View::MATCH_PARENT) {
-                int mode = (heightMode == View::MEASURE_SPEC_EXACTLY) ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST;
-                childHeightSpec = View::makeMeasureSpec(heightSize, mode);
+                childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_EXACTLY);
             } else if (lp->height == View::WRAP_CONTENT) {
-                childHeightSpec = View::makeMeasureSpec(heightSize, View::MEASURE_SPEC_AT_MOST);
-            } else {
-                childHeightSpec = View::makeMeasureSpec(lp->height, View::MEASURE_SPEC_EXACTLY);
-            }
-        } 
-        // Handle vertical
-        else {
-            if (lp->weight > 0.0f) {
-                totalWeight += lp->weight;
-                continue; // ALWAYS defer measurement for weighted children
-            }
-            if (lp->height == View::MATCH_PARENT) {
-                int mode = (heightMode == View::MEASURE_SPEC_EXACTLY) ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST;
-                childHeightSpec = View::makeMeasureSpec(heightSize, mode);
-            } else if (lp->height == View::WRAP_CONTENT) {
-                childHeightSpec = View::makeMeasureSpec(heightSize, View::MEASURE_SPEC_AT_MOST);
+                childHeightSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
             } else {
                 childHeightSpec = View::makeMeasureSpec(lp->height, View::MEASURE_SPEC_EXACTLY);
             }
             
+            if (lp->weight > 0) {
+                totalWeight += lp->weight;
+                childHeightSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
+            }
+        } else {
+            childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_AT_MOST);
+            
             if (lp->width == View::MATCH_PARENT) {
-                int mode = (widthMode == View::MEASURE_SPEC_EXACTLY) ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST;
-                childWidthSpec = View::makeMeasureSpec(widthSize, mode);
+                childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_EXACTLY);
             } else if (lp->width == View::WRAP_CONTENT) {
-                childWidthSpec = View::makeMeasureSpec(widthSize, View::MEASURE_SPEC_AT_MOST);
+                childWidthSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
             } else {
                 childWidthSpec = View::makeMeasureSpec(lp->width, View::MEASURE_SPEC_EXACTLY);
+            }
+            
+            if (lp->weight > 0) {
+                totalWeight += lp->weight;
+                childWidthSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
             }
         }
-
+        
         child->measure(childWidthSpec, childHeightSpec);
         
-        if (mOrientation == Orientation::HORIZONTAL) {
-            totalWidth += child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin;
-            totalHeight = std::max(totalHeight, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);
+        if (isVertical) {
+            usedSize += child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin;
+            maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
         } else {
-            totalHeight += child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin;
-            totalWidth = std::max(totalWidth, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
+            usedSize += child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin;
+            maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);
         }
     }
-
-    // Pass 2: Measure weighted children
-    if (totalWeight > 0.0f) {
-        int remainingWidth = std::max(0, widthSize - totalWidth);
-        int remainingHeight = std::max(0, heightSize - totalHeight);
-
-        for (auto& child : mChildren) {
-            if (child->getVisibility() == View::GONE) continue;
-
-            auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
-            if (!lp || lp->weight == 0.0f) continue;
+    
+    if (totalWeight > 0) {
+        if (isVertical) {
+            int remaining = heightSize - mPaddingTop - mPaddingBottom - usedSize;
+            if (remaining < 0) remaining = 0;
             
-            if (mOrientation == Orientation::HORIZONTAL) {
-                int share = (int)(remainingWidth * (lp->weight / totalWeight));
-                int childWidthSpec = View::makeMeasureSpec(share, View::MEASURE_SPEC_EXACTLY);
-                int childHeightSpec = View::makeMeasureSpec(heightSize, View::MEASURE_SPEC_AT_MOST);
-                if (lp->height == View::MATCH_PARENT) {
-                    int mode = (heightMode == View::MEASURE_SPEC_EXACTLY) ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST;
-                    childHeightSpec = View::makeMeasureSpec(heightSize, mode);
-                } else if (lp->height != View::WRAP_CONTENT) {
-                    childHeightSpec = View::makeMeasureSpec(lp->height, View::MEASURE_SPEC_EXACTLY);
+            for (auto& child : mChildren) {
+                if (child->getVisibility() == View::GONE) continue;
+                auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
+                if (lp && lp->weight > 0) {
+                    int childHeight = (remaining * lp->weight) / totalWeight;
+                    int childHeightSpec = View::makeMeasureSpec(childHeight, View::MEASURE_SPEC_EXACTLY);
+                    int childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_AT_MOST);
+                    child->measure(childWidthSpec, childHeightSpec);
+                    usedSize += childHeight + lp->topMargin + lp->bottomMargin;
+                    maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
                 }
-                child->measure(childWidthSpec, childHeightSpec);
-                totalWidth += child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin;
-                totalHeight = std::max(totalHeight, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);
-            } else if (mOrientation == Orientation::VERTICAL) {
-                int share = (int)(remainingHeight * (lp->weight / totalWeight));
-                int childHeightSpec = View::makeMeasureSpec(share, View::MEASURE_SPEC_EXACTLY);
-                int childWidthSpec = View::makeMeasureSpec(widthSize, View::MEASURE_SPEC_AT_MOST);
-                if (lp->width == View::MATCH_PARENT) {
-                    int mode = (widthMode == View::MEASURE_SPEC_EXACTLY) ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST;
-                    childWidthSpec = View::makeMeasureSpec(widthSize, mode);
-                } else if (lp->width != View::WRAP_CONTENT) {
-                    childWidthSpec = View::makeMeasureSpec(lp->width, View::MEASURE_SPEC_EXACTLY);
+            }
+        } else {
+            int remaining = widthSize - mPaddingLeft - mPaddingRight - usedSize;
+            if (remaining < 0) remaining = 0;
+            
+            for (auto& child : mChildren) {
+                if (child->getVisibility() == View::GONE) continue;
+                auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
+                if (lp && lp->weight > 0) {
+                    int childWidth = (remaining * lp->weight) / totalWeight;
+                    int childWidthSpec = View::makeMeasureSpec(childWidth, View::MEASURE_SPEC_EXACTLY);
+                    int childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_AT_MOST);
+                    child->measure(childWidthSpec, childHeightSpec);
+                    usedSize += childWidth + lp->leftMargin + lp->rightMargin;
+                    maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);
                 }
-                child->measure(childWidthSpec, childHeightSpec);
-                totalHeight += child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin;
-                totalWidth = std::max(totalWidth, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
             }
         }
     }
-
-    int measuredWidth = (widthMode == MEASURE_SPEC_EXACTLY) ? widthSize : totalWidth;
-    int measuredHeight = (heightMode == MEASURE_SPEC_EXACTLY) ? heightSize : totalHeight;
-
-    if (widthMode == MEASURE_SPEC_AT_MOST) measuredWidth = std::min(measuredWidth, widthSize);
-    if (heightMode == MEASURE_SPEC_AT_MOST) measuredHeight = std::min(measuredHeight, heightSize);
-
+    
+    int totalWidth = isVertical ? (mPaddingLeft + mPaddingRight + maxOrthogonal) : (mPaddingLeft + mPaddingRight + usedSize);
+    int totalHeight = isVertical ? (mPaddingTop + mPaddingBottom + usedSize) : (mPaddingTop + mPaddingBottom + maxOrthogonal);
+    
+    int measuredWidth = resolveSize(totalWidth, widthMeasureSpec);
+    int measuredHeight = resolveSize(totalHeight, heightMeasureSpec);
+    
     setMeasuredDimension(measuredWidth, measuredHeight);
 }
 
 void LinearLayout::onLayout(bool changed, int l, int t, int r, int b) {
-    int currentX = mPaddingLeft;
-    int currentY = mPaddingTop;
-
+    int childTop = mPaddingTop;
+    int childLeft = mPaddingLeft;
+    int width = r - l;
+    int height = b - t;
+    
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::GONE) continue;
-
+        
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         if (!lp) lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
-
+        
         int cw = child->getMeasuredWidth();
         int ch = child->getMeasuredHeight();
-
-        if (mOrientation == Orientation::HORIZONTAL) {
-            currentX += lp->leftMargin;
-            int childTop = currentY + lp->topMargin;
-            int verticalGravity = lp->gravity & 0x70;
-            if (verticalGravity == 0x10) { // CENTER_VERTICAL
-                childTop = currentY + (b - t - ch - lp->topMargin - lp->bottomMargin - mPaddingTop - mPaddingBottom) / 2 + lp->topMargin;
-            } else if (verticalGravity == 0x50) { // BOTTOM
-                childTop = currentY + (b - t - mPaddingTop - mPaddingBottom) - ch - lp->bottomMargin;
-            }
-            child->layout(currentX, childTop, currentX + cw, childTop + ch);
-            currentX += cw + lp->rightMargin;
-        } else {
-            currentY += lp->topMargin;
-            int childLeft = currentX + lp->leftMargin;
-            int horizontalGravity = lp->gravity & 0x07;
+        
+        int gravity = lp->gravity >= 0 ? lp->gravity : mGravity;
+        
+        int childLeftFinal = childLeft + lp->leftMargin;
+        int childTopFinal = childTop + lp->topMargin;
+        
+        if (mOrientation == Orientation::VERTICAL) {
+            int availWidth = width - mPaddingLeft - mPaddingRight - lp->leftMargin - lp->rightMargin;
+            int horizontalGravity = gravity & 0x07;
             if (horizontalGravity == 0x01) { // CENTER_HORIZONTAL
-                childLeft = currentX + (r - l - cw - lp->leftMargin - lp->rightMargin - mPaddingLeft - mPaddingRight) / 2 + lp->leftMargin;
+                childLeftFinal += (availWidth - cw) / 2;
             } else if (horizontalGravity == 0x05) { // RIGHT
-                childLeft = currentX + (r - l - mPaddingLeft - mPaddingRight) - cw - lp->rightMargin;
+                childLeftFinal += availWidth - cw;
             }
-            child->layout(childLeft, currentY, childLeft + cw, currentY + ch);
-            currentY += ch + lp->bottomMargin;
+            
+            child->layout(childLeftFinal, childTopFinal, childLeftFinal + cw, childTopFinal + ch);
+            childTop = childTopFinal + ch + lp->bottomMargin;
+        } else {
+            int availHeight = height - mPaddingTop - mPaddingBottom - lp->topMargin - lp->bottomMargin;
+            int verticalGravity = gravity & 0x70;
+            if (verticalGravity == 0x10) { // CENTER_VERTICAL
+                childTopFinal += (availHeight - ch) / 2;
+            } else if (verticalGravity == 0x50) { // BOTTOM
+                childTopFinal += availHeight - ch;
+            }
+            
+            child->layout(childLeftFinal, childTopFinal, childLeftFinal + cw, childTopFinal + ch);
+            childLeft = childLeftFinal + cw + lp->rightMargin;
         }
     }
 }
@@ -193,11 +178,25 @@ std::shared_ptr<View::LayoutParams> LinearLayout::generateLayoutParams(android::
         uint32_t data = parser->getAttributeData(i);
 
         if (attrName == "layout_weight") {
-            union { uint32_t i; float f; } u;
-            u.i = data;
-            lp->weight = (type == 0x04) ? u.f : (float)data;
+            if (type == 0x04) { // FLOAT
+                union { uint32_t i; float f; } u;
+                u.i = data;
+                lp->weight = u.f;
+            } else if (type == 0x03 && val16) { // STRING
+                try { lp->weight = std::stof(rawValue); } catch(...) {}
+            } else {
+                lp->weight = (float)data;
+            }
         } else if (attrName == "layout_gravity") {
-            lp->gravity = data;
+            if (type == 0x03 && val16) {
+                int g = 0;
+                if (rawValue.find("center") != std::string::npos) g |= 0x11;
+                if (rawValue.find("bottom") != std::string::npos) g |= 0x50;
+                if (rawValue.find("right") != std::string::npos || rawValue.find("end") != std::string::npos) g |= 0x05;
+                lp->gravity = g;
+            } else {
+                lp->gravity = data;
+            }
         }
     }
     return lp;

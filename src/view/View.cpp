@@ -43,7 +43,15 @@ void View::draw(graphics::Canvas& canvas) {
     canvas.save();
     canvas.translate((float)mLeft, (float)mTop);
     
-    // We can add canvas.clipRect(0, 0, getWidth(), getHeight()) here later
+    canvas.clipRect(0.0f, 0.0f, (float)getWidth(), (float)getHeight());
+    
+    if (mBackgroundColor != 0) {
+        graphics::Paint bgPaint;
+        bgPaint.setColor(mBackgroundColor);
+        bgPaint.setStyle(graphics::Style::FILL);
+        canvas.drawRect(0.0f, 0.0f, (float)getWidth(), (float)getHeight(), bgPaint);
+    }
+
     onDraw(canvas);
     
     canvas.restore();
@@ -83,16 +91,14 @@ void View::setLayoutParams(std::shared_ptr<LayoutParams> params) {
 
 void View::requestLayout() {
     mIsLayoutRequested = true;
+    mIsRenderNodeDirty = true;
     if (mParent) {
         mParent->requestLayout();
     }
 }
 
 void View::invalidate() {
-    // Basic invalidation: clear render node and let parent know
-    if (mRenderNode) {
-        mRenderNode->clear();
-    }
+    mIsRenderNodeDirty = true;
     if (mParent) {
         mParent->invalidate();
     }
@@ -121,6 +127,10 @@ bool View::onKeyEvent(const KeyEvent& event) {
 }
 
 void View::updateRenderNode() {
+    if (!mIsRenderNodeDirty && mRenderNode) {
+        return; // Cache hit
+    }
+
     if (!mRenderNode) {
         mRenderNode = std::make_unique<graphics::RenderNode>();
     }
@@ -128,6 +138,8 @@ void View::updateRenderNode() {
 
     graphics::RecordingCanvas canvas(mRenderNode.get());
     draw(canvas);
+    
+    mIsRenderNodeDirty = false;
 }
 
 

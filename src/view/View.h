@@ -103,6 +103,18 @@ public:
     bool isFocused() const { return mIsFocused; }
     virtual void setFocus(bool focus) { mIsFocused = focus; }
 
+    bool isClickable() const { return mClickable; }
+    virtual void setClickable(bool clickable) { mClickable = clickable; }
+
+    bool isFocusable() const { return mFocusable; }
+    virtual void setFocusable(bool focusable) { mFocusable = focusable; }
+
+    int getGravity() const { return mGravity; }
+    virtual void setGravity(int gravity) { mGravity = gravity; requestLayout(); invalidate(); }
+
+    uint32_t getBackgroundColor() const { return mBackgroundColor; }
+    virtual void setBackgroundColor(uint32_t color) { mBackgroundColor = color; invalidate(); }
+
     void setOnClickListener(std::function<void()> listener) { mOnClickListener = listener; }
     virtual void performClick() { if (mOnClickListener) mOnClickListener(); }
 
@@ -120,6 +132,24 @@ public:
     }
     static int getSize(int measureSpec) {
         return (measureSpec & ~MEASURE_SPEC_MODE_MASK);
+    }
+
+    static int resolveSize(int size, int measureSpec) {
+        int specMode = getMode(measureSpec);
+        int specSize = getSize(measureSpec);
+        int result = size;
+        switch (specMode) {
+            case MEASURE_SPEC_AT_MOST:
+                result = std::min(size, specSize);
+                break;
+            case MEASURE_SPEC_EXACTLY:
+                result = specSize;
+                break;
+            case MEASURE_SPEC_UNSPECIFIED:
+            default:
+                result = size;
+        }
+        return result;
     }
 
     void setMeasuredDimension(int measuredWidth, int measuredHeight);
@@ -172,8 +202,13 @@ protected:
     std::function<void()> mOnClickListener;
     std::shared_ptr<LayoutParams> mLayoutParams;
     bool mIsFocused = false;
+    bool mClickable = false;
+    bool mFocusable = false;
+    int mGravity = 0x33; // Default TOP | LEFT
+    uint32_t mBackgroundColor = 0x00000000;
     int mVisibility = VISIBLE;
     bool mIsLayoutRequested = false;
+    bool mIsRenderNodeDirty = true;
 };
 
 } // namespace view

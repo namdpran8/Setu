@@ -42,6 +42,7 @@ private:
 
     struct State {
         D2D1_MATRIX_3X2_F transform;
+        int clipCount = 0;
     };
     std::vector<State> mStateStack;
 };

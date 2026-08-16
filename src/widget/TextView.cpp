@@ -98,9 +98,28 @@ void TextView::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             }
         }
     } else {
-        // Fallback
-        desiredWidth = (int)(mText.length() * (mTextPaint.getTextSize() * 0.6f)); 
-        desiredHeight = (int)(mTextPaint.getTextSize() * 1.5f);
+        // GDI FALLBACK - EXACT MEASUREMENT
+        HDC hdc = GetDC(nullptr);
+        HFONT hFont = CreateFontW(
+            -MulDiv((int)mTextPaint.getTextSize(), GetDeviceCaps(hdc, LOGPIXELSY), 72),
+            0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,
+            DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
+        HGDIOBJ old = SelectObject(hdc, hFont);
+        
+        SIZE size;
+        if (mText.empty()) {
+            GetTextExtentPoint32W(hdc, L"A", 1, &size);
+            size.cx = 0; // Empty text has 0 width but full font height
+        } else {
+            GetTextExtentPoint32W(hdc, mText.c_str(), (int)mText.length(), &size);
+        }
+        
+        SelectObject(hdc, old);
+        DeleteObject(hFont);
+        ReleaseDC(nullptr, hdc);
+        desiredWidth = size.cx;
+        desiredHeight = size.cy;
     }
 
     int widthMode = getMode(widthMeasureSpec);

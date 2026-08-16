@@ -1,5 +1,6 @@
 #include "Direct2DCanvas.h"
-
+#include <unordered_map>
+#include "../utils/Logger.h"
 namespace setu {
 namespace graphics {
 
@@ -7,6 +8,7 @@ Direct2DCanvas::Direct2DCanvas(ID2D1DeviceContext* context, IDWriteFactory* dwri
     : mContext(context), mDWriteFactory(dwriteFactory) {
     State initialState;
     mContext->GetTransform(&initialState.transform);
+    initialState.clipCount = 0;
     mStateStack.push_back(initialState);
 }
 
@@ -28,6 +30,7 @@ And what’s killing me the mostIs I know that I’m the reason
 void Direct2DCanvas::save() {
     State s;
     mContext->GetTransform(&s.transform);
+    s.clipCount = 0;
     mStateStack.push_back(s);
 }
 
@@ -36,27 +39,29 @@ void Direct2DCanvas::restore() {
         State s = mStateStack.back();
         mStateStack.pop_back();
         mContext->SetTransform(s.transform);
+        for (int i = 0; i < s.clipCount; i++) {
+            mContext->PopAxisAlignedClip();
+        }
     }
 }
 
 void Direct2DCanvas::translate(float dx, float dy) {
     D2D1_MATRIX_3X2_F current;
     mContext->GetTransform(&current);
-    mContext->SetTransform(current * D2D1::Matrix3x2F::Translation(dx, dy));
+    mContext->SetTransform(D2D1::Matrix3x2F::Translation(dx, dy) * current);
 }
 
 void Direct2DCanvas::scale(float sx, float sy) {
     D2D1_MATRIX_3X2_F current;
     mContext->GetTransform(&current);
-    mContext->SetTransform(current * D2D1::Matrix3x2F::Scale(sx, sy));
+    mContext->SetTransform(D2D1::Matrix3x2F::Scale(sx, sy) * current);
 }
 
 void Direct2DCanvas::clipRect(float left, float top, float right, float bottom) {
     mContext->PushAxisAlignedClip(D2D1::RectF(left, top, right, bottom), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-    // Note: Android Canvas clipRect is a persistent state until restore().
-    // Direct2D PushAxisAlignedClip requires a matching PopAxisAlignedClip.
-    // For a full implementation, we'd need to track clip layers in the State stack and pop them on restore.
-    // We will keep it simple for milestone 1.
+    if (!mStateStack.empty()) {
+        mStateStack.back().clipCount++;
+    }
 }
 
 ID2D1SolidColorBrush* Direct2DCanvas::getCachedBrush(uint32_t color) {
@@ -118,42 +123,56 @@ void Direct2DCanvas::drawLine(float startX, float startY, float stopX, float sto
 void Direct2DCanvas::drawText(const std::wstring& text, float x, float y, const Paint& paint) {
     if (!mDWriteFactory || text.empty()) return;
 
+    // Cache TextFormat per paint config (size + font family)
+    static std::unordered_map<uint64_t, Microsoft::WRL::ComPtr<IDWriteTextFormat>> formatCache;
+    uint64_t formatKey = ((uint64_t)paint.getColor() << 32) | (uint64_t)(paint.getTextSize() * 100);
+    
     Microsoft::WRL::ComPtr<IDWriteTextFormat> textFormat;
-    mDWriteFactory->CreateTextFormat(
-        L"Segoe UI",
-        nullptr,
-        DWRITE_FONT_WEIGHT_NORMAL,
-        DWRITE_FONT_STYLE_NORMAL,
-        DWRITE_FONT_STRETCH_NORMAL,
-        paint.getTextSize(),
-        L"en-us",
-        &textFormat
-    );
-
-    if (textFormat) {
-        Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
-        mDWriteFactory->CreateTextLayout(
-            text.c_str(),
-            (UINT32)text.length(),
-            textFormat.Get(),
-            10000.0f, // Max width
-            10000.0f, // Max height
-            &textLayout
-        );
-
-        if (textLayout) {
-            auto brush = getCachedBrush(paint.getColor());
-            
-            // Android draws text from the baseline. Direct2D draws from top-left.
-            // We need to query the metrics to offset it properly.
-            DWRITE_TEXT_METRICS metrics;
-            textLayout->GetMetrics(&metrics);
-            
-            // Note: We need a more accurate baseline calculation in Phase 3.
-            // For now, we'll approximate the baseline correction.
-            mContext->DrawTextLayout(D2D1::Point2F(x, y - paint.getTextSize()), textLayout.Get(), brush);
+    auto it = formatCache.find(formatKey);
+    if (it != formatCache.end()) {
+        textFormat = it->second;
+} else {
+            HRESULT hr = mDWriteFactory->CreateTextFormat(
+                L"Segoe UI", nullptr, DWRITE_FONT_WEIGHT_NORMAL,
+                DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+                paint.getTextSize(), L"en-us", &textFormat);
+            if (SUCCEEDED(hr)) {
+                formatCache[formatKey] = textFormat;
+            } else {
+                Logger::e("Direct2DCanvas", "CreateTextFormat failed: 0x" + std::to_string(hr));
+                return;
+            }
         }
+
+    Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
+    HRESULT hr = mDWriteFactory->CreateTextLayout(
+        text.c_str(), (UINT32)text.length(), textFormat.Get(),
+        10000.0f, 10000.0f, &textLayout);
+
+    if (FAILED(hr)) {
+        Logger::e("Direct2DCanvas", "CreateTextLayout failed: 0x" + std::to_string(hr));
+        return;
     }
+
+    DWRITE_TEXT_METRICS metrics;
+    textLayout->GetMetrics(&metrics);
+    
+    UINT32 lineCount = 0;
+    textLayout->GetLineMetrics(nullptr, 0, &lineCount);
+    float baselineOffset = paint.getTextSize();
+    if (lineCount > 0) {
+        std::vector<DWRITE_LINE_METRICS> lineMetrics(lineCount);
+        textLayout->GetLineMetrics(lineMetrics.data(), lineCount, &lineCount);
+        baselineOffset = lineMetrics[0].baseline;
+    }
+
+    auto brush = getCachedBrush(paint.getColor());
+    if (!brush) {
+        Logger::e("Direct2DCanvas", "Failed to create/get brush for color 0x" + std::to_string(paint.getColor()));
+        return;
+    }
+
+    mContext->DrawTextLayout(D2D1::Point2F(x, y - baselineOffset), textLayout.Get(), brush);
 }
 
 void Direct2DCanvas::drawRenderNode(RenderNode* node) {

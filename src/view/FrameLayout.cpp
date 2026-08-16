@@ -7,37 +7,60 @@ namespace setu {
 namespace view {
 
 void FrameLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-    int maxWidth = 0;
-    int maxHeight = 0;
-
     int widthMode = getMode(widthMeasureSpec);
     int widthSize = getSize(widthMeasureSpec);
     int heightMode = getMode(heightMeasureSpec);
     int heightSize = getSize(heightMeasureSpec);
-
+    
+    int maxWidth = 0, maxHeight = 0;
+    
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::GONE) continue;
-
-        measureChildWithMargins(child, widthMeasureSpec, 0, heightMeasureSpec, 0);
-
+        
         auto lp = child->getLayoutParams();
-
-        maxWidth = std::max(maxWidth, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
-        maxHeight = std::max(maxHeight, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);
+        if (!lp) continue;
+        
+        int childWidthSpec = 0;
+        int childHeightSpec = 0;
+        
+        // Width
+        if (lp->width == View::MATCH_PARENT) {
+            childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_EXACTLY);
+        } else if (lp->width == View::WRAP_CONTENT) {
+            childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_AT_MOST);
+        } else {
+            childWidthSpec = View::makeMeasureSpec(lp->width, View::MEASURE_SPEC_EXACTLY);
+        }
+        
+        // Height
+        if (lp->height == View::MATCH_PARENT) {
+            childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_EXACTLY);
+        } else if (lp->height == View::WRAP_CONTENT) {
+            childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_AT_MOST);
+        } else {
+            childHeightSpec = View::makeMeasureSpec(lp->height, View::MEASURE_SPEC_EXACTLY);
+        }
+        
+        child->measure(childWidthSpec, childHeightSpec);
+        
+        maxWidth = std::max(maxWidth, child->getMeasuredWidth());
+        maxHeight = std::max(maxHeight, child->getMeasuredHeight());
     }
-
-    int measuredWidth = (widthMode == MEASURE_SPEC_EXACTLY) ? widthSize : maxWidth;
-    int measuredHeight = (heightMode == MEASURE_SPEC_EXACTLY) ? heightSize : maxHeight;
-
-    if (widthMode == MEASURE_SPEC_AT_MOST) measuredWidth = std::min(measuredWidth, widthSize);
-    if (heightMode == MEASURE_SPEC_AT_MOST) measuredHeight = std::min(measuredHeight, heightSize);
-
+    
+    maxWidth += mPaddingLeft + mPaddingRight;
+    maxHeight += mPaddingTop + mPaddingBottom;
+    
+    int measuredWidth = resolveSize(maxWidth, widthMeasureSpec);
+    int measuredHeight = resolveSize(maxHeight, heightMeasureSpec);
     setMeasuredDimension(measuredWidth, measuredHeight);
 }
 
 void FrameLayout::onLayout(bool changed, int l, int t, int r, int b) {
     int parentWidth = r - l;
     int parentHeight = b - t;
+
+    int availWidth = parentWidth - mPaddingLeft - mPaddingRight;
+    int availHeight = parentHeight - mPaddingTop - mPaddingBottom;
 
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::GONE) continue;
@@ -48,39 +71,38 @@ void FrameLayout::onLayout(bool changed, int l, int t, int r, int b) {
         int cw = child->getMeasuredWidth();
         int ch = child->getMeasuredHeight();
 
-        // Fix gravity
         int gravity = lp->gravity;
         if (gravity == -1 || gravity == 0) gravity = 0x33; // TOP | LEFT
 
         int horizontalGravity = gravity & 0x07;
         int verticalGravity = gravity & 0x70;
 
-        int childLeft = lp->leftMargin;
-        int childTop = lp->topMargin;
+        int childLeft = mPaddingLeft + lp->leftMargin;
+        int childTop = mPaddingTop + lp->topMargin;
 
         switch (horizontalGravity) {
             case 0x01: // CENTER_HORIZONTAL
-                childLeft = (parentWidth - cw - lp->leftMargin - lp->rightMargin) / 2 + lp->leftMargin;
+                childLeft = mPaddingLeft + (availWidth - cw - lp->leftMargin - lp->rightMargin) / 2 + lp->leftMargin;
                 break;
             case 0x05: // RIGHT
-                childLeft = parentWidth - cw - lp->rightMargin;
+                childLeft = parentWidth - mPaddingRight - cw - lp->rightMargin;
                 break;
             case 0x03: // LEFT
             default:
-                childLeft = lp->leftMargin;
+                childLeft = mPaddingLeft + lp->leftMargin;
                 break;
         }
 
         switch (verticalGravity) {
             case 0x10: // CENTER_VERTICAL
-                childTop = (parentHeight - ch - lp->topMargin - lp->bottomMargin) / 2 + lp->topMargin;
+                childTop = mPaddingTop + (availHeight - ch - lp->topMargin - lp->bottomMargin) / 2 + lp->topMargin;
                 break;
             case 0x50: // BOTTOM
-                childTop = parentHeight - ch - lp->bottomMargin;
+                childTop = parentHeight - mPaddingBottom - ch - lp->bottomMargin;
                 break;
             case 0x30: // TOP
             default:
-                childTop = lp->topMargin;
+                childTop = mPaddingTop + lp->topMargin;
                 break;
         }
 

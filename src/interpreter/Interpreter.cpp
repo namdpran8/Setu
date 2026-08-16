@@ -4,6 +4,17 @@
 #include "StubRegistry.h"
 #include <cmath>
 
+// Forward declarations for dalvik_opcodes.cpp fallback
+struct VMState {
+    const uint8_t* bytecode;
+    uint32_t pc;
+    uint32_t* registers;
+    void* exception_register;
+    void* result_register_object;
+    uint64_t result_register_primitive;
+};
+extern void ExecuteInstruction(VMState& state, uint8_t opcode);
+
 Interpreter::Interpreter() {
 }
 
@@ -30,7 +41,7 @@ uint8_t Interpreter::fetchOpcode(const std::vector<uint8_t>& bytecode, uint32_t&
 
 Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode, 
                                  const DexParser* currentDex, 
-                                 const MultiDexManager* multiDexManager,
+                                 MultiDexManager* multiDexManager,
                                  const std::vector<Value>& args,
                                  uint16_t registers_size,
                                  uint16_t ins_size) {
@@ -129,17 +140,64 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
             }
             case 0x0D: { // move-exception
                 uint8_t aa = safe8(bytecode, state.pc);
-                state.registers[aa] = Value::MakeNull(); // exception_register not fully implemented
-                Logger::d("Interpreter", "[0x0D] move-exception -> v" + std::to_string(aa));
+                if (state.pendingException) {
+                    state.registers[aa] = Value::MakeObject(state.pendingException);
+                    state.pendingException = nullptr;
+                    Logger::d("Interpreter", "[0x0D] move-exception -> v" + std::to_string(aa) + " = " + 
+                              (state.registers[aa].obj ? static_cast<InterpreterObject*>(state.registers[aa].obj)->className : "null"));
+                } else {
+                    state.registers[aa] = Value::MakeNull();
+                    Logger::d("Interpreter", "[0x0D] move-exception -> v" + std::to_string(aa) + " = null (no pending exception)");
+                }
                 state.pc += 1;
                 break;
             }
             case 0x1F: { // check-cast
                 uint8_t aa = safe8(bytecode, state.pc);
                 uint16_t typeIdx = safe16(bytecode, state.pc + 1);
-                std::string className = currentDex ? currentDex->getTypeString(typeIdx) : "";
-                Logger::d("Interpreter", "[0x1F] check-cast v" + std::to_string(aa) + " to " + className);
-                // In our simple interpreter, we don't throw ClassCastException
+                std::string expectedType = currentDex ? currentDex->getTypeString(typeIdx) : "";
+                Logger::d("Interpreter", "[0x1F] check-cast v" + std::to_string(aa) + " to " + expectedType);
+                
+                Value& val = state.registers[aa];
+                bool castOk = false;
+                
+                if (val.type == ValueType::NULL_TYPE || (val.type == ValueType::OBJECT && val.obj == nullptr)) {
+                    // null can be cast to any reference type
+                    castOk = true;
+                } else if (val.type == ValueType::OBJECT && val.obj) {
+                    InterpreterObject* obj = static_cast<InterpreterObject*>(val.obj);
+                    std::string actualType = obj->className;
+                    
+                    // Simple type checking: exact match or java.lang.Object
+                    if (expectedType == actualType || expectedType == "Ljava/lang/Object;") {
+                        castOk = true;
+                    } else if (actualType.find("Activity") != std::string::npos && expectedType.find("Context") != std::string::npos) {
+                        castOk = true;
+                    } else if (actualType.find("TextView") != std::string::npos && expectedType.find("View") != std::string::npos) {
+                        castOk = true;
+                    } else if (actualType.find("EditText") != std::string::npos && expectedType.find("TextView") != std::string::npos) {
+                        castOk = true;
+                    } else if (actualType.find("Button") != std::string::npos && expectedType.find("View") != std::string::npos) {
+                        castOk = true;
+                    } else if (expectedType == "Ljava/lang/CharSequence;" && actualType == "java.lang.String") {
+                        castOk = true;
+                    }
+                } else if (val.type == ValueType::ARRAY && val.obj) {
+                    // Array type checking
+                    if (expectedType == "Ljava/lang/Object;" || expectedType[0] == '[') {
+                        castOk = true;
+                    }
+                }
+                
+                if (!castOk) {
+                    // Throw ClassCastException
+                    InterpreterObject* cce = new InterpreterObject();
+                    cce->className = "java.lang.ClassCastException";
+                    state.pendingException = cce;
+                    isRunning = false; // Unwind to caller
+                    Logger::d("Interpreter", "[0x1F] check-cast FAILED: cannot cast to " + expectedType);
+                }
+                
                 state.pc += 3; // Format 21c is 4 bytes
                 break;
             }
@@ -180,16 +238,54 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
             case 0x1D: // monitor-enter
             case 0x1E: { // monitor-exit
                 uint8_t aa = safe8(bytecode, state.pc);
-                Logger::d("Interpreter", "[0x1D/1E] monitor-* v" + std::to_string(aa));
+                Value& val = state.registers[aa];
+                
+                if (val.type == ValueType::OBJECT && val.obj) {
+                    InterpreterObject* obj = static_cast<InterpreterObject*>(val.obj);
+                    if (opcode == 0x1D) {
+                        obj->monitor.lock();
+                        Logger::d("Interpreter", "[0x1D] monitor-enter v" + std::to_string(aa) + " (" + obj->className + ")");
+                    } else {
+                        obj->monitor.unlock();
+                        Logger::d("Interpreter", "[0x1E] monitor-exit v" + std::to_string(aa) + " (" + obj->className + ")");
+                    }
+                } else if (val.type == ValueType::ARRAY && val.obj) {
+                    ArrayObject* arr = static_cast<ArrayObject*>(val.obj);
+                    if (opcode == 0x1D) {
+                        arr->monitor.lock();
+                        Logger::d("Interpreter", "[0x1D] monitor-enter array v" + std::to_string(aa));
+                    } else {
+                        arr->monitor.unlock();
+                        Logger::d("Interpreter", "[0x1E] monitor-exit array v" + std::to_string(aa));
+                    }
+                } else {
+                    // Throw NullPointerException if null
+                    InterpreterObject* npe = new InterpreterObject();
+                    npe->className = "java.lang.NullPointerException";
+                    state.pendingException = npe;
+                    isRunning = false;
+                    Logger::d("Interpreter", "[0x1D/1E] monitor-* on null -> NullPointerException");
+                }
                 state.pc += 1;
                 break;
             }
             case 0x27: { // throw
                 uint8_t aa = safe8(bytecode, state.pc);
-                Logger::w("Interpreter", "[0x27] throw v" + std::to_string(aa) + " (UNIMPLEMENTED - Exiting method to prevent crash)");
-                Logger::e("Interpreter", "FATAL: Never Gonna Give You Up (but the app just crashed) - Rick Astley");
-                Logger::e("Interpreter", "You have been rick rolled.");
-                isRunning = false;
+                Value& exceptionVal = state.registers[aa];
+                
+                if (exceptionVal.type == ValueType::OBJECT && exceptionVal.obj) {
+                    // Store pending exception in state
+                    state.pendingException = static_cast<InterpreterObject*>(exceptionVal.obj);
+                    Logger::d("Interpreter", "[0x27] throw exception: " + state.pendingException->className);
+                } else {
+                    // Throw NullPointerException per spec
+                    Logger::d("Interpreter", "[0x27] throw null -> NullPointerException");
+                    InterpreterObject* npe = new InterpreterObject();
+                    npe->className = "java.lang.NullPointerException";
+                    state.pendingException = npe;
+                }
+                isRunning = false;  // Unwind to caller
+                state.pc += 1;
                 break;
             }
             case 0x0F: // return
@@ -461,11 +557,77 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 state.pc += 3;
                 break;
             }
-            case 0x2B: // packed-switch
+            case 0x2B: { // packed-switch
+                uint8_t aa = safe8(bytecode, state.pc);
+                int32_t switchValue = state.registers[aa].i;
+                
+                // Format 31t: AA|op BBBB (padding) CCCCCCCC DDDDDDDD
+                // pc points to padding byte after opcode
+                int32_t firstKey = (int32_t)(safe16(bytecode, state.pc + 3) | (safe8(bytecode, state.pc + 5) << 16) | (safe8(bytecode, state.pc + 6) << 24));
+                int32_t targetsSize = (int32_t)(safe16(bytecode, state.pc + 7) | (safe8(bytecode, state.pc + 9) << 16) | (safe8(bytecode, state.pc + 10) << 24));
+                
+                // Targets start at pc + 12 (aligned to 4 bytes)
+                uint32_t targetsOffset = state.pc + 12;
+                int32_t index = switchValue - firstKey;
+                
+                int32_t targetOffset = 0;
+                if (index >= 0 && index < targetsSize) {
+                    targetOffset = (int32_t)(safe16(bytecode, targetsOffset + index * 4) | 
+                                             (safe8(bytecode, targetsOffset + index * 4 + 2) << 16) | 
+                                             (safe8(bytecode, targetsOffset + index * 4 + 3) << 24));
+                } else {
+                    // Default target (first entry in payload)
+                    targetOffset = (int32_t)(safe16(bytecode, targetsOffset) | 
+                                             (safe8(bytecode, targetsOffset + 2) << 16) | 
+                                             (safe8(bytecode, targetsOffset + 3) << 24));
+                }
+                
+                Logger::d("Interpreter", "[0x2B] packed-switch v" + std::to_string(aa) + "=" + std::to_string(switchValue) + " -> offset " + std::to_string(targetOffset));
+                state.pc = (state.pc - 1) + (targetOffset * 2);
+                break;
+            }
             case 0x2C: { // sparse-switch
                 uint8_t aa = safe8(bytecode, state.pc);
-                Logger::d("Interpreter", "[0x2B/2C] switch v" + std::to_string(aa) + " (UNIMPLEMENTED - falling through)");
-                state.pc += 5; // Format 31t is 6 bytes
+                int32_t switchValue = state.registers[aa].i;
+                
+                // Format 31t: AA|op BBBB CCCCCCCC (size)
+                // pc points to AA (register) after fetchOpcode consumed the opcode
+                // Instruction start = state.pc - 1
+                int32_t targetsSize = (int32_t)(safe16(bytecode, state.pc + 3) | (safe8(bytecode, state.pc + 5) << 16) | (safe8(bytecode, state.pc + 6) << 24));
+                
+                // Keys start at instruction_start + 8, aligned to 4 bytes
+                // instruction_start = state.pc - 1
+                // So: (state.pc - 1 + 8) & ~3 = (state.pc + 7) & ~3
+                uint32_t instrStart = state.pc - 1;
+                uint32_t keysOffset = (instrStart + 8 + 3) & ~3u;  // Align to 4 bytes
+                // Targets follow keys (targetsSize * 4 bytes each)
+                uint32_t targetsOffset = keysOffset + targetsSize * 4;
+                
+                int32_t targetOffset = 0;
+                bool found = false;
+                
+                for (int i = 0; i < targetsSize; ++i) {
+                    int32_t key = (int32_t)(safe16(bytecode, keysOffset + i * 4) | 
+                                            (safe8(bytecode, keysOffset + i * 4 + 2) << 16) | 
+                                            (safe8(bytecode, keysOffset + i * 4 + 3) << 24));
+                    if (key == switchValue) {
+                        targetOffset = (int32_t)(safe16(bytecode, targetsOffset + i * 4) | 
+                                                 (safe8(bytecode, targetsOffset + i * 4 + 2) << 16) | 
+                                                 (safe8(bytecode, targetsOffset + i * 4 + 3) << 24));
+                        found = true;
+                        break;
+                    }
+                }
+                
+                if (!found) {
+                    // Default target (first target entry)
+                    targetOffset = (int32_t)(safe16(bytecode, targetsOffset) | 
+                                             (safe8(bytecode, targetsOffset + 2) << 16) | 
+                                             (safe8(bytecode, targetsOffset + 3) << 24));
+                }
+                
+                Logger::d("Interpreter", "[0x2C] sparse-switch v" + std::to_string(aa) + "=" + std::to_string(switchValue) + " -> offset " + std::to_string(targetOffset));
+                state.pc = (state.pc - 1) + (targetOffset * 2);
                 break;
             }
             case 0x1C: { // const-class vAA, type@BBBB
@@ -676,7 +838,21 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
             case 0x6B: case 0x6C: case 0x6D: { // sput-*
                 uint8_t aa = safe8(bytecode, state.pc);
                 uint16_t fieldIdx = safe16(bytecode, state.pc + 1);
-                Logger::d("Interpreter", "[0x67..6D] sput-* from v" + std::to_string(aa));
+                Value& valToStore = state.registers[aa];
+                
+                if (currentDex && multiDexManager) {
+                    std::string className = currentDex->getClassNameFromFieldIdx(fieldIdx);
+                    std::string fieldName = currentDex->getFieldNameFromFieldIdx(fieldIdx);
+                    
+                    if (!className.empty() && !fieldName.empty()) {
+                        multiDexManager->setStaticFieldValue(className, fieldName, valToStore);
+                        Logger::d("Interpreter", "[0x67..6D] sput-* v" + std::to_string(aa) + " -> " + className + "->" + fieldName);
+                    } else {
+                        Logger::w("Interpreter", "[0x67..6D] sput-* could not resolve field name for idx " + std::to_string(fieldIdx));
+                    }
+                } else {
+                    Logger::w("Interpreter", "[0x67..6D] sput-* No DexParser/MultiDexManager available to resolve field!");
+                }
                 state.pc += 3;
                 break;
             }
@@ -945,11 +1121,121 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 state.pc += 5;
                 break;
             }
+            case 0xFA: { // invoke-polymorphic
+                // Format 35c: A|G|op BBBB F|E|D|C
+                // Same arg parsing as invoke-interface
+                uint8_t aa = safe8(bytecode, state.pc);
+                uint16_t methodIdx = safe16(bytecode, state.pc + 1);
+                uint8_t argCount = aa >> 4;
+                
+                std::vector<Value> args;
+                args.reserve(argCount);
+                uint16_t fedc = safe16(bytecode, state.pc + 3);
+                if (argCount > 0) args.push_back(state.registers[fedc & 0x0F]);
+                if (argCount > 1) args.push_back(state.registers[(fedc >> 4) & 0x0F]);
+                if (argCount > 2) args.push_back(state.registers[(fedc >> 8) & 0x0F]);
+                if (argCount > 3) args.push_back(state.registers[(fedc >> 12) & 0x0F]);
+                if (argCount > 4) args.push_back(state.registers[aa & 0x0F]);
+                
+                // Also reads a MethodHandle from register (proto)
+                // For now, treat like invoke-interface
+                std::string methodSig = currentDex ? currentDex->getMethodSignature(methodIdx) : "";
+                Logger::w("Interpreter", "[0xFA] invoke-polymorphic not fully implemented, treating as invoke-interface: " + methodSig);
+                
+                // Dispatch to stub/bytecode (same as invoke-interface)
+                size_t arrowPos = methodSig.find("->");
+                size_t parenPos = methodSig.find('(');
+                bool executedBytecode = false;
+                
+                if (arrowPos != std::string::npos && parenPos != std::string::npos && multiDexManager != nullptr) {
+                    if (StubRegistry::isStubbed(methodSig)) {
+                        bool exceptionThrown = StubRegistry::invoke(methodSig, &state, args, &state.methodReturnVal);
+                        if (exceptionThrown) return Value::MakeNull();
+                        executedBytecode = true;
+                    } else {
+                        auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(methodSig);
+                        if (!bcResult.bytecode.empty() && bcDex) {
+                            static thread_local int callDepth = 0;
+                            if (callDepth > 16) {
+                                state.methodReturnVal = Value::MakeNull();
+                            } else {
+                                callDepth++;
+                                Interpreter nestedVm;
+                                state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, bcDex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                                callDepth--;
+                            }
+                            executedBytecode = true;
+                        }
+                    }
+                }
+                if (!executedBytecode) {
+                    StubRegistry::invoke(methodSig, &state, args, &state.methodReturnVal);
+                }
+                state.pc += 5;
+                break;
+            }
+            case 0xFB: { // invoke-custom (invokedynamic)
+                // Format 35c: A|G|op BBBB F|E|D|C
+                // argCount = G, methodIdx = BBBB (CallSite), args = FEDC/A
+                uint8_t aa = safe8(bytecode, state.pc);
+                uint16_t callsiteIdx = safe16(bytecode, state.pc + 1);
+                uint8_t argCount = aa >> 4;
+                
+                std::vector<Value> args;
+                args.reserve(argCount);
+                uint16_t fedc = safe16(bytecode, state.pc + 3);
+                if (argCount > 0) args.push_back(state.registers[fedc & 0x0F]);
+                if (argCount > 1) args.push_back(state.registers[(fedc >> 4) & 0x0F]);
+                if (argCount > 2) args.push_back(state.registers[(fedc >> 8) & 0x0F]);
+                if (argCount > 3) args.push_back(state.registers[(fedc >> 12) & 0x0F]);
+                if (argCount > 4) args.push_back(state.registers[aa & 0x0F]);
+                
+                Logger::w("Interpreter", "[0xFB] invoke-custom (invokedynamic) not implemented - CallSite: " + std::to_string(callsiteIdx));
+                
+                // TODO: Resolve CallSite -> MethodHandle -> target method
+                // For now, return null
+                state.methodReturnVal = Value::MakeNull();
+                state.pc += 5;
+                break;
+            }
             default: {
                 // Unimplemented opcode!
                 char hexBuf[16];
                 snprintf(hexBuf, sizeof(hexBuf), "0x%02X", opcode);
-                Logger::e("Interpreter", "UNIMPLEMENTED OPCODE: " + std::string(hexBuf) + " in method.");
+                Logger::w("Interpreter", "OPCODE: " + std::string(hexBuf) + " not natively handled. Falling back to dalvik_opcodes.cpp");
+                
+                // --- Fallback Shim to dalvik_opcodes.cpp ---
+                uint32_t tempRegs[256];
+                for (int i = 0; i < 256; i++) {
+                    // Union read to approximate the 32-bit register
+                    tempRegs[i] = (uint32_t)state.registers[i].i; 
+                }
+                
+                VMState fallbackState;
+                fallbackState.bytecode = bytecode.data();
+                fallbackState.pc = state.pc;
+                fallbackState.registers = tempRegs;
+                fallbackState.exception_register = state.pendingException;
+                fallbackState.result_register_object = state.methodReturnVal.obj;
+                fallbackState.result_register_primitive = (uint64_t)state.methodReturnVal.i;
+                
+                ExecuteInstruction(fallbackState, opcode);
+                
+                // Write back state
+                state.pc = fallbackState.pc;
+                state.pendingException = static_cast<InterpreterObject*>(fallbackState.exception_register);
+                state.methodReturnVal.obj = fallbackState.result_register_object;
+                
+                // Write back registers safely
+                for (int i = 0; i < 256; i++) {
+                    if (tempRegs[i] != (uint32_t)state.registers[i].i) {
+                        state.registers[i].i = tempRegs[i];
+                        // If it wasn't an object/array, default to INT to preserve primitive type safety
+                        if (state.registers[i].type != ValueType::OBJECT && state.registers[i].type != ValueType::ARRAY) {
+                            state.registers[i].type = ValueType::INT;
+                        }
+                    }
+                }
                 
                 // Dump the raw hex of the code item for debugging
                 std::string hexDump = "";
@@ -963,6 +1249,11 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 isRunning = false;
                 break;
             }
+        }
+        
+        if (state.pendingException) {
+            // Unwind: return exception to caller
+            return Value::MakeObject(state.pendingException);
         }
     }
     

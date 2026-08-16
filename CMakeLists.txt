@@ -20,6 +20,7 @@ add_executable(setu_runtime
     "src/dex/ResourceManager.cpp"
     "src/utils/Logger.cpp"
     "src/interpreter/Interpreter.cpp"
+    "src/dalvik_opcodes.cpp"
     "src/interpreter/StubRegistry.cpp"
     "src/ui/WindowManager.cpp"
     "src/ui/Theme.cpp"
@@ -39,7 +40,9 @@ add_executable(setu_runtime
     "src/view/GridLayout.cpp"
     "src/widget/TextView.cpp"
     "src/widget/Button.cpp"
-    "src/widget/EditText.cpp")
+    "src/widget/EditText.cpp"
+    "src/widget/ImageView.cpp"
+    "src/widget/ImageButton.cpp")
 
 target_include_directories(setu_runtime PRIVATE include)
 target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw)

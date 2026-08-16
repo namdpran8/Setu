@@ -359,7 +359,7 @@ bool WindowManager::init() {
         0,
         "SetuMainWindow",
         "Setu Runtime (Powered by Caffeine & Tears)",
-        WS_OVERLAPPEDWINDOW,
+        WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT,
         540, 1170, // Average modern phone aspect ratio
         nullptr,

@@ -2,6 +2,8 @@
 #include "LayoutInflater.h"
 #include "../utils/Logger.h"
 #include "../widget/Button.h"
+#include "../widget/ImageView.h"
+#include "../widget/ImageButton.h"
 #include "../widget/TextView.h"
 #include "../widget/EditText.h"
 #include "../view/LinearLayout.h"
@@ -97,6 +99,10 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
     } else if (tag == "Button" || tag == "android.widget.Button" ||
                tag == "androidx.appcompat.widget.AppCompatButton") {
         view = std::make_shared<setu::widget::Button>(resManager, theme, parser, 0, 0);
+    } else if (tag == "ImageView" || tag == "android.widget.ImageView" || tag == "androidx.appcompat.widget.AppCompatImageView") {
+        view = std::make_shared<setu::widget::ImageView>(resManager, theme, parser, 0, 0);
+    } else if (tag == "ImageButton" || tag == "android.widget.ImageButton" || tag == "androidx.appcompat.widget.AppCompatImageButton") {
+        view = std::make_shared<setu::widget::ImageButton>(resManager, theme, parser, 0, 0);
     } else if (tag == "EditText" || tag == "android.widget.EditText" ||
                tag == "androidx.appcompat.widget.AppCompatEditText" ||
                tag == "AutoCompleteTextView" || tag == "android.widget.AutoCompleteTextView" ||
@@ -110,11 +116,12 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
     } else if (tag == "RadioButton" || tag == "android.widget.RadioButton" ||
                tag == "CheckBox" || tag == "android.widget.CheckBox") {
         view = std::make_shared<setu::widget::Button>(resManager, theme, parser, 0, 0);
-    } else if (tag == "com.google.android.material.textfield.TextInputLayout" ||
-               tag == "com.google.android.material.textfield.TextInputEditText") {
+    } else if (tag == "com.google.android.material.textfield.TextInputLayout") {
         // TextInputLayout wraps an EditText — treat as a vertical FrameLayout container
         auto fl = std::make_shared<setu::view::FrameLayout>();
         view = fl;
+    } else if (tag == "com.google.android.material.textfield.TextInputEditText") {
+        view = std::make_shared<setu::widget::EditText>(resManager, theme, parser, 0, 0);
     } else if (tag == "Guideline" || tag == "androidx.constraintlayout.widget.Guideline" ||
                tag == "Space" || tag == "android.widget.Space" || tag == "View" || tag == "android.view.View") {
         view = std::make_shared<setu::view::View>(resManager, theme, parser, 0, 0);
@@ -277,6 +284,25 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
                 if (str16) p = parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
             }
             view->setMinimumHeight(p);
+        } else if (attrName == "gravity" || resId == 0x010100af) {
+            view->setGravity(parser->getAttributeData(i));
+        } else if (attrName == "background" || resId == 0x01010039) {
+            int type = parser->getAttributeDataType(i);
+            if (type >= android::Res_value::TYPE_FIRST_COLOR_INT && type <= android::Res_value::TYPE_LAST_COLOR_INT) {
+                view->setBackgroundColor(parser->getAttributeData(i));
+            } else if (type == android::Res_value::TYPE_REFERENCE) {
+                // TODO: resolve drawable reference from resManager
+            }
+        } else if (attrName == "clickable" || resId == 0x0101006e) {
+            int type = parser->getAttributeDataType(i);
+            if (type == android::Res_value::TYPE_INT_BOOLEAN) {
+                view->setClickable(parser->getAttributeData(i) != 0);
+            }
+        } else if (attrName == "focusable" || resId == 0x0101006f) {
+            int type = parser->getAttributeDataType(i);
+            if (type == android::Res_value::TYPE_INT_BOOLEAN) {
+                view->setFocusable(parser->getAttributeData(i) != 0);
+            }
         }
     }
 }
@@ -294,6 +320,12 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
         uint32_t data = parser->getAttributeData(idx);
         if (type == android::Res_value::TYPE_DIMENSION) {
             return LayoutInflater::parseComplexDimension(data);
+        }
+        // Also handle STRING dimensions like "16dp"
+        size_t strLen = 0;
+        const char16_t* str16 = parser->getAttributeStringValue(idx, &strLen);
+        if (str16) {
+            return parseDimension(android::util::Utf16ToUtf8(android::StringPiece16(str16, strLen)));
         }
         return (int)data;
     };
@@ -314,6 +346,7 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
             } else {
                 lp->width = parseDim(i);
             }
+            continue;  // Important: skip to next attribute
         } else if (attrName == "layout_height" || resId == 0x010100f5) {
             int type = parser->getAttributeDataType(i);
             uint32_t data = parser->getAttributeData(i);
@@ -324,6 +357,7 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
             } else {
                 lp->height = parseDim(i);
             }
+            continue;
         } else if (attrName == "layout_marginLeft" || attrName == "layout_marginStart" || resId == 0x010100f7 || resId == 0x010103b1) {
             lp->leftMargin = parseDim(i);
         } else if (attrName == "layout_marginTop" || resId == 0x010100f8) {

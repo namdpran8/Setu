@@ -26,6 +26,9 @@ public:
     // Gets a string value by resource ID
     std::string getString(uint32_t resId);
 
+    // Resolves a dimension
+    float resolveDimension(uint32_t resId);
+
     // Resolves references (@) and theme attributes (?)
     bool resolveValue(android::AssetManager2::SelectedValue& in_out_value, class Theme* theme = nullptr);
 

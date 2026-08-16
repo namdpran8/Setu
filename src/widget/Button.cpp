@@ -69,7 +69,8 @@ void Button::onDraw(graphics::Canvas& canvas) {
     if (size_needed > 0) {
         textUtf8.resize(size_needed);
         WideCharToMultiByte(CP_UTF8, 0, getText().c_str(), (int)getText().size(), &textUtf8[0], size_needed, NULL, NULL);
-        Logger::d("Button", "Drawing text: '" + textUtf8 + "' at mLeft=" + std::to_string(getLeft()) + ", mTop=" + std::to_string(getTop()));
+        Logger::d("Button", "Drawing text: '" + textUtf8 + "' color=0x" + std::to_string(mTextPaint.getColor()) + 
+                  " at (" + std::to_string((float)getLeft()) + "," + std::to_string((float)getTop()) + ")");
     }
     
     // Draw text using TextView's implementation
