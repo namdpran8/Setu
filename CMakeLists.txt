@@ -10,6 +10,7 @@ add_subdirectory(thirdparty/zlib)
 add_subdirectory(thirdparty/libziparchive)
 add_subdirectory(thirdparty/fmt)
 add_subdirectory(thirdparty/androidfw)
+add_subdirectory(src/cassowary)
 
 add_executable(setu_runtime
 
@@ -45,5 +46,5 @@ add_executable(setu_runtime
     "src/widget/ImageButton.cpp")
 
 target_include_directories(setu_runtime PRIVATE include)
-target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw)
+target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary)
 target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")

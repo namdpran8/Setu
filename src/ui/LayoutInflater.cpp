@@ -95,19 +95,19 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         view = std::make_shared<setu::view::RelativeLayout>();
     } else if (tag == "TextView" || tag == "android.widget.TextView" ||
                tag == "androidx.appcompat.widget.AppCompatTextView") {
-        view = std::make_shared<setu::widget::TextView>(resManager, theme, parser, 0, 0);
+        view = std::make_shared<setu::widget::TextView>(resManager, theme, parser, 0x01010084, 0);
     } else if (tag == "Button" || tag == "android.widget.Button" ||
                tag == "androidx.appcompat.widget.AppCompatButton") {
-        view = std::make_shared<setu::widget::Button>(resManager, theme, parser, 0, 0);
+        view = std::make_shared<setu::widget::Button>(resManager, theme, parser, 0x01010048, 0);
     } else if (tag == "ImageView" || tag == "android.widget.ImageView" || tag == "androidx.appcompat.widget.AppCompatImageView") {
-        view = std::make_shared<setu::widget::ImageView>(resManager, theme, parser, 0, 0);
+        view = std::make_shared<setu::widget::ImageView>(resManager, theme, parser, 0x01010064, 0);
     } else if (tag == "ImageButton" || tag == "android.widget.ImageButton" || tag == "androidx.appcompat.widget.AppCompatImageButton") {
-        view = std::make_shared<setu::widget::ImageButton>(resManager, theme, parser, 0, 0);
+        view = std::make_shared<setu::widget::ImageButton>(resManager, theme, parser, 0x01010039, 0);
     } else if (tag == "EditText" || tag == "android.widget.EditText" ||
                tag == "androidx.appcompat.widget.AppCompatEditText" ||
                tag == "AutoCompleteTextView" || tag == "android.widget.AutoCompleteTextView" ||
                tag == "androidx.appcompat.widget.AppCompatAutoCompleteTextView") {
-        view = std::make_shared<setu::widget::EditText>(resManager, theme, parser, 0, 0);
+        view = std::make_shared<setu::widget::EditText>(resManager, theme, parser, 0x01010006, 0);
     } else if (tag == "RadioGroup" || tag == "android.widget.RadioGroup") {
         // RadioGroup is a vertical LinearLayout
         auto ll = std::make_shared<setu::view::LinearLayout>();
@@ -290,8 +290,20 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
             int type = parser->getAttributeDataType(i);
             if (type >= android::Res_value::TYPE_FIRST_COLOR_INT && type <= android::Res_value::TYPE_LAST_COLOR_INT) {
                 view->setBackgroundColor(parser->getAttributeData(i));
-            } else if (type == android::Res_value::TYPE_REFERENCE) {
-                // TODO: resolve drawable reference from resManager
+            } else if (type == android::Res_value::TYPE_REFERENCE || type == android::Res_value::TYPE_ATTRIBUTE) {
+                // Resolve @drawable/@color references and ?attr/ theme attributes
+                android::AssetManager2::SelectedValue val;
+                val.type = type;
+                val.data = parser->getAttributeData(i);
+                val.cookie = android::kInvalidCookie;
+                val.flags = 0;
+                val.resid = 0;
+                if (resManager && resManager->resolveValue(val, theme)) {
+                    if (val.type >= android::Res_value::TYPE_FIRST_COLOR_INT &&
+                        val.type <= android::Res_value::TYPE_LAST_COLOR_INT) {
+                        view->setBackgroundColor(val.data);
+                    }
+                }
             }
         } else if (attrName == "clickable" || resId == 0x0101006e) {
             int type = parser->getAttributeDataType(i);

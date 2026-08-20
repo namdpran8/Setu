@@ -380,3 +380,11 @@ x86/
 ART-DEX/
 art-refs_heads_main-runtime-interpreter/
 base-refs_heads_main-core-java-android-view/
+thirdparty/androidfw/
+thirdparty/constraintlayout-main/
+thirdparty/fmt/
+thirdparty/include_compat/
+thirdparty/libbase/
+thirdparty/libziparchive/
+thirdparty/miniz/
+thirdparty/zlib/

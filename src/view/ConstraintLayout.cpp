@@ -5,7 +5,10 @@
 #include "androidfw/ResourceTypes.h"
 
 namespace setu {
-namespace view {
+namespace view:
+
+ConstraintLayout::ConstraintLayout() = default;
+ConstraintLayout::~ConstraintLayout() = default;
 
 void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     int widthMode = getMode(widthMeasureSpec);
@@ -13,7 +16,6 @@ void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     int heightMode = getMode(heightMeasureSpec);
     int heightSize = getSize(heightMeasureSpec);
 
-    // Initial pass: populate ResolvedNodes
     mResolvedNodes.clear();
     mIdToIndex.clear();
     for (auto& child : mChildren) {
@@ -22,7 +24,6 @@ void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         if (!lp) lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
         
-        // Measure wrap_content/exactly up front to get intrinsic sizes
         if (lp->width != 0) {
             int cWidthSpec = View::makeMeasureSpec(widthSize, lp->width == View::MATCH_PARENT ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST);
             if (lp->width > 0) cWidthSpec = View::makeMeasureSpec(lp->width, View::MEASURE_SPEC_EXACTLY);
@@ -45,17 +46,14 @@ void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         }
     }
 
-    // Resolve positions and MATCH_CONSTRAINT sizes
     resolveConstraints(widthSize, heightSize);
 
-    // After resolving, apply measurement
     int maxWidth = 0;
     int maxHeight = 0;
     for (auto& node : mResolvedNodes) {
         auto child = node.view;
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         
-        // Remeasure if it was MATCH_CONSTRAINT
         if (lp && (lp->width == 0 || lp->height == 0)) {
             child->measure(View::makeMeasureSpec(node.w, View::MEASURE_SPEC_EXACTLY), View::makeMeasureSpec(node.h, View::MEASURE_SPEC_EXACTLY));
         }
@@ -87,16 +85,15 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
             auto lp = std::dynamic_pointer_cast<LayoutParams>(node.view->getLayoutParams());
             if (!lp) continue;
 
-            // Guideline Resolution
             if (lp->isGuideline) {
                 if (!node.xResolved || !node.yResolved) {
-                    if (lp->orientation == 0) { // Horizontal Guide
+                    if (lp->orientation == 0) {
                         if (lp->guidePercent >= 0) node.y = (int)(parentHeight * lp->guidePercent);
                         else if (lp->guideBegin >= 0) node.y = lp->guideBegin;
                         else if (lp->guideEnd >= 0) node.y = parentHeight - lp->guideEnd;
                         else node.y = 0;
                         node.x = 0; node.w = parentWidth; node.h = 0;
-                    } else { // Vertical Guide
+                    } else {
                         if (lp->guidePercent >= 0) node.x = (int)(parentWidth * lp->guidePercent);
                         else if (lp->guideBegin >= 0) node.x = lp->guideBegin;
                         else if (lp->guideEnd >= 0) node.x = parentWidth - lp->guideEnd;
@@ -110,13 +107,12 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
                 continue;
             }
             
-            // X Resolution
             if (!node.xResolved) {
                 bool startReady = (lp->startToStart == 0 || lp->startToStart == -1 || (getNode(lp->startToStart) && getNode(lp->startToStart)->xResolved)) &&
                                   (lp->startToEnd == 0 || lp->startToEnd == -1 || (getNode(lp->startToEnd) && getNode(lp->startToEnd)->xResolved));
                 bool endReady = (lp->endToStart == 0 || lp->endToStart == -1 || (getNode(lp->endToStart) && getNode(lp->endToStart)->xResolved)) &&
                                 (lp->endToEnd == 0 || lp->endToEnd == -1 || (getNode(lp->endToEnd) && getNode(lp->endToEnd)->xResolved));
-                                
+                
                 if (startReady && endReady) {
                     int startCoord = 0;
                     bool hasStart = false;
@@ -144,7 +140,7 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
                     }
                     endCoord -= lp->rightMargin;
                     
-                    if (lp->width == 0) { // MATCH_CONSTRAINT
+                    if (lp->width == 0) {
                         if (hasStart && hasEnd) node.w = std::max(0, endCoord - startCoord);
                     } else if (lp->width == View::MATCH_PARENT) {
                         node.w = parentWidth - lp->leftMargin - lp->rightMargin;
@@ -162,13 +158,12 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
                 }
             }
             
-            // Y Resolution
             if (!node.yResolved) {
                 bool topReady = (lp->topToTop == 0 || lp->topToTop == -1 || (getNode(lp->topToTop) && getNode(lp->topToTop)->yResolved)) &&
                                 (lp->topToBottom == 0 || lp->topToBottom == -1 || (getNode(lp->topToBottom) && getNode(lp->topToBottom)->yResolved));
                 bool bottomReady = (lp->bottomToTop == 0 || lp->bottomToTop == -1 || (getNode(lp->bottomToTop) && getNode(lp->bottomToTop)->yResolved)) &&
                                    (lp->bottomToBottom == 0 || lp->bottomToBottom == -1 || (getNode(lp->bottomToBottom) && getNode(lp->bottomToBottom)->yResolved));
-                                
+                
                 if (topReady && bottomReady) {
                     int topCoord = 0;
                     bool hasTop = false;
@@ -196,7 +191,7 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
                     }
                     bottomCoord -= lp->bottomMargin;
                     
-                    if (lp->height == 0) { // MATCH_CONSTRAINT
+                    if (lp->height == 0) {
                         if (hasTop && hasBottom) node.h = std::max(0, bottomCoord - topCoord);
                     } else if (lp->height == View::MATCH_PARENT) {
                         node.h = parentHeight - lp->topMargin - lp->bottomMargin;
@@ -218,7 +213,6 @@ void ConstraintLayout::resolveConstraints(int parentWidth, int parentHeight) {
         if (!changed) break; 
     }
     
-    // Fallback for unresolved cycles
     for (auto& node : mResolvedNodes) {
         if (!node.xResolved || !node.yResolved) {
             Logger::w("ConstraintLayout", "Cycle or unresolved constraint for ID: " + std::to_string(node.view->getId()));
@@ -299,7 +293,3 @@ std::shared_ptr<View::LayoutParams> ConstraintLayout::generateLayoutParams(andro
 
 } // namespace view
 } // namespace setu
-
-
-
-

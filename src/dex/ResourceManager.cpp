@@ -1,6 +1,7 @@
 #include "ResourceManager.h"
 #include "../utils/Logger.h"
 #include "androidfw/ResourceUtils.h"
+#include "../ui/WindowManager.h"
 
 #include "../ui/Theme.h"
 
@@ -36,9 +37,15 @@ bool ResourceManager::init(const std::string& apkPath) {
 
     android::ResTable_config config;
     memset(&config, 0, sizeof(config));
+    // Set basic display metrics for resource filtering
+    config.density = (uint16_t)(WindowManager::getDensity() * 160);
+    config.screenWidthDp = 411;   // Reasonable phone default
+    config.screenHeightDp = 731;
+    config.sdkVersion = 34;       // Target Android 14
     
     m_assetManager = std::make_unique<android::AssetManager2>();
     std::span<const android::AssetManager2::ApkAssetsPtr> span_assets(m_apkAssets.data(), m_apkAssets.size()); m_assetManager->SetApkAssets(span_assets);
+    m_assetManager->SetConfigurations({{config}});
     
     Logger::i("ResourceManager", "Successfully initialized AssetManager2 for app.");
     return true;
@@ -85,13 +92,56 @@ std::string ResourceManager::getString(uint32_t resId) {
     return "";
 }
 
+static float complexToDimension(uint32_t data) {
+    // Extract mantissa and radix
+    float value = (float)(int32_t(data) >> android::Res_value::COMPLEX_MANTISSA_SHIFT);
+    int radix = (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
+
+    // Apply radix scaling (AOSP uses fixed-point: 23p0, 16p7, 8p15, 0p23)
+    static const float RADIX_MULTS[] = {
+        1.0f,                    // 23p0
+        1.0f / (1 << 7),         // 16p7
+        1.0f / (1 << 15),        // 8p15
+        1.0f / (1 << 23)         // 0p23
+    };
+    value *= RADIX_MULTS[radix];
+
+    // Apply unit conversion
+    int unit = data & android::Res_value::COMPLEX_UNIT_MASK;
+    float density = WindowManager::getDensity();
+    switch (unit) {
+        case android::Res_value::COMPLEX_UNIT_PX:
+            return value;
+        case android::Res_value::COMPLEX_UNIT_DIP:
+            return value * density;
+        case android::Res_value::COMPLEX_UNIT_SP:
+            return value * WindowManager::getScaledDensity();
+        case android::Res_value::COMPLEX_UNIT_PT:
+            return value * density * (1.0f / 72.0f) * 160.0f;
+        case android::Res_value::COMPLEX_UNIT_IN:
+            return value * density * 160.0f;
+        case android::Res_value::COMPLEX_UNIT_MM:
+            return value * density * (1.0f / 25.4f) * 160.0f;
+        default:
+            return value;
+    }
+}
+
 float ResourceManager::resolveDimension(uint32_t resId) {
     if (!m_assetManager) return 0.0f;
     auto res = m_assetManager->GetResource(resId);
     if (!res.has_value()) return 0.0f;
     
-    // TODO: implement proper complexToDimension conversion based on metrics
-    // For now, we return 0.0f to avoid crashing or warnings.
+    if (res->type == android::Res_value::TYPE_DIMENSION) {
+        return complexToDimension(res->data);
+    } else if (res->type == android::Res_value::TYPE_FLOAT) {
+        union { uint32_t i; float f; } u;
+        u.i = res->data;
+        return u.f;
+    } else if (res->type >= android::Res_value::TYPE_FIRST_INT &&
+               res->type <= android::Res_value::TYPE_LAST_INT) {
+        return (float)res->data;
+    }
     return 0.0f;
 }
 

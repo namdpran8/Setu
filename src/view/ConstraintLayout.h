@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <memory>
 
 namespace setu {
 namespace view {
@@ -60,10 +61,7 @@ private:
     std::map<int, size_t> mIdToIndex;
     
     void resolveConstraints(int parentWidth, int parentHeight);
-    int resolveX(int id, int parentWidth, std::vector<int>& path);
-    int resolveY(int id, int parentHeight, std::vector<int>& path);
 };
 
 } // namespace view
 } // namespace setu
-
