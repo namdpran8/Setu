@@ -5,10 +5,9 @@
 #include "androidfw/ResourceTypes.h"
 
 namespace setu {
-namespace view:
+namespace view {
 
-ConstraintLayout::ConstraintLayout() = default;
-ConstraintLayout::~ConstraintLayout() = default;
+
 
 void ConstraintLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     int widthMode = getMode(widthMeasureSpec);
