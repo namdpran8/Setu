@@ -30,8 +30,11 @@ void WindowManager::setClickCallback(std::function<void(int)> cb) {
 }
 
 void WindowManager::triggerClickCallback(int controlId) {
+    Logger::d("WindowManager", "triggerClickCallback called for id: " + std::to_string(controlId));
     if (s_clickCallback) {
         s_clickCallback(controlId);
+    } else {
+        Logger::w("WindowManager", "s_clickCallback is null!");
     }
 }
 

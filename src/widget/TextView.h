@@ -25,8 +25,8 @@ protected:
     std::wstring mText;
     graphics::Paint mTextPaint;
     int mGravity = 0x33; // Gravity::TOP | Gravity::LEFT
+    int mEms = -1;
 };
 
 } // namespace widget
 } // namespace setu
-

@@ -20,26 +20,8 @@ void FrameLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         auto lp = child->getLayoutParams();
         if (!lp) continue;
         
-        int childWidthSpec = 0;
-        int childHeightSpec = 0;
-        
-        // Width
-        if (lp->width == View::MATCH_PARENT) {
-            childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_EXACTLY);
-        } else if (lp->width == View::WRAP_CONTENT) {
-            childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_AT_MOST);
-        } else {
-            childWidthSpec = View::makeMeasureSpec(lp->width, View::MEASURE_SPEC_EXACTLY);
-        }
-        
-        // Height
-        if (lp->height == View::MATCH_PARENT) {
-            childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_EXACTLY);
-        } else if (lp->height == View::WRAP_CONTENT) {
-            childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_AT_MOST);
-        } else {
-            childHeightSpec = View::makeMeasureSpec(lp->height, View::MEASURE_SPEC_EXACTLY);
-        }
+        int childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight, lp->width);
+        int childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom, lp->height);
         
         child->measure(childWidthSpec, childHeightSpec);
         

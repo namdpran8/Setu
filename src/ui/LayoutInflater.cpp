@@ -16,6 +16,7 @@
 #include "WindowManager.h"
 #include <string>
 #include <cwchar>
+#include "TypedArray.h"
 
 namespace setu {
 
@@ -95,10 +96,10 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         view = std::make_shared<setu::view::RelativeLayout>();
     } else if (tag == "TextView" || tag == "android.widget.TextView" ||
                tag == "androidx.appcompat.widget.AppCompatTextView") {
-        view = std::make_shared<setu::widget::TextView>(resManager, theme, parser, 0x01010084, 0);
+        view = std::make_shared<setu::widget::TextView>(resManager, theme, parser, 0x010100f0, 0);
     } else if (tag == "Button" || tag == "android.widget.Button" ||
                tag == "androidx.appcompat.widget.AppCompatButton") {
-        view = std::make_shared<setu::widget::Button>(resManager, theme, parser, 0x01010048, 0);
+        view = std::make_shared<setu::widget::Button>(resManager, theme, parser, 0x010100ec, 0);
     } else if (tag == "ImageView" || tag == "android.widget.ImageView" || tag == "androidx.appcompat.widget.AppCompatImageView") {
         view = std::make_shared<setu::widget::ImageView>(resManager, theme, parser, 0x01010064, 0);
     } else if (tag == "ImageButton" || tag == "android.widget.ImageButton" || tag == "androidx.appcompat.widget.AppCompatImageButton") {
@@ -141,7 +142,7 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
     }
 
     parseViewAttributes(parser, view, resManager, theme);
-    parseLayoutParams(parser, view, parent);
+    parseLayoutParams(parser, view, parent, resManager, theme);
 
     auto viewGroup = std::dynamic_pointer_cast<setu::view::ViewGroup>(view);
     
@@ -179,14 +180,30 @@ int LayoutInflater::parseDimension(const std::string& dimenStr) {
 }
 
 int LayoutInflater::parseComplexDimension(uint32_t data) {
-    int value = (int)(data >> 8);
-    int unit = data & 0x0F;
-    if (unit == 1) { // dp
+    float value = (float)(int32_t(data) >> android::Res_value::COMPLEX_MANTISSA_SHIFT);
+    int radix = (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
+    const float MANTISSA_MULT = 1.0f / (1 << 8);
+    static const float RADIX_MULTS[] = {
+        1.0f * MANTISSA_MULT,
+        1.0f / (1 << 7) * MANTISSA_MULT,
+        1.0f / (1 << 15) * MANTISSA_MULT,
+        1.0f / (1 << 23) * MANTISSA_MULT
+    };
+    value *= RADIX_MULTS[radix];
+
+    int unit = data & android::Res_value::COMPLEX_UNIT_MASK;
+    if (unit == android::Res_value::COMPLEX_UNIT_DIP) {
         return (int)(value * WindowManager::getDensity());
-    } else if (unit == 2) { // sp
+    } else if (unit == android::Res_value::COMPLEX_UNIT_SP) {
         return (int)(value * WindowManager::getScaledDensity());
+    } else if (unit == android::Res_value::COMPLEX_UNIT_PT) {
+        return (int)(value * WindowManager::getDensity() * (1.0f / 72.0f) * 160.0f);
+    } else if (unit == android::Res_value::COMPLEX_UNIT_IN) {
+        return (int)(value * WindowManager::getDensity() * 160.0f);
+    } else if (unit == android::Res_value::COMPLEX_UNIT_MM) {
+        return (int)(value * WindowManager::getDensity() * (1.0f / 25.4f) * 160.0f);
     }
-    return value; // px or others
+    return (int)value;
 }
 
 void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::shared_ptr<setu::view::View> view, ResourceManager* resManager, Theme* theme) {
@@ -301,7 +318,10 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
                 if (resManager && resManager->resolveValue(val, theme)) {
                     if (val.type >= android::Res_value::TYPE_FIRST_COLOR_INT &&
                         val.type <= android::Res_value::TYPE_LAST_COLOR_INT) {
+                        Logger::d("LayoutInflater", "Resolved background color: 0x" + std::to_string(val.data));
                         view->setBackgroundColor(val.data);
+                    } else {
+                        Logger::d("LayoutInflater", "Resolved background is not a color. Type=" + std::to_string(val.type));
                     }
                 }
             }
@@ -319,7 +339,7 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
     }
 }
 
-void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::shared_ptr<setu::view::View> view, std::shared_ptr<setu::view::ViewGroup> parent) {
+void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::shared_ptr<setu::view::View> view, std::shared_ptr<setu::view::ViewGroup> parent, ResourceManager* resManager, Theme* theme) {
     std::shared_ptr<setu::view::View::LayoutParams> lp;
     if (parent) {
         lp = parent->generateLayoutParams(parser);
@@ -327,9 +347,41 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
         lp = std::make_shared<setu::view::View::LayoutParams>(setu::view::View::WRAP_CONTENT, setu::view::View::WRAP_CONTENT);
     }
 
+    if (resManager) {
+        std::vector<uint32_t> styleables = {
+            0x010100f4, // layout_width (0)
+            0x010100f5, // layout_height (1)
+            0x010100f6, // layout_margin (2)
+            0x010100f7, // layout_marginLeft (3)
+            0x010100f8, // layout_marginTop (4)
+            0x010100f9, // layout_marginRight (5)
+            0x010100fa  // layout_marginBottom (6)
+        };
+        TypedArray a(resManager, styleables);
+        a.obtainStyledAttributes(theme, parser, 0, 0);
+        
+        if (a.hasValue(0)) lp->width = a.getLayoutDimension(0, lp->width);
+        if (a.hasValue(1)) lp->height = a.getLayoutDimension(1, lp->height);
+        
+        int margin = a.getDimensionPixelSize(2, -1);
+        if (margin >= 0) {
+            lp->leftMargin = lp->topMargin = lp->rightMargin = lp->bottomMargin = margin;
+        }
+        if (a.hasValue(3)) lp->leftMargin = a.getDimensionPixelSize(3, lp->leftMargin);
+        if (a.hasValue(4)) lp->topMargin = a.getDimensionPixelSize(4, lp->topMargin);
+        if (a.hasValue(5)) lp->rightMargin = a.getDimensionPixelSize(5, lp->rightMargin);
+        if (a.hasValue(6)) lp->bottomMargin = a.getDimensionPixelSize(6, lp->bottomMargin);
+    }
+
     auto parseDim = [&](size_t idx) {
         int type = parser->getAttributeDataType(idx);
         uint32_t data = parser->getAttributeData(idx);
+        if (type == android::Res_value::TYPE_REFERENCE) {
+            if (resManager) {
+                return (int)resManager->resolveDimension(data);
+            }
+            return 0;
+        }
         if (type == android::Res_value::TYPE_DIMENSION) {
             return LayoutInflater::parseComplexDimension(data);
         }
@@ -348,6 +400,10 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
         std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
         uint32_t resId = parser->getAttributeNameResID(i);
         
+        int type = parser->getAttributeDataType(i);
+        uint32_t data = parser->getAttributeData(i);
+        Logger::d("LayoutInflater", "Attribute: " + attrName + " resId: " + std::to_string(resId) + " type: " + std::to_string(type) + " data: " + std::to_string(data));
+
         if (attrName == "layout_width" || resId == 0x010100f4) {
             int type = parser->getAttributeDataType(i);
             uint32_t data = parser->getAttributeData(i);
@@ -358,6 +414,7 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
             } else {
                 lp->width = parseDim(i);
             }
+            Logger::d("LayoutInflater", "Parsed layout_width for tag: " + std::string(attrName) + " val: " + std::to_string(lp->width) + " type: " + std::to_string(type));
             continue;  // Important: skip to next attribute
         } else if (attrName == "layout_height" || resId == 0x010100f5) {
             int type = parser->getAttributeDataType(i);

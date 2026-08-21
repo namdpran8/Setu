@@ -8,6 +8,8 @@
 #include "../widget/Button.h"
 #include "../widget/EditText.h"
 #include "Interpreter.h" // For recursive Interpreter execution
+#include <windows.h>
+#include <shellapi.h>
 
 std::unordered_map<std::string, StubFunc> StubRegistry::stubs;
 setu::ResourceManager* StubRegistry::m_resManager = nullptr;
@@ -73,6 +75,8 @@ void StubRegistry::init(setu::ResourceManager* resManager, MultiDexManager* mult
 bool StubRegistry::isStubbed(const std::string& methodSignature) {
     if (stubs.find(methodSignature) != stubs.end()) return true;
     if (methodSignature == "Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V") return true;
+    if (methodSignature == "Landroid/content/Intent;-><init>(Ljava/lang/String;Landroid/net/Uri;)V") return true;
+    if (methodSignature == "Landroid/net/Uri;->parse(Ljava/lang/String;)Landroid/net/Uri;") return true;
     if (methodSignature.find("->startActivity(Landroid/content/Intent;)V") != std::string::npos) return true;
     if (methodSignature.find("->setContentView(I)V") != std::string::npos) return true;
     if (methodSignature.find("->findViewById(I)Landroid/view/View;") != std::string::npos) return true;
@@ -139,7 +143,29 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                     }
                 }
             }
-            return false; // Return false means NO exception thrown
+            return false;
+        }
+        if (methodSignature == "Landroid/content/Intent;-><init>(Ljava/lang/String;Landroid/net/Uri;)V") {
+            Logger::i("StubRegistry", "Executed: Intent.<init>(String, Uri)");
+            if (args.size() >= 3 && args[0].type == ValueType::OBJECT && args[2].type == ValueType::OBJECT) {
+                InterpreterObject* intentObj = (InterpreterObject*)args[0].obj;
+                InterpreterObject* uriObj = (InterpreterObject*)args[2].obj;
+                if (intentObj && uriObj) {
+                    intentObj->fields["action"] = args[1];
+                    intentObj->fields["uri"] = args[2];
+                }
+            }
+            return false;
+        }
+        if (methodSignature == "Landroid/net/Uri;->parse(Ljava/lang/String;)Landroid/net/Uri;") {
+            Logger::i("StubRegistry", "Executed: Uri.parse(String)");
+            if (args.size() >= 1 && args[0].type == ValueType::OBJECT) {
+                InterpreterObject* uriObj = new InterpreterObject();
+                uriObj->className = "Landroid/net/Uri;";
+                uriObj->fields["uriString"] = args[0];
+                if (outReturn) *outReturn = Value::MakeObject(uriObj);
+            }
+            return false;
         }
         if (methodSignature.find("->startActivity(Landroid/content/Intent;)V") != std::string::npos) {
             Logger::i("StubRegistry", "Executed: startActivity(Intent)");
@@ -178,6 +204,22 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                                 }
                             } else {
                                 Logger::w("StubRegistry", "Could not find <init> for " + targetClassName);
+                            }
+                        }
+                    } else if (intentObj->fields.find("uri") != intentObj->fields.end() && intentObj->fields["uri"].type == ValueType::OBJECT) {
+                        InterpreterObject* uriObj = (InterpreterObject*)intentObj->fields["uri"].obj;
+                        if (uriObj && uriObj->fields.find("uriString") != uriObj->fields.end() && uriObj->fields["uriString"].type == ValueType::OBJECT) {
+                            InterpreterObject* strObj = (InterpreterObject*)uriObj->fields["uriString"].obj;
+                            if (strObj) {
+                                std::string url = strObj->className; // Wait, string's value is usually stored differently? 
+                                // Actually, in our stub strings are sometimes just objects where className holds the string, or we have a special string class. 
+                                // Let's check how string is extracted.
+                                // It seems strObj->className is used for targetClass above: std::string targetClassName = strObj->className;
+                                // Wait, a String object usually has its data in a special field or we use className for it in this mock engine?
+                                // Assuming className holds the string based on line 152: std::string targetClassName = strObj->className;
+                                std::string urlToOpen = strObj->className;
+                                Logger::i("StubRegistry", "Opening URL: " + urlToOpen);
+                                ShellExecuteA(0, 0, urlToOpen.c_str(), 0, 0, SW_SHOW);
                             }
                         }
                     }
@@ -274,9 +316,62 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             return false;
         }
         if (methodSignature.find("Ljava/lang/StringBuilder;->") != std::string::npos) {
-            if (outReturn) {
-                if (methodSignature.find("->toString") != std::string::npos) *outReturn = Value::MakeNull();
-                else *outReturn = args.size() > 0 ? args[0] : Value::MakeNull();
+            if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                InterpreterObject* sb = (InterpreterObject*)args[0].obj;
+                
+                if (methodSignature.find("-><init>") != std::string::npos) {
+                    InterpreterObject* inner = new InterpreterObject();
+                    inner->className = ""; // Start empty
+                    if (args.size() >= 2) {
+                        // <init>(String)
+                        if (args[1].type == ValueType::OBJECT && args[1].obj) {
+                            InterpreterObject* str = (InterpreterObject*)args[1].obj;
+                            if (str->fields.count("string_value")) {
+                                InterpreterObject* strInner = (InterpreterObject*)str->fields["string_value"].obj;
+                                if (strInner) inner->className = strInner->className;
+                            }
+                        }
+                    }
+                    sb->fields["string_value"] = Value::MakeObject(inner);
+                }
+                else if (methodSignature.find("->append") != std::string::npos) {
+                    if (args.size() >= 2 && sb->fields.count("string_value")) {
+                        InterpreterObject* inner = (InterpreterObject*)sb->fields["string_value"].obj;
+                        if (inner) {
+                            std::string toAppend = "";
+                            if (args[1].type == ValueType::OBJECT && args[1].obj) {
+                                InterpreterObject* argObj = (InterpreterObject*)args[1].obj;
+                                if ((argObj->className == "Ljava/lang/String;" || argObj->className == "java.lang.String") && argObj->fields.count("string_value")) {
+                                    toAppend = ((InterpreterObject*)argObj->fields["string_value"].obj)->className;
+                                } else {
+                                    toAppend = argObj->className; // Fallback
+                                }
+                            } else if (args[1].type == ValueType::INT) {
+                                toAppend = std::to_string(args[1].i);
+                            } else if (args[1].type == ValueType::FLOAT) {
+                                toAppend = std::to_string(args[1].f);
+                            }
+                            inner->className += toAppend;
+                        }
+                    }
+                    if (outReturn) *outReturn = args[0];
+                }
+                else if (methodSignature.find("->toString") != std::string::npos) {
+                    if (outReturn) {
+                        InterpreterObject* strObj = new InterpreterObject();
+                        strObj->className = "Ljava/lang/String;";
+                        InterpreterObject* innerStr = new InterpreterObject();
+                        if (sb->fields.count("string_value")) {
+                            InterpreterObject* inner = (InterpreterObject*)sb->fields["string_value"].obj;
+                            if (inner) innerStr->className = inner->className;
+                        }
+                        strObj->fields["string_value"] = Value::MakeObject(innerStr);
+                        *outReturn = Value::MakeObject(strObj);
+                    }
+                }
+            } else {
+                // Failsafe
+                if (outReturn) *outReturn = Value::MakeNull();
             }
             return false;
         }

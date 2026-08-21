@@ -22,6 +22,7 @@ public:
     float getFloat(int index, float defValue) const;
     uint32_t getColor(int index, uint32_t defValue) const;
     int getDimensionPixelSize(int index, int defValue) const;
+    int getLayoutDimension(int index, int defValue) const;
     std::string getString(int index) const;
 
 private:

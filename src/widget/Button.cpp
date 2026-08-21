@@ -4,6 +4,8 @@
 #include "../ui/TypedArray.h"
 #include "../ui/WindowManager.h"
 #include "../utils/Logger.h"
+#include <sstream>
+#include <iomanip>
 
 namespace setu {
 namespace widget {
@@ -69,8 +71,10 @@ void Button::onDraw(graphics::Canvas& canvas) {
     if (size_needed > 0) {
         textUtf8.resize(size_needed);
         WideCharToMultiByte(CP_UTF8, 0, getText().c_str(), (int)getText().size(), &textUtf8[0], size_needed, NULL, NULL);
-        Logger::d("Button", "Drawing text: '" + textUtf8 + "' color=0x" + std::to_string(mTextPaint.getColor()) + 
-                  " at (" + std::to_string((float)getLeft()) + "," + std::to_string((float)getTop()) + ")");
+        std::stringstream ss;
+        ss << "Drawing text: '" << textUtf8 << "' color=0x" << std::hex << mTextPaint.getColor() 
+           << " at (" << std::dec << (float)getLeft() << "," << (float)getTop() << ")";
+        Logger::d("Button", ss.str());
     }
     
     // Draw text using TextView's implementation
@@ -81,15 +85,18 @@ void Button::onDraw(graphics::Canvas& canvas) {
 
 bool Button::onTouchEvent(view::MotionEvent& event) {
     if (event.getAction() == view::MotionEvent::Action::DOWN) {
+        Logger::d("Button", "Action::DOWN received");
         mBackgroundPaint.setColor(0xFF3700B3); // Darker purple when pressed
         InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
         return true;
     } else if (event.getAction() == view::MotionEvent::Action::UP) {
+        Logger::d("Button", "Action::UP received, performing click");
         mBackgroundPaint.setColor(0xFF6200EE); // Restore original purple
         InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
         performClick();
         return true;
     } else if (event.getAction() == view::MotionEvent::Action::CANCEL) {
+        Logger::d("Button", "Action::CANCEL received");
         mBackgroundPaint.setColor(0xFF6200EE); // Restore original purple
         InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
         return true;

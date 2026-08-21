@@ -30,8 +30,9 @@ TextView::TextView(ResourceManager* resManager, Theme* theme, android::ResXMLPar
         static const uint32_t attr_textSize = 0x01010095;
         static const uint32_t attr_textColor = 0x01010098;
         static const uint32_t attr_gravity = 0x010100af;
+        static const uint32_t attr_ems = 0x01010158;
         
-        std::vector<uint32_t> styleables = { attr_text, attr_textSize, attr_textColor, attr_gravity };
+        std::vector<uint32_t> styleables = { attr_text, attr_textSize, attr_textColor, attr_gravity, attr_ems };
         TypedArray a(resManager, styleables);
         a.obtainStyledAttributes(theme, parser, defStyleAttr, defStyleRes);
         
@@ -39,6 +40,7 @@ TextView::TextView(ResourceManager* resManager, Theme* theme, android::ResXMLPar
         if (a.hasValue(1)) setTextSize((float)a.getDimensionPixelSize(1, 16));
         if (a.hasValue(2)) setTextColor(a.getColor(2, 0xFF000000));
         if (a.hasValue(3)) mGravity = a.getInt(3, 0x33);
+        if (a.hasValue(4)) mEms = a.getInt(4, -1);
     }
 }
 
@@ -118,8 +120,12 @@ void TextView::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         SelectObject(hdc, old);
         DeleteObject(hFont);
         ReleaseDC(nullptr, hdc);
-        desiredWidth = size.cx;
-        desiredHeight = size.cy;
+        desiredWidth = size.cx + mPaddingLeft + mPaddingRight;
+        desiredHeight = size.cy + mPaddingTop + mPaddingBottom;
+    }
+
+    if (mEms > 0) {
+        desiredWidth = (int)(mTextPaint.getTextSize() * 0.6f * mEms) + mPaddingLeft + mPaddingRight;
     }
 
     int widthMode = getMode(widthMeasureSpec);

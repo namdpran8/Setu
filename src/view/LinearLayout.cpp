@@ -27,34 +27,20 @@ void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int childWidthSpec, childHeightSpec;
         
         if (isVertical) {
-            childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_AT_MOST);
-            
-            if (lp->height == View::MATCH_PARENT) {
-                childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_EXACTLY);
-            } else if (lp->height == View::WRAP_CONTENT) {
-                childHeightSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
-            } else {
-                childHeightSpec = View::makeMeasureSpec(lp->height, View::MEASURE_SPEC_EXACTLY);
-            }
-            
+            childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin, lp->width);
             if (lp->weight > 0) {
                 totalWeight += lp->weight;
                 childHeightSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
+            } else {
+                childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
             }
         } else {
-            childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_AT_MOST);
-            
-            if (lp->width == View::MATCH_PARENT) {
-                childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_EXACTLY);
-            } else if (lp->width == View::WRAP_CONTENT) {
-                childWidthSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
-            } else {
-                childWidthSpec = View::makeMeasureSpec(lp->width, View::MEASURE_SPEC_EXACTLY);
-            }
-            
+            childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
             if (lp->weight > 0) {
                 totalWeight += lp->weight;
                 childWidthSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
+            } else {
+                childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin, lp->width);
             }
         }
         
@@ -80,7 +66,7 @@ void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                 if (lp && lp->weight > 0) {
                     int childHeight = (remaining * lp->weight) / totalWeight;
                     int childHeightSpec = View::makeMeasureSpec(childHeight, View::MEASURE_SPEC_EXACTLY);
-                    int childWidthSpec = View::makeMeasureSpec(widthSize - mPaddingLeft - mPaddingRight, View::MEASURE_SPEC_AT_MOST);
+                    int childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin, lp->width);
                     child->measure(childWidthSpec, childHeightSpec);
                     usedSize += childHeight + lp->topMargin + lp->bottomMargin;
                     maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
@@ -96,7 +82,7 @@ void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                 if (lp && lp->weight > 0) {
                     int childWidth = (remaining * lp->weight) / totalWeight;
                     int childWidthSpec = View::makeMeasureSpec(childWidth, View::MEASURE_SPEC_EXACTLY);
-                    int childHeightSpec = View::makeMeasureSpec(heightSize - mPaddingTop - mPaddingBottom, View::MEASURE_SPEC_AT_MOST);
+                    int childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
                     child->measure(childWidthSpec, childHeightSpec);
                     usedSize += childWidth + lp->leftMargin + lp->rightMargin;
                     maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);

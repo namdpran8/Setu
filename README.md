@@ -48,3 +48,15 @@ Setu is built using **CMake** and C++17. It requires a Windows environment due t
 ## 📝 License
 
 This project is for educational and experimental purposes.
+
+---
+
+## 🙏 Acknowledgments
+
+Setu leverages several open-source projects located in the `thirdparty/` folder. We would like to acknowledge and thank the contributors and maintainers of the following:
+
+* **[Android Open Source Project (AOSP)](https://source.android.com/)**: For the foundational components including ART (Android Runtime) structures, `libbase`, `libziparchive`, and `androidfw` which are used heavily for DEX execution and APK resource parsing.
+* **[fmt](https://github.com/fmtlib/fmt)**: A modern, safe, and fast formatting library for C++.
+* **[miniz](https://github.com/richgel999/miniz)**: A lightweight, drop-in replacement for zlib, used for ZIP and APK extraction.
+* **[zlib](https://zlib.net/)**: The widely-used general-purpose data compression library.
+* **[ConstraintLayout](https://github.com/androidx/constraintlayout)**: Core solver engine implementations utilized for mimicking complex Android layout structures natively on Windows.

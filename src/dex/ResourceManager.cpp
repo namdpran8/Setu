@@ -41,12 +41,20 @@ bool ResourceManager::init(const std::string& apkPath) {
     config.density = (uint16_t)(WindowManager::getDensity() * 160);
     config.screenWidthDp = 411;   // Reasonable phone default
     config.screenHeightDp = 731;
-    config.sdkVersion = 34;       // Target Android 14
+    config.sdkVersion = 33;       // Target Android 13
+    config.orientation = android::ResTable_config::ORIENTATION_PORT;
     
     m_assetManager = std::make_unique<android::AssetManager2>();
-    std::span<const android::AssetManager2::ApkAssetsPtr> span_assets(m_apkAssets.data(), m_apkAssets.size()); m_assetManager->SetApkAssets(span_assets);
     m_assetManager->SetConfigurations({{config}});
+
+    std::span<const android::AssetManager2::ApkAssetsPtr> span_assets(m_apkAssets.data(), m_apkAssets.size());
+    m_assetManager->SetApkAssets(span_assets);
     
+    Logger::i("ResourceManager", "Config: density=" + std::to_string(config.density) + 
+                                 ", screenWidthDp=" + std::to_string(config.screenWidthDp) +
+                                 ", screenHeightDp=" + std::to_string(config.screenHeightDp) +
+                                 ", sdkVersion=" + std::to_string(config.sdkVersion) +
+                                 ", orientation=" + std::to_string(config.orientation));
     Logger::i("ResourceManager", "Successfully initialized AssetManager2 for app.");
     return true;
 }
@@ -98,11 +106,12 @@ static float complexToDimension(uint32_t data) {
     int radix = (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
 
     // Apply radix scaling (AOSP uses fixed-point: 23p0, 16p7, 8p15, 0p23)
+    const float MANTISSA_MULT = 1.0f / (1 << 8);
     static const float RADIX_MULTS[] = {
-        1.0f,                    // 23p0
-        1.0f / (1 << 7),         // 16p7
-        1.0f / (1 << 15),        // 8p15
-        1.0f / (1 << 23)         // 0p23
+        1.0f * MANTISSA_MULT,                    // 23p0
+        1.0f / (1 << 7) * MANTISSA_MULT,         // 16p7
+        1.0f / (1 << 15) * MANTISSA_MULT,        // 8p15
+        1.0f / (1 << 23) * MANTISSA_MULT         // 0p23
     };
     value *= RADIX_MULTS[radix];
 
@@ -132,15 +141,26 @@ float ResourceManager::resolveDimension(uint32_t resId) {
     auto res = m_assetManager->GetResource(resId);
     if (!res.has_value()) return 0.0f;
     
-    if (res->type == android::Res_value::TYPE_DIMENSION) {
-        return complexToDimension(res->data);
-    } else if (res->type == android::Res_value::TYPE_FLOAT) {
+    android::AssetManager2::SelectedValue val;
+    val.type = res->type;
+    val.data = res->data;
+    val.cookie = res->cookie;
+    val.flags = res->flags;
+    val.resid = resId;
+
+    if (!resolveValue(val, nullptr)) {
+        return 0.0f;
+    }
+
+    if (val.type == android::Res_value::TYPE_DIMENSION) {
+        return complexToDimension(val.data);
+    } else if (val.type == android::Res_value::TYPE_FLOAT) {
         union { uint32_t i; float f; } u;
-        u.i = res->data;
+        u.i = val.data;
         return u.f;
-    } else if (res->type >= android::Res_value::TYPE_FIRST_INT &&
-               res->type <= android::Res_value::TYPE_LAST_INT) {
-        return (float)res->data;
+    } else if (val.type >= android::Res_value::TYPE_FIRST_INT &&
+               val.type <= android::Res_value::TYPE_LAST_INT) {
+        return (float)val.data;
     }
     return 0.0f;
 }

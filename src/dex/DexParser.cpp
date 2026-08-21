@@ -244,7 +244,10 @@ DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& 
         return {};
     }
 
-    Logger::w("DexParser", "Class " + className + " not found in DEX.");
+    // Suppress warnings for standard Android and Java classes
+    if (className.find("Ljava/") != 0 && className.find("Landroid/") != 0 && className.find("Ldalvik/") != 0) {
+        Logger::w("DexParser", "Class " + className + " not found in DEX.");
+    }
     return {};
 }
 

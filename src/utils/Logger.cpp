@@ -37,6 +37,9 @@ void Logger::setLevel(LogLevel level) {
 }
 
 void Logger::d(const std::string& tag, const std::string& message) {
+    if (tag == "Interpreter" && !message.empty() && message[0] == '[') {
+        return; // Silence instruction-level tracing to prevent I/O bottlenecks
+    }
     log(LogLevel::DEBUG, tag, message);
 }
 

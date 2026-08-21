@@ -153,18 +153,32 @@ int TypedArray::getDimensionPixelSize(int index, int defValue) const {
     if (type == ::android::Res_value::TYPE_REFERENCE) return defValue;
     
     if (type == ::android::Res_value::TYPE_DIMENSION) {
-        int value = (int)(data >> 8);
-        int unit = data & 0x0F;
-        if (unit == 1 || unit == 2) { // dp or sp
-            return value * 2; // naive 2.0 density
-        }
-        return value;
+        return LayoutInflater::parseComplexDimension(data);
     }
     
     if (type >= ::android::Res_value::TYPE_FIRST_INT && type <= ::android::Res_value::TYPE_LAST_INT) {
         return (int)data; // fallback for plain integers
     }
     
+    return defValue;
+}
+
+int TypedArray::getLayoutDimension(int index, int defValue) const {
+    if (!hasValue(index)) return defValue;
+    uint8_t type = m_values[index].dataType;
+    uint32_t data = m_values[index].data;
+    if (type == ::android::Res_value::TYPE_REFERENCE) return defValue;
+    if (type == ::android::Res_value::TYPE_INT_DEC) {
+        return (int)data; // MATCH_PARENT or WRAP_CONTENT
+    }
+    if (type == ::android::Res_value::TYPE_DIMENSION) {
+        if (m_resManager) {
+            // Re-use complexToDimension logic if we want to be accurate, but resolveDimension takes resId.
+            // Oh wait, we already resolved it, so we can't use resolveDimension.
+            // But we can just use getDimensionPixelSize.
+        }
+        return getDimensionPixelSize(index, defValue);
+    }
     return defValue;
 }
 
