@@ -15,4 +15,5 @@ add_library(setu_zlib STATIC
     uncompr.c
     zutil.c
 )
-target_include_directories(setu_zlib PUBLIC .)
+configure_file(zconf.h.in ${CMAKE_CURRENT_BINARY_DIR}/zconf.h COPYONLY)
+target_include_directories(setu_zlib PUBLIC . ${CMAKE_CURRENT_BINARY_DIR})
