@@ -619,9 +619,7 @@ SolverVariable* ArrayRow::getKey() {
 
 /// ArrayRow.java:776 — public void updateFromSystem(LinearSystem system)
 void ArrayRow::updateFromSystem(LinearSystem* system) {
-    if (system->getNumEquations() == 0) {
-        return;
-    }
+
 
     bool done = false;
     while (!done) {

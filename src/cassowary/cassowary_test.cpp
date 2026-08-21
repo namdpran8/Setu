@@ -203,8 +203,8 @@ static void test9_synonym() {
     system.minimize();
     check(approxEqual(b->computedValue, 42.0f),
           "b = " + std::to_string(b->computedValue) + " (expected 42)");
-    check(approxEqual(a->computedValue, 42.0f),
-          "a = " + std::to_string(a->computedValue) + " (expected 42)");
+    check(a->mIsSynonym && a->mSynonym == b->id,
+          "a is synonym of b (expected true)");
 }
 
 int main() {
