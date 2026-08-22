@@ -160,16 +160,35 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    std::string apkPath;
+
     if (launchArgs.package.empty()) {
-        std::cerr << "Usage: setu_runtime.exe --package=<name> [--log-level=<level>]" << std::endl;
-        return 1;
+        OPENFILENAMEA ofn;
+        char szFile[MAX_PATH] = { 0 };
+        ZeroMemory(&ofn, sizeof(ofn));
+        ofn.lStructSize = sizeof(ofn);
+        ofn.hwndOwner = NULL;
+        ofn.lpstrFile = szFile;
+        ofn.nMaxFile = sizeof(szFile);
+        ofn.lpstrFilter = "APK Files\0*.apk\0All Files\0*.*\0";
+        ofn.nFilterIndex = 1;
+        ofn.lpstrFileTitle = NULL;
+        ofn.nMaxFileTitle = 0;
+        ofn.lpstrInitialDir = NULL;
+        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+
+        if (GetOpenFileNameA(&ofn) == TRUE) {
+            apkPath = ofn.lpstrFile;
+        } else {
+            return 0;
+        }
+    } else {
+        const char* localAppData = getenv("LOCALAPPDATA");
+        std::string cacheDir = std::string(localAppData ? localAppData : "") + "\\Setu\\apps\\" + launchArgs.package;
+        apkPath = cacheDir + "\\base.apk";
     }
 
     Logger::setConfiguredLevel(launchArgs.logLevel);
-
-    const char* localAppData = getenv("LOCALAPPDATA");
-    std::string cacheDir = std::string(localAppData ? localAppData : "") + "\\Setu\\apps\\" + launchArgs.package;
-    std::string apkPath = cacheDir + "\\base.apk";
 
     std::string lowerApk = apkPath;
     std::transform(lowerApk.begin(), lowerApk.end(), lowerApk.begin(), ::tolower);

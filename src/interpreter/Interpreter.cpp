@@ -160,26 +160,28 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 
                 Value& val = state.registers[aa];
                 bool castOk = false;
+                std::string actualType = "";
                 
                 if (val.type == ValueType::NULL_TYPE || (val.type == ValueType::OBJECT && val.obj == nullptr)) {
                     // null can be cast to any reference type
                     castOk = true;
                 } else if (val.type == ValueType::OBJECT && val.obj) {
                     InterpreterObject* obj = static_cast<InterpreterObject*>(val.obj);
-                    std::string actualType = obj->className;
+                    actualType = obj->className;
                     
                     // Simple type checking: exact match or java.lang.Object
                     if (expectedType == actualType || expectedType == "Ljava/lang/Object;") {
                         castOk = true;
                     } else if (actualType.find("Activity") != std::string::npos && expectedType.find("Context") != std::string::npos) {
                         castOk = true;
-                    } else if (actualType.find("TextView") != std::string::npos && expectedType.find("View") != std::string::npos) {
-                        castOk = true;
-                    } else if (actualType.find("EditText") != std::string::npos && expectedType.find("TextView") != std::string::npos) {
-                        castOk = true;
-                    } else if (actualType.find("Button") != std::string::npos && expectedType.find("View") != std::string::npos) {
-                        castOk = true;
                     } else if (expectedType == "Ljava/lang/CharSequence;" && actualType == "java.lang.String") {
+                        castOk = true;
+                    } else if (expectedType.find("android/view/") != std::string::npos || 
+                               expectedType.find("android/widget/") != std::string::npos ||
+                               expectedType.find("androidx/") != std::string::npos ||
+                               expectedType.find("com/google/android/material/") != std::string::npos) {
+                        // In our stubbed UI environment, allow casting generic Views to specific types
+                        // since we only instantiate generic Button/TextView/ViewGroup
                         castOk = true;
                     }
                 } else if (val.type == ValueType::ARRAY && val.obj) {
@@ -195,7 +197,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     cce->className = "java.lang.ClassCastException";
                     state.pendingException = cce;
                     isRunning = false; // Unwind to caller
-                    Logger::d("Interpreter", "[0x1F] check-cast FAILED: cannot cast to " + expectedType);
+                    Logger::e("Interpreter", "check-cast FAILED: cannot cast " + actualType + " to " + expectedType);
                 }
                 
                 state.pc += 3; // Format 21c is 4 bytes
