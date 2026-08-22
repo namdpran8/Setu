@@ -531,6 +531,32 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             return false;
         }
 
+        if (methodSignature.find("->getStackTrace()[Ljava/lang/StackTraceElement;") != std::string::npos) {
+            ArrayObject* arr = new ArrayObject();
+            for (int i = 0; i < 15; ++i) {
+                InterpreterObject* elem = new InterpreterObject();
+                elem->className = "Ljava/lang/StackTraceElement;";
+                arr->elements.push_back(Value::MakeObject(elem));
+            }
+            if (outReturn) *outReturn = Value::MakeArray(arr);
+            return false;
+        }
+
+        if (methodSignature == "Ljava/lang/StackTraceElement;->getClassName()Ljava/lang/String;") {
+            InterpreterObject* strObj = new InterpreterObject();
+            strObj->className = "Ljava/lang/String;";
+            if (outReturn) *outReturn = Value::MakeObject(strObj);
+            return false;
+        }
+
+        if (methodSignature == "Ljava/lang/StackTraceElement;->getMethodName()Ljava/lang/String;" || 
+            methodSignature == "Ljava/lang/StackTraceElement;->getFileName()Ljava/lang/String;") {
+            InterpreterObject* strObj = new InterpreterObject();
+            strObj->className = "Ljava/lang/String;";
+            if (outReturn) *outReturn = Value::MakeObject(strObj);
+            return false;
+        }
+
         Logger::w("StubRegistry", "Unimplemented stub: " + methodSignature);
         // We do not throw an exception here just because it's a stub missing, 
         // we'll just return false (no exception thrown) and ignore it for now.
