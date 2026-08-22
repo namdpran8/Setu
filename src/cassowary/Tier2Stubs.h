@@ -3,15 +3,9 @@
 #include "ConstraintWidget.h"
 #include <set>
 
+#include "Guideline.h"
+
 namespace setu::cassowary {
-    
-class Guideline : public ConstraintWidget {
-public:
-    static constexpr int HORIZONTAL = 0;
-    static constexpr int VERTICAL = 1;
-    virtual ~Guideline() = default;
-    int getOrientation() const { return HORIZONTAL; }
-};
 
 class Barrier : public ConstraintWidget {
 public:

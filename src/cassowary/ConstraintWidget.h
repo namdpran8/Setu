@@ -378,7 +378,8 @@ public:
     int getHorizontalChainStyle() const;
     void setVerticalChainStyle(int verticalChainStyle);
     int getVerticalChainStyle() const;
-    bool allowedInBarrier() const;
+public:
+    virtual bool allowedInBarrier() const;
 
     void immediateConnect(int startType, ConstraintWidget* target, int endType, int margin, int goneMargin);
     void connect(ConstraintAnchor* from, ConstraintAnchor* to, int margin);
@@ -388,8 +389,8 @@ public:
     void resetAllConstraints();
     void resetAnchor(ConstraintAnchor* anchor);
     void resetAnchors();
-    ConstraintAnchor* getAnchor(int anchorType);
-    ConstraintAnchor* getAnchor(ConstraintAnchor::Type anchorType) {
+    virtual ConstraintAnchor* getAnchor(int anchorType);
+    virtual ConstraintAnchor* getAnchor(ConstraintAnchor::Type anchorType) {
         return getAnchor(static_cast<int>(anchorType));
     }
 
@@ -410,7 +411,7 @@ private:
     bool isChainHead(int orientation) const;
 
 public:
-    void addToSolver(LinearSystem* system, bool optimize);
+    virtual void addToSolver(LinearSystem* system, bool optimize);
     bool addFirst() const;
     void setupDimensionRatio(bool hParentWrapContent, bool vParentWrapContent, bool horizontalDimensionFixed, bool verticalDimensionFixed);
 
@@ -418,7 +419,7 @@ private:
     void applyConstraints(LinearSystem* system, bool isHorizontal, bool parentWrapContent, bool oppositeParentWrapContent, bool isTerminal, void* parentMin, void* parentMax, DimensionBehaviour dimensionBehaviour, bool wrapContent, ConstraintAnchor* beginAnchor, ConstraintAnchor* endAnchor, int beginPosition, int dimension, int minDimension, int maxDimension, float bias, bool useRatio, bool oppositeVariable, bool inChain, bool oppositeInChain, bool inBarrier, int matchConstraintDefault, int oppositeMatchConstraintDefault, int matchMinDimension, int matchMaxDimension, float matchPercentDimension, bool applyPosition);
 
 public:
-    void updateFromSolver(LinearSystem* system, bool optimize);
+    virtual void updateFromSolver(LinearSystem* system, bool optimize);
     void copy(ConstraintWidget* src, std::unordered_map<ConstraintWidget*, ConstraintWidget*>& map);
     virtual void updateFromRuns(bool updateHorizontal, bool updateVertical);
     void addChildrenToSolverByDependency(ConstraintWidgetContainer* container, LinearSystem* system, std::unordered_set<ConstraintWidget*>& widgets, int orientation, bool addSelf);

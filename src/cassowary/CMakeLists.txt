@@ -12,6 +12,7 @@ add_library(cassowary STATIC
     ConstraintWidget.cpp
     WidgetContainer.cpp
     ConstraintWidgetContainer.cpp
+    Guideline.cpp
 )
 
 target_include_directories(cassowary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
