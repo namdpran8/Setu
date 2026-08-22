@@ -229,6 +229,57 @@ void test6_guideline() {
     check_eq(ptrA->getX(), 300, "A x");
 }
 
+#include "Barrier.h"
+
+void test7_barrier() {
+    std::cout << "Test 7: Barrier (Right of A and B)" << std::endl;
+    
+    ConstraintWidgetContainer root;
+    root.setX(0);
+    root.setY(0);
+    root.setWidth(1000);
+    root.setHeight(1000);
+
+    auto a = std::make_unique<ConstraintWidget>(100, 50);
+    a->setDebugName("A");
+    a->mLeft.connect(&root.mLeft, 50);
+
+    auto b = std::make_unique<ConstraintWidget>(200, 50);
+    b->setDebugName("B");
+    b->mLeft.connect(&root.mLeft, 100);
+
+    auto barrier = std::make_unique<Barrier>();
+    barrier->setBarrierType(Barrier::RIGHT);
+    barrier->add(a.get());
+    barrier->add(b.get());
+
+    auto c = std::make_unique<ConstraintWidget>(100, 50);
+    c->setDebugName("C");
+    // Connect C's left to the barrier
+    c->mLeft.connect(&barrier->mRight, 0);
+
+    ConstraintWidget* ptrA = a.get();
+    ConstraintWidget* ptrB = b.get();
+    ConstraintWidget* ptrC = c.get();
+    Barrier* ptrBarrier = barrier.get();
+
+    root.add(std::move(a));
+    root.add(std::move(b));
+    root.add(std::move(barrier));
+    root.add(std::move(c));
+
+    root.layout();
+
+    std::cout << "A X: " << ptrA->getX() << " Right: " << ptrA->getX() + ptrA->getWidth() << std::endl;
+    std::cout << "B X: " << ptrB->getX() << " Right: " << ptrB->getX() + ptrB->getWidth() << std::endl;
+    std::cout << "C X: " << ptrC->getX() << std::endl;
+    std::cout << "Barrier Left: " << ptrBarrier->getLeft() << " Right: " << ptrBarrier->getRight() << std::endl;
+
+    // Since B's right is 300 and A's right is 150, the barrier (RIGHT) should be at max(150, 300) = 300.
+    // C is anchored to the barrier, so C's X should be 300.
+    check_eq(ptrC->getX(), 300, "C x (after barrier)");
+}
+
 int main() {
     std::cout << "=== Cassowary Tier 2 Widget Tests ===" << std::endl;
     
@@ -238,6 +289,7 @@ int main() {
     test4_horizontal_bias();
     // test5_horizontal_chain(); // TODO: Implement Chain logic in the engine
     test6_guideline();
+    test7_barrier();
     
     std::cout << "=== All tests passed! ===" << std::endl;
     return 0;

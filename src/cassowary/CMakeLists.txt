@@ -13,6 +13,8 @@ add_library(cassowary STATIC
     WidgetContainer.cpp
     ConstraintWidgetContainer.cpp
     Guideline.cpp
+    HelperWidget.cpp
+    Barrier.cpp
 )
 
 target_include_directories(cassowary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

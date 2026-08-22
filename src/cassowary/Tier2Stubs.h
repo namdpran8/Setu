@@ -5,13 +5,9 @@
 
 #include "Guideline.h"
 
-namespace setu::cassowary {
+#include "Barrier.h"
 
-class Barrier : public ConstraintWidget {
-public:
-    virtual ~Barrier() = default;
-    void markWidgets() {}
-};
+namespace setu::cassowary {
 
 class VirtualLayout : public ConstraintWidget {
 public:
