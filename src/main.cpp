@@ -13,25 +13,36 @@
 #include <commdlg.h>
 #include <functional>
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <chrono>
+#include <iomanip>
 
-std::string getApkPathWithDialog() {
-    char filename[MAX_PATH];
-    ZeroMemory(filename, sizeof(filename));
-    
-    OPENFILENAMEA ofn;
-    ZeroMemory(&ofn, sizeof(ofn));
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = NULL;
-    ofn.lpstrFilter = "APK Files\0*.apk\0All Files\0*.*\0";
-    ofn.lpstrFile = filename;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrTitle = "Select an APK to run with Setu";
-    ofn.Flags = OFN_DONTADDTORECENT | OFN_FILEMUSTEXIST;
-    
-    if (GetOpenFileNameA(&ofn)) {
-        return std::string(filename);
+struct LaunchArgs {
+    std::string package;
+    std::string logLevel = "info";
+};
+
+void crashExit(int code, const std::string& package, const std::string& message) {
+    if (!package.empty()) {
+        const char* localAppData = getenv("LOCALAPPDATA");
+        if (localAppData) {
+            std::string cacheDir = std::string(localAppData) + "\\Setu\\apps\\" + package;
+            std::error_code ec;
+            std::filesystem::create_directories(cacheDir, ec);
+            std::string crashLogPath = cacheDir + "\\crash.log";
+            
+            std::ofstream ofs(crashLogPath, std::ios::out | std::ios::trunc);
+            if (ofs.is_open()) {
+                auto now = std::chrono::system_clock::now();
+                auto time = std::chrono::system_clock::to_time_t(now);
+                ofs << "Timestamp: " << std::put_time(std::localtime(&time), "%Y-%m-%d %H:%M:%S") << "\n";
+                ofs << "Exit Code: " << code << "\n";
+                ofs << "Message: " << message << "\n";
+            }
+        }
     }
-    return "";
+    exit(code);
 }
 
 std::string resolveMainActivity(android::ResXMLParser* parser) {
@@ -139,17 +150,26 @@ int main(int argc, char* argv[]) {
     }
     Logger::i("Main", "Fun fact: Dalvik was named after a fishing village in Iceland! \xF0\x9F\x90\xA7");
 
-    std::string apkPath = "";
-    
-    if (argc > 1) {
-        apkPath = argv[1];
-    } else {
-        apkPath = getApkPathWithDialog();
-        if (apkPath.empty()) {
-            Logger::e("Main", "No APK selected. Exiting.");
-            return 1;
+    LaunchArgs launchArgs;
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg.find("--package=") == 0) {
+            launchArgs.package = arg.substr(10);
+        } else if (arg.find("--log-level=") == 0) {
+            launchArgs.logLevel = arg.substr(12);
         }
     }
+
+    if (launchArgs.package.empty()) {
+        std::cerr << "Usage: setu_runtime.exe --package=<name> [--log-level=<level>]" << std::endl;
+        return 1;
+    }
+
+    Logger::setConfiguredLevel(launchArgs.logLevel);
+
+    const char* localAppData = getenv("LOCALAPPDATA");
+    std::string cacheDir = std::string(localAppData ? localAppData : "") + "\\Setu\\apps\\" + launchArgs.package;
+    std::string apkPath = cacheDir + "\\base.apk";
 
     std::string lowerApk = apkPath;
     std::transform(lowerApk.begin(), lowerApk.end(), lowerApk.begin(), ::tolower);
@@ -158,13 +178,13 @@ int main(int argc, char* argv[]) {
         DWORD username_len = sizeof(username);
         GetUserNameA(username, &username_len);
         Logger::e("HAL9000", std::string("I'm sorry ") + username + ", I'm afraid I can't run that.");
-        return 1;
+        crashExit(99, launchArgs.package, "HAL9000 error");
     }
 
     ApkExtractor extractor;
     if (!extractor.OpenApk(apkPath)) {
         Logger::e("Main", "Failed to open APK: " + apkPath);
-        return 1;
+        crashExit(2, launchArgs.package, "Failed to open APK");
     }
 
     Logger::i("Main", "Successfully opened APK.");
@@ -216,23 +236,25 @@ int main(int argc, char* argv[]) {
     
     if (dexIndex == 1) {
         Logger::e("Main", "No classes.dex found in the APK!");
-        return 1;
+        crashExit(2, launchArgs.package, "No classes.dex found in the APK");
     }
 
     // --- Phase 4: Window Manager Init ---
     if (!WindowManager::init()) {
-        return 1;
+        crashExit(3, launchArgs.package, "Window/Render initialization failed");
     }
 
     // --- Phase 5: Resource Management ---
     setu::ResourceManager resManager(&extractor);
     if (!resManager.init(apkPath)) {
         Logger::e("Main", "Failed to initialize ResourceManager!");
+        // We'll let this pass, maybe just missing resources
     }
     
     Logger::i("Main", "Attempting to load framework-res.apk in Main phase...");
     if (!resManager.loadFrameworkApk("C:\\Users\\namde\\Documents\\Windroid\\testapk\\framework-res.apk")) {
         Logger::w("Main", "Failed to load framework-res.apk. Framework attributes will not resolve.");
+        crashExit(2, launchArgs.package, "framework-res.apk load failure");
     } else {
         Logger::i("Main", "Framework APK loaded successfully in Main phase.");
     }
@@ -255,7 +277,10 @@ int main(int argc, char* argv[]) {
         args.push_back(Value::MakeObject(mainActivityObj));
         args.push_back(Value::MakeNull()); // Bundle (null for now)
         
-        vm.executeMethod(realBytecodeResult.bytecode, currentDex, &multiDexManager, args, realBytecodeResult.registers_size, realBytecodeResult.ins_size);
+        Value res = vm.executeMethod(realBytecodeResult.bytecode, currentDex, &multiDexManager, args, realBytecodeResult.registers_size, realBytecodeResult.ins_size);
+        if (res.type == ValueType::OBJECT && res.obj && static_cast<InterpreterObject*>(res.obj)->className.find("Exception") != std::string::npos) {
+            crashExit(1, launchArgs.package, "Uncaught interpreter exception: " + static_cast<InterpreterObject*>(res.obj)->className + " in " + mainActivityClass + "->onCreate()");
+        }
     } else {
         Logger::e("Main", "Failed to extract bytecode for " + mainActivityClass + ".onCreate!");
     }
@@ -271,7 +296,10 @@ int main(int argc, char* argv[]) {
                 clickArgs.push_back(Value::MakeObject(listener)); // this
                 clickArgs.push_back(Value::MakeNull());           // View parameter
                 
-                vm.executeMethod(clickBytecodeResult.bytecode, clickDex, &multiDexManager, clickArgs, clickBytecodeResult.registers_size, clickBytecodeResult.ins_size);
+                Value clickRes = vm.executeMethod(clickBytecodeResult.bytecode, clickDex, &multiDexManager, clickArgs, clickBytecodeResult.registers_size, clickBytecodeResult.ins_size);
+                if (clickRes.type == ValueType::OBJECT && clickRes.obj && static_cast<InterpreterObject*>(clickRes.obj)->className.find("Exception") != std::string::npos) {
+                    crashExit(1, launchArgs.package, "Uncaught interpreter exception: " + static_cast<InterpreterObject*>(clickRes.obj)->className + " in " + listener->className + "->onClick()");
+                }
             } else {
                 Logger::w("Main", "onClick method not found for class: " + listener->className);
             }

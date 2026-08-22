@@ -24,7 +24,10 @@ public:
     // Set the minimum level to print (e.g., set to INFO to hide DEBUG logs)
     static void setLevel(LogLevel level);
 
+    static void setConfiguredLevel(const std::string& level);
+
 private:
+    static std::string s_configuredLevel;
     static LogLevel s_currentLevel;
     static std::ofstream s_logFile;
     static void initLogFile();

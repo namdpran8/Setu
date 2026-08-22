@@ -7,6 +7,7 @@
 #include <filesystem>
 
 // Default log level is DEBUG so we see everything by default
+std::string Logger::s_configuredLevel = "info";
 LogLevel Logger::s_currentLevel = LogLevel::DEBUG;
 std::ofstream Logger::s_logFile;
 
@@ -34,6 +35,10 @@ void Logger::initLogFile() {
 
 void Logger::setLevel(LogLevel level) {
     s_currentLevel = level;
+}
+
+void Logger::setConfiguredLevel(const std::string& level) {
+    s_configuredLevel = level;
 }
 
 void Logger::d(const std::string& tag, const std::string& message) {
