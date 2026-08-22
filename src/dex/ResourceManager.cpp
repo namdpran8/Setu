@@ -101,8 +101,8 @@ std::string ResourceManager::getString(uint32_t resId) {
 }
 
 static float complexToDimension(uint32_t data) {
-    // Extract mantissa and radix
-    float value = (float)(int32_t(data) >> android::Res_value::COMPLEX_MANTISSA_SHIFT);
+    // Extract mantissa and radix using AOSP mask logic
+    float value = (float)(int32_t(data & 0xFFFFFF00));
     int radix = (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
 
     // Apply radix scaling (AOSP uses fixed-point: 23p0, 16p7, 8p15, 0p23)

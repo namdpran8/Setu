@@ -180,7 +180,7 @@ int LayoutInflater::parseDimension(const std::string& dimenStr) {
 }
 
 int LayoutInflater::parseComplexDimension(uint32_t data) {
-    float value = (float)(int32_t(data) >> android::Res_value::COMPLEX_MANTISSA_SHIFT);
+    float value = (float)(int32_t(data & 0xFFFFFF00));
     int radix = (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
     const float MANTISSA_MULT = 1.0f / (1 << 8);
     static const float RADIX_MULTS[] = {
