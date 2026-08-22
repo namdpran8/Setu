@@ -1,2 +1,0 @@
-[WARN]  DexParser: Class Landroid/view/View; not found in DEX.
-[WARN]  StubRegistry: Unimplemented stub: Landroid/view/View;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V

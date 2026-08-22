@@ -381,3 +381,11 @@ ART-DEX/
 art-refs_heads_main-runtime-interpreter/
 base-refs_heads_main-core-java-android-view/
 thirdparty/constraintlayout-main/
+# SetuLauncher build
+SetuLauncher/build/
+SetuLauncher/launcher_log.txt
+*.apk
+*_out.txt
+*_err.txt
+run_log.txt
+warnings.txt
