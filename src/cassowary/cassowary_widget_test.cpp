@@ -287,7 +287,7 @@ int main() {
     test2_centering();
     test3_dimension_ratio();
     test4_horizontal_bias();
-    // test5_horizontal_chain(); // TODO: Implement Chain logic in the engine
+    test5_horizontal_chain();
     test6_guideline();
     test7_barrier();
     

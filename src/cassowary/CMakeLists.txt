@@ -15,6 +15,8 @@ add_library(cassowary STATIC
     Guideline.cpp
     HelperWidget.cpp
     Barrier.cpp
+    ChainHead.cpp
+    Chain.cpp
 )
 
 target_include_directories(cassowary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

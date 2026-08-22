@@ -4,6 +4,7 @@
 #include "Tier2Stubs.h"
 #include "ConstraintAnchor.h"
 #include "LinearSystem.h"
+#include "Chain.h"
 #include <iostream>
 #include <algorithm>
 #include <cmath>
@@ -241,11 +242,12 @@ bool ConstraintWidgetContainer::addChildrenToSolver(LinearSystem& system) {
         }
     }
 
+    // Chains
     if (mHorizontalChainsSize > 0) {
-        // Chain::applyChainConstraints(this, system, nullptr, HORIZONTAL);
+        Chain::applyChainConstraints(this, &system, mHorizontalChainsArray, mHorizontalChainsSize, HORIZONTAL);
     }
     if (mVerticalChainsSize > 0) {
-        // Chain::applyChainConstraints(this, system, nullptr, VERTICAL);
+        Chain::applyChainConstraints(this, &system, mVerticalChainsArray, mVerticalChainsSize, VERTICAL);
     }
     return true;
 }
