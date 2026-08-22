@@ -1,9 +1,12 @@
 #pragma once
 #include "ViewGroup.h"
-#include <map>
+#include <unordered_map>
 #include <string>
 #include <vector>
 #include <memory>
+
+#include "../cassowary/ConstraintWidgetContainer.h"
+#include "../cassowary/ConstraintWidget.h"
 
 namespace setu {
 namespace view {
@@ -36,7 +39,7 @@ public:
         LayoutParams(int w, int h) : View::LayoutParams(w, h) {}
     };
 
-    ConstraintLayout() = default;
+    ConstraintLayout();
     virtual ~ConstraintLayout() = default;
 
     void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
@@ -44,23 +47,23 @@ public:
 
     std::shared_ptr<View::LayoutParams> generateLayoutParams(android::ResXMLParser* parser) override;
 
-private:
-    struct ResolvedNode {
-        std::shared_ptr<View> view;
-        int x = 0;
-        int y = 0;
-        int w = 0;
-        int h = 0;
-        bool xResolved = false;
-        bool yResolved = false;
-        bool wResolved = false;
-        bool hResolved = false;
-    };
+    // Phase 1: manual registration
+    void addConstrainedChild(std::shared_ptr<View> child);
 
-    std::vector<ResolvedNode> mResolvedNodes;
-    std::map<int, size_t> mIdToIndex;
+    void addView(std::shared_ptr<View> child) override;
+    void onFinishInflate() override;
     
-    void resolveConstraints(int parentWidth, int parentHeight);
+    // For testing
+    cassowary::ConstraintWidget* getWidget(View* child) const {
+        auto it = mViewToWidget.find(child);
+        return it != mViewToWidget.end() ? it->second : nullptr;
+    }
+
+
+private:
+    cassowary::ConstraintWidgetContainer mLayoutWidget;
+    std::unordered_map<View*, cassowary::ConstraintWidget*> mViewToWidget;
+    std::unordered_map<cassowary::ConstraintWidget*, View*> mWidgetToView;
 };
 
 } // namespace view

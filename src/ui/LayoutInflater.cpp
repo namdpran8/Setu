@@ -160,6 +160,7 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         }
     }
 
+    view->onFinishInflate();
     return view;
 }
 

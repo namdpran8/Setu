@@ -12,14 +12,14 @@ public:
     ViewGroup() = default;
     virtual ~ViewGroup() = default;
 
-    void addView(std::shared_ptr<View> child) {
+    virtual void addView(std::shared_ptr<View> child) {
         if (child) {
             child->setParent(this);
             mChildren.push_back(child);
         }
     }
 
-    void removeView(std::shared_ptr<View> child) {
+    virtual void removeView(std::shared_ptr<View> child) {
         auto it = std::find(mChildren.begin(), mChildren.end(), child);
         if (it != mChildren.end()) {
             (*it)->setParent(nullptr);

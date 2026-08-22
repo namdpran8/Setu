@@ -89,6 +89,7 @@ public:
     virtual void onMeasure(int widthMeasureSpec, int heightMeasureSpec);
     virtual void onLayout(bool changed, int l, int t, int r, int b);
     virtual void onDraw(graphics::Canvas& canvas);
+    virtual void onFinishInflate() {}
 
     virtual void dump(int depth = 0);
     virtual std::string getClassName() const { return "View"; }

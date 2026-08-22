@@ -48,3 +48,17 @@ add_executable(setu_runtime
 target_include_directories(setu_runtime PRIVATE include)
 target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary)
 target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
+
+add_executable(constraint_layout_test src/test_constraint_layout.cpp
+    "src/utils/Logger.cpp"
+    "src/view/View.cpp"
+    "src/view/ViewGroup.cpp"
+    "src/view/ConstraintLayout.cpp"
+    "src/graphics/Paint.cpp"
+    "src/graphics/RecordingCanvas.cpp"
+)
+target_include_directories(constraint_layout_test PRIVATE include)
+target_link_libraries(constraint_layout_test PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary)
+target_compile_options(constraint_layout_test PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
+
+
