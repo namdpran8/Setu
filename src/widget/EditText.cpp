@@ -21,8 +21,8 @@ EditText::EditText(ResourceManager* resManager, Theme* theme, android::ResXMLPar
     setTextColor(0xFF000000); 
 
     if (resManager) {
-        // Just mock parsing background color here too
-        static const uint32_t attr_background = 0x01010039;
+        // Mock styleables (Android framework IDs for android:background)
+        static const uint32_t attr_background = 0x010100d4;
         std::vector<uint32_t> styleables = { attr_background };
         TypedArray a(resManager, styleables);
         a.obtainStyledAttributes(theme, parser, defStyleAttr, defStyleRes);
@@ -75,8 +75,11 @@ void EditText::onDraw(graphics::Canvas& canvas) {
 
 bool EditText::onTouchEvent(view::MotionEvent& event) {
     if (event.getAction() == view::MotionEvent::Action::DOWN) {
-        mIsFocused = true;
-        InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
+        if (!mIsFocused) {
+            mIsFocused = true;
+            invalidate(); // Invalidate RenderNode to draw thicker underline
+            InvalidateRect(WindowManager::getMainWindow(), nullptr, FALSE);
+        }
         return true;
     }
     return false;

@@ -50,13 +50,16 @@ TextView::TextView() {
 }
 
 void TextView::setText(const std::wstring& text) {
-    mText = text;
-    // In a real framework, we would call requestLayout() here
+    if (mText != text) {
+        mText = text;
+        invalidate();
+        requestLayout();
+    }
 }
 
 void TextView::setTextColor(uint32_t color) {
     mTextPaint.setColor(color);
-    // In a real framework, we would call invalidate() here
+    invalidate();
 }
 
 void TextView::setTextSize(float size) {

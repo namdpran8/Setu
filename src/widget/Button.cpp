@@ -20,7 +20,7 @@ Button::Button(ResourceManager* resManager, Theme* theme, android::ResXMLParser*
 
     if (resManager) {
         // Mock styleables (Android framework IDs for android:background)
-        static const uint32_t attr_background = 0x01010039;
+        static const uint32_t attr_background = 0x010100d4;
         
         std::vector<uint32_t> styleables = { attr_background };
         TypedArray a(resManager, styleables);
