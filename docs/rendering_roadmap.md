@@ -4,18 +4,22 @@ Durable record of the rendering/drawable phase plan for Windroid, kept in-repo s
 it survives independent of any chat session. Update this file when the plan
 changes; do not let it drift.
 
-**Last updated:** 2026-08-24
+**Last updated:** 2026-08-25
 
 ---
 
 ## Status at a glance
 
-- **Phase 4 (ColorStateList + colour-only tinting): COMPLETE, but uncompiled and
-  uncommitted as of 2026-08-24.** All source is on disk and internally
-  consistent; it has not yet been compiled against the current tree (which is
-  mid-refactor with a large outstanding error count being worked through by
-  hand), and the code changes are not yet committed. This doc is committed ahead
-  of the code deliberately, at the maintainer's request.
+- **Phase 4 (ColorStateList + colour-only tinting): COMPLETE and committed** —
+  landed in `40df498` on 2026-08-24, alongside the drawable-inflation work.
+  Compilation against the current tree is still unverified here: the tree is
+  mid-refactor with a large outstanding error count being worked through by hand,
+  and per standing rule this project is never built by the assistant.
+- **Phase 2 V1.5 (OVAL / LINE / RING): COMPLETE, uncompiled, as of 2026-08-25.**
+  On disk and internally consistent; not yet built.
+- **Gradients and dashed strokes are now the only `<shape>` features left, and
+  they are UNSCHEDULED.** They were candidates for V1.5 and were deliberately
+  cut; they need placing in the order. See "Deferred, unscheduled" below.
 - **`android:backgroundTint` is explicitly OUT of Phase 4** and is not scheduled
   into any later phase here. It was a deliberate scope decision, not an
   oversight. (Note: `android:tint` on a drawable and `android:backgroundTint` on
@@ -27,7 +31,7 @@ changes; do not let it drift.
 ## Confirmed phase order
 
 ```
-Phase 4  [DONE, uncompiled]  →  Phase 2 V1.5  →  Phase 5  →  Phase 6  →  Item 9
+Phase 4  [DONE, committed]  →  Phase 2 V1.5  [DONE, uncompiled]  →  Phase 5  →  Phase 6  →  Item 9
 ```
 
 This ordering is confirmed. What follows is the detail for each entry, marked by
@@ -37,7 +41,7 @@ scope lives only in chat history and should be re-agreed before work starts.
 
 ---
 
-## Phase 4 — ColorStateList + colour-only tinting  **[DONE, uncompiled]**
+## Phase 4 — ColorStateList + colour-only tinting  **[DONE, committed]**
 
 The `android.content.res.ColorStateList` value type and the plumbing that lets a
 colour follow a view's drawable state.
@@ -59,35 +63,81 @@ Delivered:
   `constraint_layout_test` target compiles none of the units that include
   `ColorStateList.h`).
 
-Remaining for this phase: **compile and commit.** Both are the maintainer's to
-do; per standing rule this project is never built by the assistant.
+Remaining for this phase: **compile.** That is the maintainer's to do; per
+standing rule this project is never built by the assistant.
 
 ---
 
-## Phase 2 V1.5 — finish the `<shape>` / GradientDrawable surface  **[NEXT]**
+## Phase 2 V1.5 — finish the `<shape>` / GradientDrawable surface  **[DONE, uncompiled]**
 
 Phase 2 built the background-drawable pipeline: `GradientDrawable` paints a
 `<shape>` and `DrawableInflater` reads one out of an APK (see the header note in
 `src/ui/DrawableInflater.h`, which calls itself "the other half of Phase 2").
-V1.5 is the next increment of that same surface.
+V1.5 completed the shape geometry.
 
-**[reconfirm]** The exact line-item list for V1.5 is not captured outside chat.
-Re-agree scope before starting. The concrete deferrals the current code itself
-points at — the natural candidate scope — are:
+**Scope was decided as: the shapes that need nothing new below
+`GradientDrawable`.** `Path::addOval`, `Path::FillType::EVEN_ODD`,
+`Canvas::drawPath` and `Canvas::drawLine` already existed and were unused for
+this purpose, and `Direct2DCanvas::drawPath` already mapped `EVEN_ODD` to
+`D2D1_FILL_MODE_ALTERNATE`. So OVAL/LINE/RING cost no Canvas, Paint, Path or
+backend changes. Gradients and dashed strokes were cut because both require
+extending `Paint` *and* the Direct2D backend *and* `RecordingCanvas` — a
+subsystem, not a point-five.
 
-- **OVAL / LINE / RING shapes.** `GradientDrawable::draw` currently falls back to
-  a rectangle for every non-rectangle shape (`GradientDrawable.cpp`, `default:`
-  branch).
-- **Ring geometry** — `innerRadius` / `innerRadiusRatio` / `thickness` /
-  `thicknessRatio`, read but not yet honoured (`DrawableInflater::inflateShape`).
+Delivered:
+
+- **OVAL** — built via `Path::addOval` into the existing cached `mPath`.
+- **LINE** — stroke only, across the vertical centre, per AOSP. A line shape
+  carrying only a `<solid>` and no `<stroke>` draws nothing, on a real device
+  too.
+- **RING** — `buildRingPath()`, following AOSP's `buildRing` for the full-sweep
+  case.
+- **Ring geometry** — `android:innerRadius` / `innerRadiusRatio` / `thickness` /
+  `thicknessRatio`, with AOSP's `-1` sentinel and its
+  `DEFAULT_INNER_RADIUS_RATIO` (3.0) / `DEFAULT_THICKNESS_RATIO` (9.0), now
+  named constants on `GradientDrawable`.
+
+Three AOSP details verified against `scratch/GradientDrawable.java` rather than
+recalled, because all three are easy to get wrong:
+
+1. Full-sweep rings use `addOval(CW)` + `addOval(CCW)` under the **default
+   WINDING** rule; the `EVEN_ODD` branch is only for partial sweeps. Our
+   `Path::addOval` takes no direction and always winds clockwise, so we use
+   `EVEN_ODD` with two same-wound ovals — identical result for two nested
+   non-intersecting ovals, and exactly what `Path.h`'s own comment prescribes.
+2. Ring `thickness` and inner `radius` **both divide `bounds.width()`**, even
+   though one drives a vertical inset. That is AOSP's arithmetic; it is what
+   makes a ring in a non-square view match.
+3. The `*Ratio` attributes are read **only when** the matching absolute
+   dimension is absent.
+
+Known fidelity quirk, matching AOSP exactly: `draw()` bails on an empty rect,
+and `ensureValidRect` insets by half the stroke width. So a LINE in a view
+exactly as tall as its own stroke collapses to zero height and draws nothing.
+Real Android does the same — which is why real dividers use a rectangle+solid or
+give the view more height. Not a bug to fix here.
+
+Still unread on `<shape>`: `android:tint` and `android:useLevel` (the latter
+would make a ring a partial arc driven by `setLevel()`).
+
+---
+
+## Deferred, unscheduled — gradients and dashed strokes  **[needs placing]**
+
+Cut from V1.5. Both need `Paint` extended and the Direct2D backend taught a new
+trick, so each is a real slice of work rather than a shape case:
+
 - **Real gradients.** `<gradient>` is currently approximated by averaging its
-  stops into one flat colour, pending a shader on `Paint`
-  (`DrawableInflater::inflateShape`, `meanColor` / `meanColor3`).
+  stops into one flat colour (`DrawableInflater::inflateShape`, `meanColor` /
+  `meanColor3`). Needs a shader concept on `Paint`, D2D linear/radial/sweep
+  gradient brushes, and `RecordingCanvas` support. Deleting the averaging
+  branch is the marker for this landing.
 - **Dashed strokes.** `dashWidth` / `dashGap` are parsed and stored but draw
-  solid, because `Paint` has no dash support yet (`GradientDrawable.h` members).
+  solid (`GradientDrawable.h` members). Needs dash support on `Paint` and a D2D
+  stroke style.
 
-Each of the above is a `[from code]` anchor, not a locked commitment. Confirm
-which land in V1.5 versus later.
+These have **no agreed position in the phase order.** Decide where they go
+before starting either.
 
 ---
 
