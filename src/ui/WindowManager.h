@@ -39,21 +39,24 @@ public:
     static std::shared_ptr<setu::view::View> getRootView();
     static void dumpRootViewAfterLayout();
 
-    static float getDensity() { return s_density; }
-    static void setDensity(float density) { s_density = density; }
-    
-    static float getScaledDensity() { return s_scaledDensity; }
-    static void setScaledDensity(float scaledDensity) { s_scaledDensity = scaledDensity; }
+    // Forwarders. The values themselves live on setu::view::View, because
+    // ViewGroup has to scale a layout_margin and the view layer is also built
+    // standalone (constraint_layout_test), where no WindowManager is linked.
+    // Keeping these as the public spelling means every existing caller -
+    // XmlAttrs, TextView - is untouched. Defined out of line because View is
+    // only forward-declared here.
+    static float getDensity();
+    static void setDensity(float density);
+
+    static float getScaledDensity();
+    static void setScaledDensity(float scaledDensity);
 
 private:
     static std::shared_ptr<setu::view::View> s_rootView;
     static bool s_rootViewDumpPending;
     static std::function<void(int)> s_clickCallback;
     static HWND s_mainWindow;
-    
-    static float s_density;
-    static float s_scaledDensity;
-    
+
     // Direct2D / DirectX resources
     static Microsoft::WRL::ComPtr<ID3D11Device> s_d3dDevice;
     static Microsoft::WRL::ComPtr<ID3D11DeviceContext> s_d3dContext;

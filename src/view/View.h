@@ -5,6 +5,7 @@
 #include <functional>
 #include "../graphics/Canvas.h"
 #include "../graphics/RenderNode.h"
+#include "../graphics/drawable/Drawable.h"
 #include "MotionEvent.h"
 #include "KeyEvent.h"
 
@@ -20,7 +21,8 @@ namespace view {
 
 class ViewGroup;
 
-class View : public std::enable_shared_from_this<View> {
+class View : public std::enable_shared_from_this<View>,
+             public graphics::Drawable::Callback {
 public:
     static const int MATCH_PARENT = -1;
     static const int WRAP_CONTENT = -2;
@@ -32,7 +34,7 @@ public:
     public:
         int width;
         int height;
-        
+
         // Margins
         int leftMargin = 0;
         int topMargin = 0;
@@ -49,7 +51,7 @@ public:
 
     int getId() const { return mId; }
     void setId(int id) { mId = id; }
-    
+
     virtual std::shared_ptr<View> findViewById(int targetId);
 
     std::shared_ptr<LayoutParams> getLayoutParams() const { return mLayoutParams; }
@@ -102,7 +104,35 @@ public:
     virtual bool onKeyEvent(const class KeyEvent& event);
 
     bool isFocused() const { return mIsFocused; }
-    virtual void setFocus(bool focus) { mIsFocused = focus; }
+    virtual void setFocus(bool focus);
+
+    // Drawable state. A <selector> background asks its owner "which of these are
+    // you?" through getDrawableState(), so every flag below is something a real
+    // APK can make visible: a pressed button darkens, a disabled one greys out, a
+    // selected list row highlights.
+    bool isPressed() const { return mIsPressed; }
+    virtual void setPressed(bool pressed);
+
+    bool isEnabled() const { return mEnabled; }
+    virtual void setEnabled(bool enabled);
+
+    bool isSelected() const { return mIsSelected; }
+    virtual void setSelected(bool selected);
+
+    bool isActivated() const { return mIsActivated; }
+    virtual void setActivated(bool activated);
+
+    bool isHovered() const { return mIsHovered; }
+    virtual void setHovered(bool hovered);
+
+    // The state set handed to stateful drawables, in StateSet token form. Cached,
+    // because a selector asks for it on every state change and building it
+    // allocates. Not const: the first call after a flag moves rebuilds it.
+    const std::vector<int>& getDrawableState();
+
+    // Rebuilds the state set and pushes it into anything that cares. Call this
+    // after changing anything getDrawableState() reports.
+    void refreshDrawableState();
 
     bool isClickable() const { return mClickable; }
     virtual void setClickable(bool clickable) { mClickable = clickable; }
@@ -113,8 +143,19 @@ public:
     int getGravity() const { return mGravity; }
     virtual void setGravity(int gravity) { mGravity = gravity; requestLayout(); invalidate(); }
 
-    uint32_t getBackgroundColor() const { return mBackgroundColor; }
-    virtual void setBackgroundColor(uint32_t color) { mBackgroundColor = color; invalidate(); }
+    // Background. A View's background is a Drawable, so a <shape>, <selector> or
+    // nine-patch from a layout renders instead of being discarded for not being
+    // a colour. setBackgroundColor() is a convenience that wraps the value in a
+    // ColorDrawable, so both paths draw through the same code.
+    virtual void setBackground(std::shared_ptr<graphics::Drawable> background);
+    graphics::Drawable* getBackground() const { return mBackground.get(); }
+    const std::shared_ptr<graphics::Drawable>& getBackgroundDrawable() const { return mBackground; }
+    virtual void setBackgroundColor(uint32_t color);
+    // The colour of the background when it is a plain ColorDrawable; 0 otherwise.
+    uint32_t getBackgroundColor() const;
+
+    // graphics::Drawable::Callback
+    void invalidateDrawable(graphics::Drawable* who) override;
 
     void setOnClickListener(std::function<void()> listener) { mOnClickListener = listener; }
     virtual void performClick() { if (mOnClickListener) mOnClickListener(); }
@@ -164,13 +205,7 @@ public:
     int getPaddingRight() const { return mPaddingRight; }
     int getPaddingBottom() const { return mPaddingBottom; }
 
-    void setPadding(int left, int top, int right, int bottom) {
-        mPaddingLeft = left;
-        mPaddingTop = top;
-        mPaddingRight = right;
-        mPaddingBottom = bottom;
-        requestLayout();
-    }
+    void setPadding(int left, int top, int right, int bottom);
 
     int getMinimumWidth() const { return mMinWidth; }
     int getMinimumHeight() const { return mMinHeight; }
@@ -179,7 +214,42 @@ public:
 
     void invalidate();
 
+    // Installed once by the host so that invalidate() actually reaches the
+    // screen. Without it, marking a render node dirty updated the display list
+    // and stopped there, which is why widgets used to call InvalidateRect() by
+    // hand. The view layer is also built standalone (constraint_layout_test), so
+    // this is a hook rather than a direct call into WindowManager.
+    static void setInvalidateHandler(std::function<void()> handler);
+    static void requestHostRedraw();
+
+    // Display metrics live here rather than in WindowManager for the same reason
+    // the invalidate handler does: the view layer is built standalone, so
+    // ViewGroup cannot reach a symbol that only exists in the full runtime.
+    // WindowManager's getDensity()/setDensity() forward to these, so there is
+    // still exactly one value. 2.0 (xhdpi) until something actually queries the
+    // display - the same constant WindowManager defaulted to before.
+    static float getDisplayDensity();
+    static float getScaledDensity();
+    static void setDisplayMetrics(float density, float scaledDensity);
+
 protected:
+    // The states this view is in. AOSP passes an extraSpace count so a subclass
+    // can size the array up front; a vector makes that pointless, so a subclass
+    // just appends to what the base returns - a CheckBox would add
+    // STATE_CHECKABLE and STATE_CHECKED here.
+    virtual std::vector<int> onCreateDrawableState() const;
+
+    // Called after the state set changes. The default pushes it into the
+    // background and repaints only if the background's appearance actually moved.
+    virtual void drawableStateChanged();
+
+    // Applies padding without marking it as user-specified, so a later
+    // background swap can still contribute its own insets.
+    void internalSetPadding(int left, int top, int right, int bottom);
+
+    // Pushes the current size into the background drawable.
+    void updateBackgroundBounds();
+
     int mId = 0;
     int mLeft = 0;
     int mTop = 0;
@@ -188,12 +258,12 @@ protected:
 
     int mMeasuredWidth = 0;
     int mMeasuredHeight = 0;
-    
+
     int mPaddingLeft = 0;
     int mPaddingTop = 0;
     int mPaddingRight = 0;
     int mPaddingBottom = 0;
-    
+
     int mMinWidth = 0;
     int mMinHeight = 0;
 
@@ -203,16 +273,35 @@ protected:
     std::function<void()> mOnClickListener;
     std::shared_ptr<LayoutParams> mLayoutParams;
     bool mIsFocused = false;
+    bool mIsPressed = false;
+    // Enabled by default, like every real View. Note that this is the one state
+    // flag whose default is true, which is also why a background <selector> has to
+    // be told the state the moment it is installed: an empty state set reads as
+    // "not enabled" to AOSP's matcher.
+    bool mEnabled = true;
+    bool mIsSelected = false;
+    bool mIsActivated = false;
+    bool mIsHovered = false;
+    // Rebuilt lazily by getDrawableState().
+    std::vector<int> mDrawableState;
+    bool mDrawableStateDirty = true;
     bool mClickable = false;
     bool mFocusable = false;
     int mGravity = 0x33; // Default TOP | LEFT
-    uint32_t mBackgroundColor = 0x00000000;
+    std::shared_ptr<graphics::Drawable> mBackground;
+    // True once padding has been set explicitly (from XML or code). AOSP gives
+    // explicit padding precedence over a background drawable's own insets.
+    bool mUserPaddingDefined = false;
     int mVisibility = VISIBLE;
     bool mIsLayoutRequested = false;
     bool mIsRenderNodeDirty = true;
+
+private:
+    static std::function<void()> s_invalidateHandler;
+    static float s_density;
+    static float s_scaledDensity;
 };
 
 } // namespace view
 } // namespace setu
-
 

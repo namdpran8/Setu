@@ -5,6 +5,8 @@
 #include "androidfw/ResourceTypes.h"
 #include "androidfw/AssetManager2.h"
 #include "Theme.h"
+#include "../graphics/drawable/Drawable.h"
+#include "../graphics/ColorStateList.h"
 
 namespace setu {
 
@@ -25,11 +27,33 @@ public:
     int getLayoutDimension(int index, int defValue) const;
     std::string getString(int index) const;
 
+    // The attribute as a Drawable, whatever form it arrived in: a colour becomes
+    // a ColorDrawable, a resource is inflated through DrawableInflater. This is
+    // how a widget picks up the background its *style* declares - most real
+    // Material widgets never mention android:background in the layout at all.
+    // nullptr when the attribute is absent or is a drawable kind not yet
+    // supported.
+    graphics::DrawablePtr getDrawable(int index) const;
+
+    // The attribute as a ColorStateList, whatever form it arrived in: an inline
+    // colour becomes a constant one-item list, a res/color/*.xml reference is
+    // inflated. This is what android:textColor needs - a stock Material text
+    // colour is a selector with a disabled entry, and getColor() reports nothing
+    // at all for one of those because it is a reference, not a colour int.
+    // nullptr when the attribute is absent or is not a colour resource.
+    graphics::ColorStateListPtr getColorStateList(int index) const;
+
 private:
     ResourceManager* m_resManager;
+    // Kept from obtainStyledAttributes so getDrawable() can resolve nested
+    // ?attr/ references inside the drawable it opens.
+    Theme* m_theme = nullptr;
     std::vector<uint32_t> m_styleables;
     std::vector<android::Res_value> m_values;
     std::vector<std::string> m_stringValues;
+    // The resource ID each value resolved from, which is what getDrawable needs
+    // in order to open the drawable's own XML.
+    std::vector<uint32_t> m_resIds;
     std::vector<bool> m_hasValue;
 };
 

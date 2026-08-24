@@ -1,6 +1,7 @@
 #pragma once
 #include "TextView.h"
 #include <functional>
+#include <memory>
 
 namespace setu {
 namespace widget {
@@ -11,15 +12,14 @@ public:
     Button();
     virtual ~Button() = default;
 
-    void onDraw(graphics::Canvas& canvas) override;
-    void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
-    
+    // Reports the press through setPressed(), so the background <selector> is what
+    // decides how a pressed button looks. Nothing here knows about colours any
+    // more, which is why an app's own selector now works as well as the built-in
+    // one.
     bool onTouchEvent(view::MotionEvent& event) override;
 
-private:
-    graphics::Paint mBackgroundPaint;
+    std::string getClassName() const override { return "Button"; }
 };
 
 } // namespace widget
 } // namespace setu
-

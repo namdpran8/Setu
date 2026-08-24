@@ -3,9 +3,24 @@
 #include <algorithm>
 #include "MotionEvent.h"
 #include "androidfw/ResourceTypes.h"
+#include "../ui/XmlAttrs.h"
 
 namespace setu {
 namespace view {
+
+namespace {
+
+// A TYPE_DIMENSION attribute is a fixed-point complex word, not a pixel count:
+// 16dp compiles to 4097. This used to assign the raw word straight into a
+// margin. Routed through the same decoder LayoutInflater and the drawable
+// inflater use, so all three agree on what "16dp" means, and rounded the way
+// AOSP's MarginLayoutParams does (getDimensionPixelSize, not truncation).
+int layoutDimensionPx(uint32_t data) {
+    return dimensionPixelSize(complexToDimensionPxWith(
+        data, View::getDisplayDensity(), View::getScaledDensity()));
+}
+
+} // namespace
 
 std::shared_ptr<View> ViewGroup::findViewById(int targetId) {
     if (mId == targetId) return shared_from_this();
@@ -179,10 +194,10 @@ void ViewGroup::parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, an
                 else if ((int)data == -2) lp->width = View::WRAP_CONTENT;
                 else lp->width = data;
             } else if (type == 0x05) { // DIMENSION
-                lp->width = data; // Raw for now, should map px
+                lp->width = layoutDimensionPx(data);
             }
         } else if (attrName == "layout_height") {
-            if (type == 0x03) { 
+            if (type == 0x03) {
                 if (rawValue == "match_parent" || rawValue == "fill_parent") lp->height = View::MATCH_PARENT;
                 else if (rawValue == "wrap_content") lp->height = View::WRAP_CONTENT;
             } else if (type == 0x10 || type == 0x11) { // INT
@@ -190,16 +205,21 @@ void ViewGroup::parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, an
                 else if ((int)data == -2) lp->height = View::WRAP_CONTENT;
                 else lp->height = data;
             } else if (type == 0x05) { // DIMENSION
-                lp->height = data;
+                lp->height = layoutDimensionPx(data);
             }
+        } else if (attrName == "layout_margin") {
+            // Shorthand: sets all four edges. Was dropped entirely before, so a
+            // layout_margin with no per-edge overrides produced no spacing at all.
+            int m = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
+            lp->leftMargin = lp->topMargin = lp->rightMargin = lp->bottomMargin = m;
         } else if (attrName == "layout_marginLeft" || attrName == "layout_marginStart") {
-            lp->leftMargin = data;
+            lp->leftMargin = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
         } else if (attrName == "layout_marginRight" || attrName == "layout_marginEnd") {
-            lp->rightMargin = data;
+            lp->rightMargin = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
         } else if (attrName == "layout_marginTop") {
-            lp->topMargin = data;
+            lp->topMargin = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
         } else if (attrName == "layout_marginBottom") {
-            lp->bottomMargin = data;
+            lp->bottomMargin = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
         }
     }
 }

@@ -2,6 +2,10 @@
 #include "../ui/LayoutInflater.h"
 #include "../utils/Logger.h"
 
+#include "DrawableInflater.h"
+#include "ColorStateListInflater.h"
+#include "../graphics/drawable/ColorDrawable.h"
+
 #include "androidfw/AttributeResolution.h"
 #include "androidfw/ResourceUtils.h"
 
@@ -11,6 +15,7 @@ TypedArray::TypedArray(ResourceManager* resManager, const std::vector<uint32_t>&
     : m_resManager(resManager), m_styleables(styleables) {
     m_values.resize(styleables.size());
     m_stringValues.resize(styleables.size());
+    m_resIds.resize(styleables.size(), 0);
     m_hasValue.resize(styleables.size(), false);
 }
 
@@ -18,6 +23,8 @@ TypedArray::~TypedArray() {
 }
 
 void TypedArray::obtainStyledAttributes(const Theme* theme, ::android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes) {
+    m_theme = const_cast<Theme*>(theme);
+
     std::vector<uint32_t> outValues(m_styleables.size() * ::android::STYLE_NUM_ENTRIES, 0);
     // out_indices must be sized attrs_length + 1 because the first element stores the count of valid indices
     std::vector<uint32_t> outIndices(m_styleables.size() + 1, 0);
@@ -63,6 +70,10 @@ void TypedArray::obtainStyledAttributes(const Theme* theme, ::android::ResXMLPar
             if (m_resManager) {
                 m_resManager->resolveValue(val, const_cast<Theme*>(theme));
             }
+
+            // Held for getDrawable(): resolveValue() rewrites resid as it follows
+            // an alias chain, so this is the ID the value finally came from.
+            m_resIds[i] = val.resid;
 
             ::android::Res_value resVal;
             resVal.dataType = val.type;
@@ -182,9 +193,41 @@ int TypedArray::getLayoutDimension(int index, int defValue) const {
     return defValue;
 }
 
+graphics::DrawablePtr TypedArray::getDrawable(int index) const {
+    if (!hasValue(index)) return nullptr;
+
+    const uint8_t type = m_values[index].dataType;
+
+    // An inline colour needs no resource lookup, and this is also how
+    // ?attr/colorPrimary-style backgrounds arrive once the theme has resolved.
+    if (type >= ::android::Res_value::TYPE_FIRST_COLOR_INT &&
+        type <= ::android::Res_value::TYPE_LAST_COLOR_INT) {
+        return std::make_shared<graphics::ColorDrawable>(m_values[index].data);
+    }
+
+    if (index >= (int)m_resIds.size() || m_resIds[index] == 0) return nullptr;
+    return DrawableInflater::inflate(m_resManager, m_theme, m_resIds[index]);
+}
+
+graphics::ColorStateListPtr TypedArray::getColorStateList(int index) const {
+    if (!hasValue(index)) return nullptr;
+
+    const uint8_t type = m_values[index].dataType;
+
+    // Same shape as getDrawable: an inline colour needs no resource lookup, and
+    // this is also how a ?attr/textColorPrimary arrives once the theme resolved it.
+    if (type >= ::android::Res_value::TYPE_FIRST_COLOR_INT &&
+        type <= ::android::Res_value::TYPE_LAST_COLOR_INT) {
+        return graphics::ColorStateList::valueOf(m_values[index].data);
+    }
+
+    if (index >= (int)m_resIds.size() || m_resIds[index] == 0) return nullptr;
+    return ColorStateListInflater::inflate(m_resManager, m_theme, m_resIds[index]);
+}
+
 std::string TypedArray::getString(int index) const {
     if (!hasValue(index)) return "";
-    
+
     if (!m_stringValues[index].empty()) {
         return m_stringValues[index];
     }

@@ -112,12 +112,23 @@ private:
 
 class DrawTextCommand : public DrawCommand {
 public:
-    DrawTextCommand(const std::wstring& txt, float x, float y, const Paint& p) 
+    DrawTextCommand(const std::wstring& txt, float x, float y, const Paint& p)
         : text(txt), x(x), y(y), paint(p) {}
     void execute(Canvas& canvas) override { canvas.drawText(text, x, y, paint); }
 private:
     std::wstring text;
     float x, y;
+    Paint paint;
+};
+
+class DrawPathCommand : public DrawCommand {
+public:
+    DrawPathCommand(const Path& p, const Paint& pt) : path(p), paint(pt) {}
+    void execute(Canvas& canvas) override { canvas.drawPath(path, paint); }
+private:
+    // Held by value like Paint: a Path is just two vectors of floats, and the
+    // drawable that produced it may be gone by the time the list is replayed.
+    Path path;
     Paint paint;
 };
 

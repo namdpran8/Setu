@@ -20,8 +20,17 @@ public:
 
     android::AssetManager2* getAssetManager() { return m_assetManager.get(); }
 
+    // Extracts and parses a binary XML resource given its resource ID. Layouts,
+    // drawables, animators - anything AAPT compiled to an XML file.
+    std::unique_ptr<android::ResXMLTree> openXml(uint32_t resId);
+
     // Extracts and parses a binary XML layout given its resource ID
     std::unique_ptr<android::ResXMLTree> getLayout(uint32_t layoutId);
+
+    // The file path a resource ID points at, e.g. "res/drawable/bg.xml". Empty
+    // when the resource is not a file at all. Lets a caller tell a compiled XML
+    // drawable apart from a .png before trying to parse it.
+    std::string getResourceFilePath(uint32_t resId);
 
     // Gets a string value by resource ID
     std::string getString(uint32_t resId);

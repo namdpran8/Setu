@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Paint.h"
+#include "Path.h"
 #include <string>
 
 namespace setu {
@@ -17,7 +18,7 @@ public:
     virtual void restore() = 0;
     virtual void translate(float dx, float dy) = 0;
     virtual void scale(float sx, float sy) = 0;
-    
+
     // Clipping
     virtual void clipRect(float left, float top, float right, float bottom) = 0;
 
@@ -27,6 +28,11 @@ public:
     virtual void drawRoundRect(float left, float top, float right, float bottom, float rx, float ry, const Paint& paint) = 0;
     virtual void drawLine(float startX, float startY, float stopX, float stopY, const Paint& paint) = 0;
     virtual void drawText(const std::wstring& text, float x, float y, const Paint& paint) = 0;
+
+    // Anything the axis-aligned primitives cannot express: per-corner rounded
+    // rectangles, ovals, rings. Honours Paint's style and stroke width the same
+    // way drawRect does.
+    virtual void drawPath(const Path& path, const Paint& paint) = 0;
 
     virtual void drawRenderNode(RenderNode* node) = 0;
 };

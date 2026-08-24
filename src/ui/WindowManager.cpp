@@ -5,6 +5,7 @@
 #include "../view/KeyEvent.h"
 #include "../view/Choreographer.h"
 #include "../graphics/Direct2DCanvas.h"
+#include "../graphics/FontManager.h"
 
 static const int KONAMI_CODE[] = {VK_UP, VK_UP, VK_DOWN, VK_DOWN, VK_LEFT, VK_RIGHT, VK_LEFT, VK_RIGHT, 'B', 'A'};
 static int s_konamiIndex = 0;
@@ -14,8 +15,23 @@ HWND WindowManager::s_mainWindow = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
 std::shared_ptr<setu::view::View> WindowManager::s_rootView = nullptr;
 bool WindowManager::s_rootViewDumpPending = false;
-float WindowManager::s_density = 2.0f; // Default 2.0 (xhdpi) for now
-float WindowManager::s_scaledDensity = 2.0f;
+
+// Density lives on setu::view::View; see the declarations in WindowManager.h.
+float WindowManager::getDensity() {
+    return setu::view::View::getDisplayDensity();
+}
+
+void WindowManager::setDensity(float density) {
+    setu::view::View::setDisplayMetrics(density, getScaledDensity());
+}
+
+float WindowManager::getScaledDensity() {
+    return setu::view::View::getScaledDensity();
+}
+
+void WindowManager::setScaledDensity(float scaledDensity) {
+    setu::view::View::setDisplayMetrics(getDensity(), scaledDensity);
+}
 
 Microsoft::WRL::ComPtr<ID3D11Device> WindowManager::s_d3dDevice;
 Microsoft::WRL::ComPtr<ID3D11DeviceContext> WindowManager::s_d3dContext;
@@ -152,6 +168,21 @@ bool WindowManager::initDirect2D() {
     // 6. Create DirectWrite Factory
     hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)&s_dWriteFactory);
     if (FAILED(hr)) return false;
+
+    // Hand it to FontManager immediately: views can measure text during layout
+    // inflation, long before the first WM_PAINT builds a canvas.
+    setu::graphics::FontManager::getInstance().setFactory(s_dWriteFactory.Get());
+
+    // Close the loop between View::invalidate() and the screen. Until now
+    // invalidate() only marked render nodes dirty, and widgets that wanted a
+    // repaint had to call InvalidateRect() themselves - which meant anything
+    // that changed appearance without knowing about the HWND simply never
+    // redrew. Reads s_mainWindow lazily so install order does not matter.
+    setu::view::View::setInvalidateHandler([]() {
+        if (s_mainWindow) {
+            InvalidateRect(s_mainWindow, nullptr, FALSE);
+        }
+    });
 
     return true;
 }

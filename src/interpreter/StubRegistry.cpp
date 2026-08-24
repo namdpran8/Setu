@@ -867,7 +867,78 @@ void StubRegistry::registerViewStubs() {
         }
         return false;
     };
-    stubs["Landroid/view/View;->setEnabled(Z)V"] = emptyStub;
+    // The state setters an app calls at runtime. These used to be no-ops, which is
+    // why a button an app disabled in onCreate still looked and behaved enabled.
+    // Now they reach the real View, whose drawable state pushes straight into a
+    // <selector> background.
+    stubs["Landroid/view/View;->setEnabled(Z)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj &&
+            args[1].type == ValueType::INT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            if (view) view->setEnabled(args[1].i != 0);
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->isEnabled()Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        // Enabled is the default, so an object with no View behind it answers the
+        // way a freshly constructed View would rather than claiming to be disabled.
+        int enabled = 1;
+        if (!args.empty() && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            if (view) enabled = view->isEnabled() ? 1 : 0;
+        }
+        if (outReturn) *outReturn = Value::MakeInt(enabled);
+        return false;
+    };
+    stubs["Landroid/view/View;->setSelected(Z)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj &&
+            args[1].type == ValueType::INT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            if (view) view->setSelected(args[1].i != 0);
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->isSelected()Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        int selected = 0;
+        if (!args.empty() && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            if (view) selected = view->isSelected() ? 1 : 0;
+        }
+        if (outReturn) *outReturn = Value::MakeInt(selected);
+        return false;
+    };
+    stubs["Landroid/view/View;->setPressed(Z)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj &&
+            args[1].type == ValueType::INT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            if (view) view->setPressed(args[1].i != 0);
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->isPressed()Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        int pressed = 0;
+        if (!args.empty() && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            if (view) pressed = view->isPressed() ? 1 : 0;
+        }
+        if (outReturn) *outReturn = Value::MakeInt(pressed);
+        return false;
+    };
+    stubs["Landroid/view/View;->setActivated(Z)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj &&
+            args[1].type == ValueType::INT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            if (view) view->setActivated(args[1].i != 0);
+        }
+        return false;
+    };
     stubs["Landroid/app/Activity;->getResources()Landroid/content/res/Resources;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
         return false;

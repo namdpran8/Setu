@@ -1,11 +1,17 @@
 #include "Direct2DCanvas.h"
 #include <unordered_map>
+#include "FontManager.h"
 #include "../utils/Logger.h"
 namespace setu {
 namespace graphics {
 
 Direct2DCanvas::Direct2DCanvas(ID2D1DeviceContext* context, IDWriteFactory* dwriteFactory)
     : mContext(context), mDWriteFactory(dwriteFactory) {
+    // Keep FontManager pointed at the factory we actually render with, so the
+    // format a view measured itself with is the format its text draws with.
+    // This is a no-op after the first frame.
+    FontManager::getInstance().setFactory(dwriteFactory);
+
     State initialState;
     mContext->GetTransform(&initialState.transform);
     initialState.clipCount = 0;
@@ -123,47 +129,22 @@ void Direct2DCanvas::drawLine(float startX, float startY, float stopX, float sto
 void Direct2DCanvas::drawText(const std::wstring& text, float x, float y, const Paint& paint) {
     if (!mDWriteFactory || text.empty()) return;
 
-    // Cache TextFormat per paint config (size + font family)
-    static std::unordered_map<uint64_t, Microsoft::WRL::ComPtr<IDWriteTextFormat>> formatCache;
-    uint64_t formatKey = ((uint64_t)paint.getColor() << 32) | (uint64_t)(paint.getTextSize() * 100);
-    
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> textFormat;
-    auto it = formatCache.find(formatKey);
-    if (it != formatCache.end()) {
-        textFormat = it->second;
-} else {
-            HRESULT hr = mDWriteFactory->CreateTextFormat(
-                L"Segoe UI", nullptr, DWRITE_FONT_WEIGHT_NORMAL,
-                DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
-                paint.getTextSize(), L"en-us", &textFormat);
-            if (SUCCEEDED(hr)) {
-                formatCache[formatKey] = textFormat;
-            } else {
-                Logger::e("Direct2DCanvas", "CreateTextFormat failed: 0x" + std::to_string(hr));
-                return;
-            }
-        }
+    FontManager& fonts = FontManager::getInstance();
+    IDWriteTextFormat* textFormat = fonts.getTextFormat(paint);
+    if (!textFormat) return;
 
+    // Text arriving here is always a single, already-broken line: TextView does
+    // its own line breaking through FontManager so that what it measured is what
+    // gets drawn. Laying out at an unbounded width guarantees we cannot silently
+    // re-break it into a different set of lines.
     Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
     HRESULT hr = mDWriteFactory->CreateTextLayout(
-        text.c_str(), (UINT32)text.length(), textFormat.Get(),
-        10000.0f, 10000.0f, &textLayout);
+        text.c_str(), (UINT32)text.length(), textFormat,
+        FontManager::UNBOUNDED_WIDTH, FontManager::UNBOUNDED_WIDTH, &textLayout);
 
-    if (FAILED(hr)) {
+    if (FAILED(hr) || !textLayout) {
         Logger::e("Direct2DCanvas", "CreateTextLayout failed: 0x" + std::to_string(hr));
         return;
-    }
-
-    DWRITE_TEXT_METRICS metrics;
-    textLayout->GetMetrics(&metrics);
-    
-    UINT32 lineCount = 0;
-    textLayout->GetLineMetrics(nullptr, 0, &lineCount);
-    float baselineOffset = paint.getTextSize();
-    if (lineCount > 0) {
-        std::vector<DWRITE_LINE_METRICS> lineMetrics(lineCount);
-        textLayout->GetLineMetrics(lineMetrics.data(), lineCount, &lineCount);
-        baselineOffset = lineMetrics[0].baseline;
     }
 
     auto brush = getCachedBrush(paint.getColor());
@@ -172,7 +153,85 @@ void Direct2DCanvas::drawText(const std::wstring& text, float x, float y, const 
         return;
     }
 
-    mContext->DrawTextLayout(D2D1::Point2F(x, y - baselineOffset), textLayout.Get(), brush);
+    // Android's drawText() y is the baseline; DrawTextLayout's origin is the top
+    // of the line box, so shift up by the ascent.
+    const float baseline = -fonts.getFontMetrics(paint).ascent;
+    mContext->DrawTextLayout(D2D1::Point2F(x, y - baseline), textLayout.Get(), brush);
+}
+
+void Direct2DCanvas::drawPath(const Path& path, const Paint& paint) {
+    if (!mContext || path.isEmpty()) return;
+
+    Microsoft::WRL::ComPtr<ID2D1Factory> factory;
+    mContext->GetFactory(&factory);
+    if (!factory) return;
+
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geometry;
+    if (FAILED(factory->CreatePathGeometry(&geometry)) || !geometry) return;
+
+    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+    if (FAILED(geometry->Open(&sink)) || !sink) return;
+
+    // Must be set before the first figure, otherwise D2D ignores it - which is
+    // how a ring silently comes out as a filled disc.
+    sink->SetFillMode(path.getFillType() == Path::FillType::EVEN_ODD
+                          ? D2D1_FILL_MODE_ALTERNATE
+                          : D2D1_FILL_MODE_WINDING);
+
+    const std::vector<Path::Verb>& verbs = path.getVerbs();
+    const std::vector<float>& pts = path.getPoints();
+    size_t p = 0;
+    bool figureOpen = false;
+
+    auto take = [&pts, &p]() -> D2D1_POINT_2F {
+        const D2D1_POINT_2F pt = D2D1::Point2F(pts[p], pts[p + 1]);
+        p += 2;
+        return pt;
+    };
+
+    for (Path::Verb verb : verbs) {
+        switch (verb) {
+            case Path::Verb::MOVE_TO: {
+                if (p + 2 > pts.size()) break;
+                if (figureOpen) sink->EndFigure(D2D1_FIGURE_END_OPEN);
+                sink->BeginFigure(take(), D2D1_FIGURE_BEGIN_FILLED);
+                figureOpen = true;
+                break;
+            }
+            case Path::Verb::LINE_TO: {
+                if (!figureOpen || p + 2 > pts.size()) break;
+                sink->AddLine(take());
+                break;
+            }
+            case Path::Verb::CUBIC_TO: {
+                if (!figureOpen || p + 6 > pts.size()) break;
+                D2D1_BEZIER_SEGMENT seg;
+                seg.point1 = take();
+                seg.point2 = take();
+                seg.point3 = take();
+                sink->AddBezier(seg);
+                break;
+            }
+            case Path::Verb::CLOSE: {
+                if (!figureOpen) break;
+                sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+                figureOpen = false;
+                break;
+            }
+        }
+    }
+    if (figureOpen) sink->EndFigure(D2D1_FIGURE_END_OPEN);
+    if (FAILED(sink->Close())) return;
+
+    auto brush = getCachedBrush(paint.getColor());
+    if (!brush) return;
+
+    if (paint.getStyle() == Style::FILL || paint.getStyle() == Style::FILL_AND_STROKE) {
+        mContext->FillGeometry(geometry.Get(), brush);
+    }
+    if (paint.getStyle() == Style::STROKE || paint.getStyle() == Style::FILL_AND_STROKE) {
+        mContext->DrawGeometry(geometry.Get(), brush, paint.getStrokeWidth());
+    }
 }
 
 void Direct2DCanvas::drawRenderNode(RenderNode* node) {

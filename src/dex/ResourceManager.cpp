@@ -4,6 +4,7 @@
 #include "../ui/WindowManager.h"
 
 #include "../ui/Theme.h"
+#include "../ui/XmlAttrs.h"
 
 namespace setu {
 
@@ -101,39 +102,8 @@ std::string ResourceManager::getString(uint32_t resId) {
 }
 
 static float complexToDimension(uint32_t data) {
-    // Extract mantissa and radix using AOSP mask logic
-    float value = (float)(int32_t(data & 0xFFFFFF00));
-    int radix = (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
-
-    // Apply radix scaling (AOSP uses fixed-point: 23p0, 16p7, 8p15, 0p23)
-    const float MANTISSA_MULT = 1.0f / (1 << 8);
-    static const float RADIX_MULTS[] = {
-        1.0f * MANTISSA_MULT,                    // 23p0
-        1.0f / (1 << 7) * MANTISSA_MULT,         // 16p7
-        1.0f / (1 << 15) * MANTISSA_MULT,        // 8p15
-        1.0f / (1 << 23) * MANTISSA_MULT         // 0p23
-    };
-    value *= RADIX_MULTS[radix];
-
-    // Apply unit conversion
-    int unit = data & android::Res_value::COMPLEX_UNIT_MASK;
-    float density = WindowManager::getDensity();
-    switch (unit) {
-        case android::Res_value::COMPLEX_UNIT_PX:
-            return value;
-        case android::Res_value::COMPLEX_UNIT_DIP:
-            return value * density;
-        case android::Res_value::COMPLEX_UNIT_SP:
-            return value * WindowManager::getScaledDensity();
-        case android::Res_value::COMPLEX_UNIT_PT:
-            return value * density * (1.0f / 72.0f) * 160.0f;
-        case android::Res_value::COMPLEX_UNIT_IN:
-            return value * density * 160.0f;
-        case android::Res_value::COMPLEX_UNIT_MM:
-            return value * density * (1.0f / 25.4f) * 160.0f;
-        default:
-            return value;
-    }
+    // Unit and radix decoding lives in one place now; see ui/XmlAttrs.cpp.
+    return complexToDimensionPx(data);
 }
 
 float ResourceManager::resolveDimension(uint32_t resId) {
@@ -165,60 +135,74 @@ float ResourceManager::resolveDimension(uint32_t resId) {
     return 0.0f;
 }
 
-std::unique_ptr<android::ResXMLTree> ResourceManager::getLayout(uint32_t layoutId) {
-    if (!m_assetManager) return nullptr;
+std::string ResourceManager::getResourceFilePath(uint32_t resId) {
+    if (!m_assetManager) return "";
 
-    // First, resolve the layout resource to get its file path
-    auto res_name_exp = m_assetManager->GetResourceName(layoutId);
-    if (!res_name_exp.has_value()) {
-        Logger::e("ResourceManager", "Failed to resolve layout name for ID: " + std::to_string(layoutId));
-        return nullptr;
+    auto res = m_assetManager->GetResource(resId);
+    if (!res.has_value()) {
+        Logger::e("ResourceManager", "No value for resource ID: " + std::to_string(resId));
+        return "";
     }
 
-    // The name of the layout is the entry string, e.g. "activity_main"
-    // Wait, the actual file path is stored as a TYPE_STRING value.
-    auto res = m_assetManager->GetResource(layoutId);
-    if (!res.has_value() || res->type != android::Res_value::TYPE_STRING) {
-        Logger::e("ResourceManager", "Layout resource is not a string path.");
-        return nullptr;
-    }
-
-    std::string path;
-    auto pool = m_assetManager->GetStringPoolForCookie(res->cookie);
-    if (pool) {
-        auto str_exp = pool->stringAt(res->data);
-        if (str_exp.has_value()) {
-            path = android::util::Utf16ToUtf8(str_exp.value());
-        } else {
-            auto str8_exp = pool->string8At(res->data);
-            if (str8_exp.has_value()) {
-                path = std::string(str8_exp.value());
-            }
+    // A drawable can be an alias for another drawable (@drawable/a -> @drawable/b),
+    // so follow references before deciding whether this is a file at all.
+    android::AssetManager2::SelectedValue val = res.value();
+    if (val.type == android::Res_value::TYPE_REFERENCE) {
+        if (!m_assetManager->ResolveReference(val).has_value()) {
+            Logger::e("ResourceManager", "Could not resolve reference for resource ID: " + std::to_string(resId));
+            return "";
         }
     }
 
-    if (path.empty()) {
-        Logger::e("ResourceManager", "Could not resolve layout path for ID: " + std::to_string(layoutId));
-        return nullptr;
+    if (val.type != android::Res_value::TYPE_STRING) {
+        // Not an error: a colour, a dimension or an inline value simply is not a file.
+        return "";
     }
-    
-    Logger::d("ResourceManager", "Resolved layout ID " + std::to_string(layoutId) + " to path: " + path);
-    
-    // Open the asset file (binary XML)
-    auto asset = m_assetManager->OpenNonAsset(path, android::Asset::ACCESS_BUFFER);
-    if (!asset) {
-        Logger::e("ResourceManager", "Could not open layout asset: " + path);
+
+    auto pool = m_assetManager->GetStringPoolForCookie(val.cookie);
+    if (!pool) return "";
+
+    auto str_exp = pool->stringAt(val.data);
+    if (str_exp.has_value()) {
+        return android::util::Utf16ToUtf8(str_exp.value());
+    }
+    auto str8_exp = pool->string8At(val.data);
+    if (str8_exp.has_value()) {
+        return std::string(str8_exp.value());
+    }
+    return "";
+}
+
+std::unique_ptr<android::ResXMLTree> ResourceManager::openXml(uint32_t resId) {
+    if (!m_assetManager) return nullptr;
+
+    const std::string path = getResourceFilePath(resId);
+    if (path.empty()) {
+        Logger::e("ResourceManager", "Could not resolve file path for resource ID: " + std::to_string(resId));
         return nullptr;
     }
 
-    // Pass the buffer to ResXMLTree
+    Logger::d("ResourceManager", "Resolved resource ID " + std::to_string(resId) + " to path: " + path);
+
+    // Open the asset file (binary XML)
+    auto asset = m_assetManager->OpenNonAsset(path, android::Asset::ACCESS_BUFFER);
+    if (!asset) {
+        Logger::e("ResourceManager", "Could not open asset: " + path);
+        return nullptr;
+    }
+
+    // copyData=true, so the tree owns its buffer and outlives the Asset.
     auto tree = std::make_unique<android::ResXMLTree>();
     if (tree->setTo(asset->getBuffer(true), asset->getLength(), true) != android::NO_ERROR) {
         Logger::e("ResourceManager", "Failed to parse binary XML: " + path);
         return nullptr;
     }
-    
+
     return tree;
+}
+
+std::unique_ptr<android::ResXMLTree> ResourceManager::getLayout(uint32_t layoutId) {
+    return openXml(layoutId);
 }
 
 } // namespace setu

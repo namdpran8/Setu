@@ -392,3 +392,10 @@ warnings.txt
 
 # Ignore scratch_apk folders
 scratch_apk*/
+scratch 
+
+# Docs Roadmap
+rendering_roadmap.md
+perf_roadmap.md
+ui_roadmap.md
+dialog_roadmap.md

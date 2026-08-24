@@ -17,6 +17,8 @@
 #include <string>
 #include <cwchar>
 #include "TypedArray.h"
+#include "DrawableInflater.h"
+#include "XmlAttrs.h"
 
 namespace setu {
 
@@ -181,30 +183,10 @@ int LayoutInflater::parseDimension(const std::string& dimenStr) {
 }
 
 int LayoutInflater::parseComplexDimension(uint32_t data) {
-    float value = (float)(int32_t(data & 0xFFFFFF00));
-    int radix = (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
-    const float MANTISSA_MULT = 1.0f / (1 << 8);
-    static const float RADIX_MULTS[] = {
-        1.0f * MANTISSA_MULT,
-        1.0f / (1 << 7) * MANTISSA_MULT,
-        1.0f / (1 << 15) * MANTISSA_MULT,
-        1.0f / (1 << 23) * MANTISSA_MULT
-    };
-    value *= RADIX_MULTS[radix];
-
-    int unit = data & android::Res_value::COMPLEX_UNIT_MASK;
-    if (unit == android::Res_value::COMPLEX_UNIT_DIP) {
-        return (int)(value * WindowManager::getDensity());
-    } else if (unit == android::Res_value::COMPLEX_UNIT_SP) {
-        return (int)(value * WindowManager::getScaledDensity());
-    } else if (unit == android::Res_value::COMPLEX_UNIT_PT) {
-        return (int)(value * WindowManager::getDensity() * (1.0f / 72.0f) * 160.0f);
-    } else if (unit == android::Res_value::COMPLEX_UNIT_IN) {
-        return (int)(value * WindowManager::getDensity() * 160.0f);
-    } else if (unit == android::Res_value::COMPLEX_UNIT_MM) {
-        return (int)(value * WindowManager::getDensity() * (1.0f / 25.4f) * 160.0f);
-    }
-    return (int)value;
+    // The unit and radix decoding is shared with the drawable inflater; see
+    // XmlAttrs.cpp. Truncating rather than rounding is kept as-is: layout
+    // dimensions have always been read this way here.
+    return (int)complexToDimensionPx(data);
 }
 
 void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::shared_ptr<setu::view::View> view, ResourceManager* resManager, Theme* theme) {
@@ -322,7 +304,16 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
                         Logger::d("LayoutInflater", "Resolved background color: 0x" + std::to_string(val.data));
                         view->setBackgroundColor(val.data);
                     } else {
-                        Logger::d("LayoutInflater", "Resolved background is not a color. Type=" + std::to_string(val.type));
+                        // Not a colour, so val names a drawable resource: a
+                        // <shape>, a <selector>, a nine-patch. DrawableInflater
+                        // turns the ones it understands into pixels and logs the
+                        // phase owed for the rest.
+                        auto drawable = DrawableInflater::inflate(resManager, theme, val.resid);
+                        if (drawable) {
+                            view->setBackground(std::move(drawable));
+                        } else {
+                            Logger::d("LayoutInflater", "Background drawable not inflated. Type=" + std::to_string(val.type));
+                        }
                     }
                 }
             }
@@ -335,6 +326,21 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
             int type = parser->getAttributeDataType(i);
             if (type == android::Res_value::TYPE_INT_BOOLEAN) {
                 view->setFocusable(parser->getAttributeData(i) != 0);
+            }
+        } else if (attrName == "enabled" || resId == 0x0101000e) {
+            // A layout-declared disabled widget has to reach its background before
+            // the first touch, which setEnabled() does by refreshing the drawable
+            // state - so a <selector> with a state_enabled="false" item paints greyed
+            // out from the very first frame.
+            //
+            // AOSP declares android:enabled on TextView rather than on View, so on a
+            // real device it is ignored on a bare ViewGroup. Applying it uniformly
+            // here matches how this loop already treats background, clickable and
+            // focusable; the only case where it diverges is a layout that disables a
+            // plain container, which is not something apps do.
+            int type = parser->getAttributeDataType(i);
+            if (type == android::Res_value::TYPE_INT_BOOLEAN) {
+                view->setEnabled(parser->getAttributeData(i) != 0);
             }
         }
     }

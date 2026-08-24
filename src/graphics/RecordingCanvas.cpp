@@ -46,6 +46,10 @@ void RecordingCanvas::drawText(const std::wstring& text, float x, float y, const
     mNode->addCommand(std::make_unique<DrawTextCommand>(text, x, y, paint));
 }
 
+void RecordingCanvas::drawPath(const Path& path, const Paint& paint) {
+    mNode->addCommand(std::make_unique<DrawPathCommand>(path, paint));
+}
+
 void RecordingCanvas::drawRenderNode(RenderNode* node) {
     mNode->addCommand(std::make_unique<DrawRenderNodeCommand>(node));
 }
