@@ -284,15 +284,35 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
         const XmlAttrs attrs(parser, resManager, theme);
         // The enum ordinals AAPT compiles android:shape to are the same numbers
         // GradientDrawable.Shape uses.
+        Shape shapeKind = Shape::RECTANGLE;
         switch (attrs.getInt("shape", (int)Shape::RECTANGLE)) {
-            case (int)Shape::OVAL: shape->setShape(Shape::OVAL); break;
-            case (int)Shape::LINE: shape->setShape(Shape::LINE); break;
-            case (int)Shape::RING: shape->setShape(Shape::RING); break;
-            default: shape->setShape(Shape::RECTANGLE); break;
+            case (int)Shape::OVAL: shapeKind = Shape::OVAL; break;
+            case (int)Shape::LINE: shapeKind = Shape::LINE; break;
+            case (int)Shape::RING: shapeKind = Shape::RING; break;
+            default: shapeKind = Shape::RECTANGLE; break;
         }
-        // Still unread here: android:tint (Phase 4), android:useLevel, and the
-        // ring geometry (innerRadius/innerRadiusRatio/thickness/thicknessRatio),
-        // which arrives with oval/ring/line support.
+        shape->setShape(shapeKind);
+
+        if (shapeKind == Shape::RING) {
+            // AOSP reads each absolute dimension first and only consults the
+            // matching ratio when that dimension is absent, so an authored
+            // innerRadius wins outright instead of being combined with a ratio.
+            // -1 is its "no absolute value" sentinel.
+            using G = graphics::GradientDrawable;
+            const int innerRadius = attrs.getDimensionPixelSize("innerRadius", -1);
+            const int thickness = attrs.getDimensionPixelSize("thickness", -1);
+            shape->setRingGeometry(
+                (float)innerRadius,
+                innerRadius == -1 ? attrs.getFloat("innerRadiusRatio",
+                                                   G::DEFAULT_INNER_RADIUS_RATIO)
+                                  : G::DEFAULT_INNER_RADIUS_RATIO,
+                (float)thickness,
+                thickness == -1 ? attrs.getFloat("thicknessRatio", G::DEFAULT_THICKNESS_RATIO)
+                                : G::DEFAULT_THICKNESS_RATIO);
+        }
+        // Still unread here: android:tint, and android:useLevel - which would make
+        // a ring a partial arc driven by setLevel(). Without it a ring is always the
+        // full annulus, which is what an unlevelled one draws anyway.
     }
 
     // A <gradient> outranks a <solid> in AOSP regardless of which came first, so

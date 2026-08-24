@@ -135,6 +135,55 @@ void GradientDrawable::setStroke(float width, uint32_t color, float dashWidth, f
     invalidateSelf();
 }
 
+void GradientDrawable::setRingGeometry(float innerRadius, float innerRadiusRatio,
+                                      float thickness, float thicknessRatio) {
+    mInnerRadius = innerRadius;
+    mInnerRadiusRatio = innerRadiusRatio;
+    mThickness = thickness;
+    mThicknessRatio = thicknessRatio;
+    mPathDirty = true;
+    invalidateSelf();
+}
+
+void GradientDrawable::buildRingPath() {
+    mPath.reset();
+
+    // AOSP's buildRing, full sweep only: android:useLevel is not supported, so the
+    // ring is always the complete annulus rather than a partial arc.
+    const float width = mRect.width();
+    const float halfW = width * 0.5f;
+    const float halfH = mRect.height() * 0.5f;
+
+    // Both of these divide the *width*, including the one that ends up driving a
+    // vertical inset. That is AOSP's arithmetic rather than a slip here, and it is
+    // what makes a ring in a non-square view match a real device.
+    const float thickness = mThickness != -1.0f
+                                ? mThickness
+                                : (mThicknessRatio != 0.0f ? width / mThicknessRatio : 0.0f);
+    const float radius = mInnerRadius != -1.0f
+                             ? mInnerRadius
+                             : (mInnerRadiusRatio != 0.0f ? width / mInnerRadiusRatio : 0.0f);
+
+    // The hole: centred in the bounds with a half-extent of `radius` on both axes.
+    RectF inner = mRect;
+    inner.inset(halfW - radius, halfH - radius);
+    // The outer edge, grown from the hole by the ring's thickness.
+    RectF outer = inner;
+    outer.inset(-thickness, -thickness);
+
+    // Path::addOval always winds clockwise, so the hole has to come from the fill
+    // rule: EVEN_ODD leaves the inner oval unpainted. AOSP instead winds the two
+    // in opposite directions under the default rule, which for two nested ovals
+    // produces the same band.
+    //
+    // If the inner oval collapses (radius 0, or a degenerate rect), addOval adds
+    // nothing and this paints a solid disc - the same graceful fallback AOSP gets
+    // from a zero-radius ring.
+    mPath.setFillType(Path::FillType::EVEN_ODD);
+    mPath.addOval(outer);
+    mPath.addOval(inner);
+}
+
 void GradientDrawable::setPaddingInsets(int left, int top, int right, int bottom) {
     mPaddingInsets.set(left, top, right, bottom);
     mHasPadding = true;
@@ -233,17 +282,39 @@ void GradientDrawable::draw(Canvas& canvas) {
             }
             break;
         }
-        default:
-            // OVAL, LINE and RING arrive with the rest of the <shape> surface
-            // area. Falling back to the rectangle keeps them visible in the
-            // meantime rather than dropping the background entirely.
-            if (filling) {
-                canvas.drawRect(mRect.left, mRect.top, mRect.right, mRect.bottom, fillPaint);
+        case Shape::OVAL: {
+            if (mPathDirty) {
+                mPath.reset();
+                mPath.addOval(mRect);
+                mPathDirty = false;
             }
+            if (filling) canvas.drawPath(mPath, fillPaint);
+            if (stroking) canvas.drawPath(mPath, strokePaint);
+            break;
+        }
+        case Shape::LINE: {
+            // Stroke only, across the vertical centre. AOSP draws no fill for a
+            // line, so a <shape android:shape="line"> carrying only a <solid> is
+            // invisible on a real device too - not a gap here.
+            //
+            // Note the empty-rect bail at the top of this function: a line in a
+            // view exactly as tall as its own stroke insets to zero height and
+            // draws nothing. AOSP's ensureValidRect does the same.
             if (stroking) {
-                canvas.drawRect(mRect.left, mRect.top, mRect.right, mRect.bottom, strokePaint);
+                const float y = mRect.centerY();
+                canvas.drawLine(mRect.left, y, mRect.right, y, strokePaint);
             }
             break;
+        }
+        case Shape::RING: {
+            if (mPathDirty) {
+                buildRingPath();
+                mPathDirty = false;
+            }
+            if (filling) canvas.drawPath(mPath, fillPaint);
+            if (stroking) canvas.drawPath(mPath, strokePaint);
+            break;
+        }
     }
 }
 

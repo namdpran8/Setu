@@ -38,6 +38,11 @@ public:
 
     GradientDrawable() = default;
 
+    // AOSP's DEFAULT_INNER_RADIUS_RATIO / DEFAULT_THICKNESS_RATIO, used when a
+    // ring gives no absolute innerRadius / thickness.
+    static constexpr float DEFAULT_INNER_RADIUS_RATIO = 3.0f;
+    static constexpr float DEFAULT_THICKNESS_RATIO = 9.0f;
+
     void draw(Canvas& canvas) override;
 
     void setShape(Shape shape);
@@ -77,6 +82,12 @@ public:
     void setStroke(float width, uint32_t color, float dashWidth, float dashGap);
     float getStrokeWidth() const { return mStrokeWidth; }
 
+    // <shape android:innerRadius|innerRadiusRatio|thickness|thicknessRatio>, for
+    // Shape::RING. -1 on either absolute dimension is AOSP's sentinel for "derive
+    // this from the matching ratio instead", and is the default for both.
+    void setRingGeometry(float innerRadius, float innerRadiusRatio,
+                         float thickness, float thicknessRatio);
+
     // <padding>. Reported back to the owning View through getPadding().
     void setPaddingInsets(int left, int top, int right, int bottom);
     bool getPadding(Rect& padding) const override;
@@ -103,6 +114,9 @@ protected:
 private:
     // AOSP's ensureValidRect: the drawing rect, inset by half the stroke.
     void ensureValidRect();
+
+    // Builds the annulus for Shape::RING into mPath, following AOSP's buildRing.
+    void buildRingPath();
 
     // Applies mAlpha on top of an authored colour.
     uint32_t applyAlpha(uint32_t argb) const;
@@ -131,6 +145,14 @@ private:
     // Paint has no dash support, so a dashed stroke currently draws solid.
     float mStrokeDashWidth = 0.0f;
     float mStrokeDashGap = 0.0f;
+
+    // Ring geometry, used only by Shape::RING. The ratio defaults are AOSP's
+    // DEFAULT_INNER_RADIUS_RATIO and DEFAULT_THICKNESS_RATIO; an absolute value of
+    // -1 means the corresponding ratio is what applies.
+    float mInnerRadius = -1.0f;
+    float mInnerRadiusRatio = DEFAULT_INNER_RADIUS_RATIO;
+    float mThickness = -1.0f;
+    float mThicknessRatio = DEFAULT_THICKNESS_RATIO;
 
     Rect mPaddingInsets;
     bool mHasPadding = false;
