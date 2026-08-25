@@ -434,6 +434,19 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
                 lp->height = parseDim(i);
             }
             continue;
+        } else if (attrName == "layout_margin" || resId == 0x010100f6) {
+            // Shorthand for all four edges. Reached here so that @dimen/spacing
+            // resolves the same way the per-edge attributes below already do -
+            // before this, the shorthand was set only by ViewGroup's
+            // resolver-free pass and by the TypedArray pass above, so a layout
+            // inflated without a ResourceManager kept a raw resource ID.
+            //
+            // The per-edge attributes must still win over it, and they do:
+            // compiled XML sorts attributes by increasing resource ID within a
+            // package, so 0x010100f6 is visited before layout_marginLeft (f7)
+            // through layout_marginBottom (fa) and marginStart/End (0x010103b1,
+            // b2). Same precedence as the TypedArray pass above applies by index.
+            lp->leftMargin = lp->topMargin = lp->rightMargin = lp->bottomMargin = parseDim(i);
         } else if (attrName == "layout_marginLeft" || attrName == "layout_marginStart" || resId == 0x010100f7 || resId == 0x010103b1) {
             lp->leftMargin = parseDim(i);
         } else if (attrName == "layout_marginTop" || resId == 0x010100f8) {

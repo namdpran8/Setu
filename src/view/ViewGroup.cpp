@@ -20,6 +20,37 @@ int layoutDimensionPx(uint32_t data) {
         data, View::getDisplayDensity(), View::getScaledDensity()));
 }
 
+// A layout dimension attribute in pixels. False when the value is not one this
+// layer can decode, and the caller then leaves its field at the default.
+//
+// The types that are *not* decodable matter more than the ones that are.
+// android:layout_margin="@dimen/spacing" compiles to TYPE_REFERENCE, whose data
+// word is a bare resource ID (0x7F040012), and a string dimension's data word is
+// a string-pool index; neither is a pixel count. Turning either into one takes an
+// AssetManager, which this layer deliberately cannot reach - XmlAttrs.h spells
+// out why, and constraint_layout_test builds View/ViewGroup without
+// ResourceManager to keep it that way.
+//
+// So the value is reported as absent rather than written through raw. That is
+// what the callers below used to do, and a resource ID read as pixels is a
+// two-billion-pixel margin: not a slightly-wrong layout but a collapsed one.
+// Holding the default leaves the field for LayoutInflater::parseLayoutParams,
+// which re-reads these same attributes with a ResourceManager in hand and does
+// resolve the reference.
+bool layoutDimensionAttr(uint8_t type, uint32_t data, int& out) {
+    if (type == android::Res_value::TYPE_DIMENSION) {
+        out = layoutDimensionPx(data);
+        return true;
+    }
+    // A plain integer is already a pixel count.
+    if (type == android::Res_value::TYPE_INT_DEC ||
+        type == android::Res_value::TYPE_INT_HEX) {
+        out = (int)data;
+        return true;
+    }
+    return false;
+}
+
 } // namespace
 
 std::shared_ptr<View> ViewGroup::findViewById(int targetId) {
@@ -210,16 +241,21 @@ void ViewGroup::parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, an
         } else if (attrName == "layout_margin") {
             // Shorthand: sets all four edges. Was dropped entirely before, so a
             // layout_margin with no per-edge overrides produced no spacing at all.
-            int m = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
-            lp->leftMargin = lp->topMargin = lp->rightMargin = lp->bottomMargin = m;
+            // Unlike the per-edge attributes below, no later pass in
+            // LayoutInflater re-reads this one, so an undecodable value here just
+            // means no margin.
+            int m;
+            if (layoutDimensionAttr(type, data, m)) {
+                lp->leftMargin = lp->topMargin = lp->rightMargin = lp->bottomMargin = m;
+            }
         } else if (attrName == "layout_marginLeft" || attrName == "layout_marginStart") {
-            lp->leftMargin = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
+            layoutDimensionAttr(type, data, lp->leftMargin);
         } else if (attrName == "layout_marginRight" || attrName == "layout_marginEnd") {
-            lp->rightMargin = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
+            layoutDimensionAttr(type, data, lp->rightMargin);
         } else if (attrName == "layout_marginTop") {
-            lp->topMargin = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
+            layoutDimensionAttr(type, data, lp->topMargin);
         } else if (attrName == "layout_marginBottom") {
-            lp->bottomMargin = (type == 0x05) ? layoutDimensionPx(data) : (int)data;
+            layoutDimensionAttr(type, data, lp->bottomMargin);
         }
     }
 }

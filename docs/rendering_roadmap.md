@@ -4,7 +4,7 @@ Durable record of the rendering/drawable phase plan for Windroid, kept in-repo s
 it survives independent of any chat session. Update this file when the plan
 changes; do not let it drift.
 
-**Last updated:** 2026-08-25 (Phase 5 complete)
+**Last updated:** 2026-08-25 (Phase 5 complete; Item 9 scope recorded)
 
 ---
 
@@ -17,14 +17,20 @@ changes; do not let it drift.
   and per standing rule this project is never built by the assistant.
 - **Phase 2 V1.5 (OVAL / LINE / RING): COMPLETE and committed** — landed in
   `9d6d40f` on 2026-08-25.
-- **Phase 5 (RippleDrawable): COMPLETE, uncompiled, as of 2026-08-25.** Brought
-  the runtime's first *animating* drawable, and with it the frame clock. On disk
-  and internally consistent; not yet built.
+- **Phase 5 (RippleDrawable): COMPLETE and committed (in `449e25a`)** — landed on
+  2026-08-25. Brought the runtime's first *animating* drawable, and with it the
+  frame clock. Internally consistent on disk; **still uncompiled**, exactly like
+  Phase 4. Note that `449e25a`'s commit message does not mention ripple at all —
+  see "Where this landed in git" under Phase 5.
 - **`<animated-selector>` was scoped OUT of Phase 5.** It is
   `AnimatedStateListDrawable`, a different class that cross-fades or plays an
   `AnimationDrawable` *between* selector items — not a variant of `<ripple>`.
   `phaseFor()` was retargeted accordingly and it now sits under "Not on this
   roadmap".
+- **Item 9 (font metrics precision audit): scope now recorded.** Written into this
+  doc on 2026-08-25, verbatim from the working plan. It was the last roadmap entry
+  whose scope lived only in chat history, so it was the one most at risk of being
+  lost. Steps 2 and 4 need real-device numbers the assistant cannot produce.
 - **Gradients and dashed strokes are now the only `<shape>` features left, and
   they are UNSCHEDULED.** They were candidates for V1.5 and were deliberately
   cut; they need placing in the order. See "Deferred, unscheduled" below.
@@ -39,7 +45,7 @@ changes; do not let it drift.
 ## Confirmed phase order
 
 ```
-Phase 4  [DONE, committed]  →  Phase 2 V1.5  [DONE, committed]  →  Phase 5  [DONE, uncompiled]  →  Phase 6  →  Item 9
+Phase 4  [DONE, committed]  →  Phase 2 V1.5  [DONE, committed]  →  Phase 5  [DONE, committed]  →  Phase 6  →  Item 9
 ```
 
 This ordering is confirmed. What follows is the detail for each entry, marked by
@@ -145,11 +151,14 @@ trick, so each is a real slice of work rather than a shape case:
   stroke style.
 
 These have **no agreed position in the phase order.** Decide where they go
-before starting either.
+before starting either. To be precise about what was and was not decided: the
+*cut from V1.5* is a recorded decision, but no landing slot ever was — in
+particular **"after Phase 6" is not a recorded decision**, so if that is the
+intent it still needs agreeing and writing down here.
 
 ---
 
-## Phase 5 — RippleDrawable  **[DONE, uncompiled]**
+## Phase 5 — RippleDrawable  **[DONE, committed]**
 
 `<ripple>` support: the touch feedback every Material widget is built on. Before
 this, a `<ripple>` background inflated to nothing at all, which is why a stock
@@ -234,10 +243,13 @@ Each is documented in the class header as well as here.
    content layers logs and keeps the first.
 3. **No mask shader.** AOSP builds an `ALPHA_8` bitmap from the mask or content
    and draws the ripple through a `BitmapShader` + `PorterDuffColorFilter`.
-   `Paint` has no alpha, no shader and no colour filter, so this takes AOSP's
-   *other* branch — **`MASK_NONE`**, where `clipRect` to the bounds does the
-   containing. The mask child is still parsed and held, because it decides
-   `isBounded()`.
+   `Paint` has no shader and no colour filter, so this takes AOSP's *other*
+   branch — **`MASK_NONE`**, where `clipRect` to the bounds does the containing.
+   The mask child is still parsed and held, because it decides `isBounded()`.
+   (Per-ripple *opacity* is not affected by this: it is folded into the colour's
+   ARGB alpha channel by `withOpacity()`, which is exact. Only the shader and the
+   colour filter are missing — this line previously overstated the gap as "no
+   alpha" too.)
 4. **Solid style only.** `STYLE_PATTERNED` (Android 12's "sparkle") needs a
    `RuntimeShader`. This is the `STYLE_SOLID` path every version before it used
    and every version since still falls back to. `android:effectColor` is parsed
@@ -280,6 +292,26 @@ looks right at rest and simply does not respond to touch.
 
 Remaining for this phase: **compile.**
 
+### Where this landed in git
+
+**Phase 5's commit is `449e25a`**, whose message reads *"Move framework-res.apk to
+apkresources folder and make its path robust"* and does not mention ripple, the
+frame clock, or Phase 5 anywhere. Everything in this phase went in under that
+message: `RippleDrawable.{h,cpp}`, `SystemClock.h`, `Interpolator.h`, the
+`scheduleSelf` / `runScheduledWork` frame clock, the `WindowManager` animation
+timer, the hotspot plumbing, the `<ripple>` inflater path, and the Phase 5 text in
+this doc.
+
+`git log --oneline` therefore gives no hint that Phase 5 exists, and
+`git log --oneline -- src/graphics/drawable/RippleDrawable.cpp` is the only cheap
+way to find it. This note is here so that lookup is unnecessary. The message was
+left uncorrected on purpose — the history was already pushed and a rewrite plus
+force-push was judged not worth it. **Nothing is missing from the commit; only its
+description is wrong.**
+
+For contrast, the two neighbouring phases are labelled honestly: Phase 4 is in
+`40df498` and Phase 2 V1.5 is in `9d6d40f`.
+
 ---
 
 ## Phase 6 — bitmap pipeline  **[from code]**
@@ -295,12 +327,48 @@ nine-patch assets in `Button.cpp` (`fade()` / `darken()` / `makeDefaultBackgroun
 
 ---
 
-## Item 9  **[reconfirm]**
+## Item 9 — font metrics precision audit  **[confirmed]**
 
-The terminal roadmap entry in the confirmed order. Its detailed scope is **not**
-recorded outside chat history and should be re-established before it comes up.
-Do not infer its contents from the Phase 4 build-order (which also happened to
-have nine items — a separate, now-completed list).
+The terminal roadmap entry in the confirmed order. Its scope was previously
+recorded nowhere outside chat history; it is written down here as of 2026-08-25,
+which closes that gap. Do not infer its contents from the Phase 4 build-order
+(which also happened to have nine items — a separate, now-completed list).
+
+The order inside this item is load-bearing: **the font decision is step 5 because
+steps 1–4 are what produce the evidence for it.** Deciding the font first would
+throw that away.
+
+Scope, as agreed:
+
+1. Instrument `FontManager::getFontMetrics` to dump `top`, `ascent`, `descent`, `bottom`, `leading`, and derived `getLineHeight()` at a spread of text sizes (12sp, 14sp, 16sp, 20sp, 34sp).
+2. On a real device, dump `Paint.getFontMetrics()` at the same sizes via a trivial harness APK. Compare. Remember the sign convention already encoded in `TextLayout.h`: above-baseline values are negative.
+3. Check the two known conversion points: `drawText`'s `-ascent` offset (Android's y is the baseline; DirectWrite's origin is the top of the line box) and `TextLayout::Line::baseline`.
+4. Verify `getDefaultTextSizePx()`'s `14.0f * scaledDensity` against a real device's default `TextView` — this already fixed a hardcoded-16px bug that made every unstyled TextView render at what a device shows for 8sp, so it deserves confirmation rather than trust.
+5. **Then, and only then, decide the font.** Everything funnels through `FontManager::mFamilyName`, so it's one line plus asset loading. If metrics still can't be matched with Segoe UI, that's the evidence for shipping Roboto — per your "centralize now, decide later" call, this is where the deciding happens.
+
+Multi-line leading and `android:lineSpacingExtra`/`lineSpacingMultiplier` belong in this pass too, since they're pure metrics arithmetic.
+
+Every anchor named above was re-verified against the tree on 2026-08-25:
+
+- `FontManager::getFontMetrics` — declared `src/graphics/FontManager.h:59`, defined
+  `src/graphics/FontManager.cpp:153`.
+- The sign convention — stated at `src/graphics/TextLayout.h:11`, with `top` /
+  `ascent` negative and `descent` / `bottom` positive on lines 13–16.
+- `drawText`'s `-ascent` offset — `src/graphics/Direct2DCanvas.cpp:158`
+  (`const float baseline = -fonts.getFontMetrics(paint).ascent;`).
+- `TextLayout::Line::baseline` — `src/graphics/TextLayout.h:39`, documented as the
+  offset of the baseline from the layout's top.
+- `getDefaultTextSizePx()` — `src/widget/TextView.cpp:25`, returning
+  `14.0f * scaledDensity` at line 31.
+- `FontManager::mFamilyName` — `src/graphics/FontManager.h:77`, defaulting to
+  `L"Segoe UI"`. `FontManager.h:28` already records it as the single point of
+  change, which is the "centralize now, decide later" call in the code.
+
+**Steps 2 and 4 have a hard external dependency:** both need real-device numbers
+from a harness APK, which the assistant cannot produce. Like "compile", that half
+is the maintainer's. Steps 1, 3 and the `lineSpacing*` arithmetic can be done
+without a device; the font decision in step 5 cannot, because it is gated on the
+comparison.
 
 ---
 
@@ -333,3 +401,5 @@ load-bearing anchors:
 - `src/view/View.h` — the frame-clock contract
   (`setAnimationHandler` / `runScheduledWork` / `hasScheduledWork`), including why
   it is a static hook rather than a call into `WindowManager`.
+- `src/graphics/FontManager.h` — `mFamilyName` and the header note naming it as the
+  only thing that changes when the font decision in Item 9 is finally made.

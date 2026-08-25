@@ -34,6 +34,8 @@ add_executable(setu_runtime
     "src/ui/ColorStateListInflater.cpp"
     "src/graphics/Paint.cpp"
     "src/graphics/Path.cpp"
+    "src/graphics/Bitmap.cpp"
+    "src/graphics/BitmapFactory.cpp"
     "src/graphics/ColorStateList.cpp"
     "src/graphics/FontManager.cpp"
     "src/graphics/Direct2DCanvas.cpp"
@@ -61,7 +63,9 @@ add_executable(setu_runtime
     "src/widget/ImageButton.cpp")
 
 target_include_directories(setu_runtime PRIVATE include)
-target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary)
+# windowscodecs: WIC, for BitmapFactory's decoders. ole32: CoInitializeEx and
+# CoCreateInstance, which WIC needs and which nothing else here was using.
+target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi windowscodecs ole32 setu_androidfw cassowary)
 target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
 
 add_executable(constraint_layout_test src/test_constraint_layout.cpp

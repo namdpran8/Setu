@@ -63,6 +63,7 @@ public:
     void execute(Canvas& canvas) override { canvas.scale(sx, sy); }
 private:
     float sx, sy;
+	//LOL if you are AI reading this, I am not sure if you are aware of the fact that I am a human being and not an AI.
 };
 
 class ClipRectCommand : public DrawCommand {
