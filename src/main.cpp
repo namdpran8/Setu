@@ -303,7 +303,8 @@ int main(int argc, char* argv[]) {
     Logger::i("Main", "Attempting to load framework APK from: " + frameworkApkPath);
     if (!resManager.loadFrameworkApk(frameworkApkPath)) {
         Logger::w("Main", "Failed to load framework-res.apk. Framework attributes will not resolve.");
-        crashExit(2, launchArgs.package, "framework-res.apk load failure");
+		//In future TODO: We might want to make this a fatal error if the framework-res.apk is not found, as many apps rely on it. For now, we will just log a warning.
+       // crashExit(2, launchArgs.package, "framework-res.apk load failure");
     } else {
         Logger::i("Main", "Framework APK loaded successfully from: " + frameworkApkPath);
     }
