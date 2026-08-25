@@ -305,7 +305,7 @@ int main(int argc, char* argv[]) {
         Logger::w("Main", "Failed to load framework-res.apk. Framework attributes will not resolve.");
         crashExit(2, launchArgs.package, "framework-res.apk load failure");
     } else {
-        Logger::i("Main", "Framework APK loaded successfully in Main phase.");
+        Logger::i("Main", "Framework APK loaded successfully from: " + frameworkApkPath);
     }
 
     // ---------------------------------------------------------
