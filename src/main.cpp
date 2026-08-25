@@ -21,6 +21,7 @@
 struct LaunchArgs {
     std::string package;
     std::string logLevel = "info";
+    std::string frameworkApk = "";
 };
 
 void crashExit(int code, const std::string& package, const std::string& message) {
@@ -157,6 +158,8 @@ int main(int argc, char* argv[]) {
             launchArgs.package = arg.substr(10);
         } else if (arg.find("--log-level=") == 0) {
             launchArgs.logLevel = arg.substr(12);
+        } else if (arg.find("--framework=") == 0) {
+            launchArgs.frameworkApk = arg.substr(12);
         }
     }
 
@@ -270,8 +273,35 @@ int main(int argc, char* argv[]) {
         // We'll let this pass, maybe just missing resources
     }
     
-    Logger::i("Main", "Attempting to load framework-res.apk in Main phase...");
-    if (!resManager.loadFrameworkApk("C:\\Users\\namde\\Documents\\Windroid\\testapk\\framework-res.apk")) {
+    std::string frameworkApkPath = launchArgs.frameworkApk;
+    
+    if (frameworkApkPath.empty()) {
+        std::vector<std::string> searchPaths = {
+            "apkresources\\framework-res.apk",
+            "framework-res.apk",
+            "..\\apkresources\\framework-res.apk"
+        };
+        
+        if (executablePathLength > 0 && executablePathLength < MAX_PATH) {
+            std::filesystem::path exePath(std::string(executablePath, executablePathLength));
+            searchPaths.insert(searchPaths.begin(), (exePath.parent_path() / "framework-res.apk").string());
+            searchPaths.insert(searchPaths.begin(), (exePath.parent_path() / "apkresources" / "framework-res.apk").string());
+        }
+
+        for (const auto& path : searchPaths) {
+            if (std::filesystem::exists(path)) {
+                frameworkApkPath = path;
+                break;
+            }
+        }
+        
+        if (frameworkApkPath.empty()) {
+            frameworkApkPath = "apkresources\\framework-res.apk"; // Fallback
+        }
+    }
+
+    Logger::i("Main", "Attempting to load framework APK from: " + frameworkApkPath);
+    if (!resManager.loadFrameworkApk(frameworkApkPath)) {
         Logger::w("Main", "Failed to load framework-res.apk. Framework attributes will not resolve.");
         crashExit(2, launchArgs.package, "framework-res.apk load failure");
     } else {

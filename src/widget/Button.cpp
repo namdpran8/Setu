@@ -128,10 +128,21 @@ bool Button::onTouchEvent(view::MotionEvent& event) {
 
     if (event.getAction() == view::MotionEvent::Action::DOWN) {
         Logger::d("Button", "Action::DOWN received");
+        // Before setPressed, not after: a <ripple> background starts expanding from
+        // wherever its hotspot is at the moment the pressed state arrives, so the
+        // other order would ripple from the centre of the button on every first
+        // touch. ViewGroup::dispatchTouchEvent has already offset the event into
+        // this view's coordinates, which is the space the background lives in.
+        drawableHotspotChanged(event.getX(), event.getY());
         // setPressed() refreshes the drawable state, which is what re-selects the
         // background's pressed item and repaints through Drawable::Callback. No
         // colour arithmetic and no window handle involved.
         setPressed(true);
+        return true;
+    } else if (event.getAction() == view::MotionEvent::Action::MOVE) {
+        // A ripple that has not finished entering follows the finger. Harmless for
+        // every other background: setHotspot is a no-op on all of them.
+        drawableHotspotChanged(event.getX(), event.getY());
         return true;
     } else if (event.getAction() == view::MotionEvent::Action::UP) {
         Logger::d("Button", "Action::UP received, performing click");

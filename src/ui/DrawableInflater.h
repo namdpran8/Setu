@@ -20,7 +20,7 @@ class Theme;
 // androidfw or ResourceManager, so the drawing code can be reasoned about (and
 // unit-tested) without a loaded APK.
 //
-// Root elements that belong to later phases (<ripple>, <bitmap>, <nine-patch>)
+// Root elements that belong to later phases (<bitmap>, <nine-patch>, <vector>)
 // are recognised and logged rather than silently dropped, so a missing
 // background in a real app names the phase that will fix it.
 class DrawableInflater {
@@ -51,6 +51,9 @@ private:
     static graphics::DrawablePtr inflateSelector(android::ResXMLParser* parser,
                                                  ResourceManager* resManager,
                                                  Theme* theme);
+    static graphics::DrawablePtr inflateRipple(android::ResXMLParser* parser,
+                                               ResourceManager* resManager,
+                                               Theme* theme);
 };
 
 } // namespace setu

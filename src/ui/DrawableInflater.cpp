@@ -11,6 +11,7 @@
 #include "../dex/ResourceManager.h"
 #include "../graphics/drawable/ColorDrawable.h"
 #include "../graphics/drawable/GradientDrawable.h"
+#include "../graphics/drawable/RippleDrawable.h"
 #include "../graphics/drawable/StateListDrawable.h"
 #include "../graphics/drawable/StateSet.h"
 #include "../utils/Logger.h"
@@ -20,6 +21,12 @@ namespace setu {
 namespace {
 
 const char* const TAG = "DrawableInflater";
+
+// @android:id/mask: the well-known ID a <ripple> gives the child that shapes it.
+// Hard-coded rather than looked up by name, because it is a *public* framework ID
+// and therefore frozen for good, and because this has to keep working with no
+// framework-res loaded - which is exactly when a name lookup would fail.
+constexpr uint32_t ANDROID_ID_MASK = 0x0102002e;
 
 bool endsWith(const std::string& str, const char* suffix) {
     const std::string s(suffix);
@@ -122,11 +129,38 @@ void inflateSelectorItem(android::ResXMLParser* parser, ResourceManager* resMana
     selector.addState(states, std::move(child));
 }
 
+// One <item> of a <ripple>. Consumes the element either way, and reports the
+// layer's android:id so the caller can tell the mask from the content.
+graphics::DrawablePtr inflateRippleItem(android::ResXMLParser* parser, ResourceManager* resManager,
+                                        Theme* theme, uint32_t& outId) {
+    // Same ordering constraint as inflateSelectorItem: XmlAttrs reads through the
+    // parser live, so every attribute has to come off it before anything advances.
+    const XmlAttrs attrs(parser, resManager, theme);
+    outId = attrs.getResourceId("id");
+    graphics::DrawablePtr child = drawableFromAttr(attrs, "drawable", resManager, theme);
+
+    if (child) {
+        skipCurrentElement(parser);
+    } else {
+        child = inflateFirstChild(parser, resManager, theme);
+    }
+    // Unread: android:left/top/right/bottom, android:width/height and
+    // android:gravity, which inset or size a layer within the stack. They need a
+    // real layer stack to mean anything, and a <ripple> that uses them is rare
+    // enough that AOSP's own Material resources never do.
+    return child;
+}
+
 // The roadmap item that will make a given root element work, for the log line.
 const char* phaseFor(const std::string& tag) {
-    if (tag == "ripple" || tag == "animated-selector") return "Phase 5 (RippleDrawable)";
     if (tag == "bitmap" || tag == "nine-patch") return "Phase 6 (bitmap pipeline)";
     if (tag == "vector" || tag == "animated-vector") return "not yet on the roadmap (vector drawables)";
+    if (tag == "animated-selector") {
+        // A different class, not a variant of <ripple>: AnimatedStateListDrawable
+        // cross-fades or plays an AnimationDrawable *between* selector items, which
+        // needs frame-by-frame drawables rather than a touch effect.
+        return "not yet on the roadmap (AnimatedStateListDrawable)";
+    }
     if (tag == "layer-list" || tag == "level-list" || tag == "transition") {
         return "not yet on the roadmap (drawable containers)";
     }
@@ -200,6 +234,9 @@ graphics::DrawablePtr DrawableInflater::inflateFromParser(android::ResXMLParser*
     if (tag == "selector") {
         return inflateSelector(parser, resManager, theme);
     }
+    if (tag == "ripple") {
+        return inflateRipple(parser, resManager, theme);
+    }
 
     Logger::d(TAG, "<" + tag + "> is " + phaseFor(tag) + "; no background drawn");
     skipCurrentElement(parser);
@@ -272,6 +309,82 @@ graphics::DrawablePtr DrawableInflater::inflateSelector(android::ResXMLParser* p
         return nullptr;
     }
     return selector;
+}
+
+graphics::DrawablePtr DrawableInflater::inflateRipple(android::ResXMLParser* parser,
+                                                     ResourceManager* resManager, Theme* theme) {
+    graphics::ColorStateListPtr color;
+    int radius = graphics::RippleDrawable::RADIUS_AUTO;
+
+    {
+        const XmlAttrs attrs(parser, resManager, theme);
+        // A ColorStateList rather than a colour: the usual value is
+        // ?colorControlHighlight, which resolves to a flat one, but a <ripple> whose
+        // highlight varies by state is legal and getColorStateList reads both.
+        color = attrs.getColorStateList("color");
+        // RADIUS_AUTO is AOSP's own sentinel for this attribute, so an absent
+        // android:radius means "grow to the bounds" with no extra branch here.
+        radius = attrs.getDimensionPixelSize("radius", graphics::RippleDrawable::RADIUS_AUTO);
+
+        if (attrs.has("effectColor")) {
+            Logger::d(TAG, "<ripple> android:effectColor ignored: it only colours the "
+                           "patterned (Android 12 sparkle) style, and this draws the solid "
+                           "one every version falls back to");
+        }
+    }
+
+    graphics::DrawablePtr content;
+    graphics::DrawablePtr mask;
+
+    android::ResXMLParser::event_code_t event;
+    while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
+           event != android::ResXMLParser::END_DOCUMENT) {
+        // As in <selector>: every branch consumes one whole element, so an END_TAG
+        // seen at this level is always </ripple>.
+        if (event == android::ResXMLParser::END_TAG) break;
+        if (event != android::ResXMLParser::START_TAG) continue;
+
+        const std::string tag = elementName(parser);
+        if (tag != "item") {
+            Logger::d(TAG, "<ripple> child <" + tag + "> is not an item; ignored");
+            skipCurrentElement(parser);
+            continue;
+        }
+
+        uint32_t id = 0;
+        graphics::DrawablePtr child = inflateRippleItem(parser, resManager, theme, id);
+        if (!child) continue;
+
+        if (id == ANDROID_ID_MASK) {
+            mask = std::move(child);
+        } else if (!content) {
+            content = std::move(child);
+        } else {
+            // A genuine layer stack. Nothing here can composite one yet, so the
+            // first layer is kept rather than the layers being drawn in whatever
+            // order they happened to arrive.
+            Logger::d(TAG, "<ripple> has more than one content layer; the extra ones are "
+                           "dropped until drawable containers exist");
+        }
+    }
+
+    if (!color) {
+        // AOSP throws XmlPullParserException here, which aborts the inflation and
+        // leaves the widget with no background at all. The content layer is the more
+        // useful half of a <ripple> anyway, so it is kept on its own: the widget
+        // looks right at rest and simply does not respond to touch.
+        Logger::w(TAG, "<ripple> without android:color; drawing its content layer only");
+        return content;
+    }
+
+    auto ripple = std::make_shared<graphics::RippleDrawable>(std::move(color));
+    ripple->setMaxRadius(radius);
+    if (content) ripple->setContent(std::move(content));
+    if (mask) ripple->setMask(std::move(mask));
+    // No emptiness check, unlike <selector>: a <ripple> with no children at all is
+    // ?selectableItemBackground, which is a real and very common resource. It draws
+    // nothing at rest and touch feedback when touched, which is the whole point.
+    return ripple;
 }
 
 graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* parser,

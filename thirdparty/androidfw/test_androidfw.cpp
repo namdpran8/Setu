@@ -11,10 +11,14 @@
 
 using namespace android;
 
-int main() {
+int main(int argc, char** argv) {
     std::cout << "test_androidfw starting..." << std::endl;
     
-    ApkAssetsPtr apk = ApkAssets::Load("C:\\Users\\namde\\Documents\\Setu\\testapk\\openclalc.apk");
+    std::string apkPath = "testapk\\openclalc.apk";
+    if (argc > 1) {
+        apkPath = argv[1];
+    }
+    ApkAssetsPtr apk = ApkAssets::Load(apkPath);
     if (!apk) {
         std::cerr << "Failed to load APK!" << std::endl;
         return 1;

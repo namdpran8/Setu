@@ -43,7 +43,7 @@ Setu is built using **CMake** and C++17/C++20. It requires a Windows environment
 3. **Run:**
    - You can launch Setu via CLI (e.g., `setu_runtime.exe --package=com.example.app`) or simply double-click the executable to open an APK file picker.
    - The runtime will parse the APK, draw the main window, and start interpreting the `MainActivity` bytecode.
-   - **Note:** Ensure `framework-res.apk` is available in `testapk/framework-res.apk` for standard Android resource resolution.
+   - **Note:** Ensure `framework-res.apk` is available in `apkresources/framework-res.apk` for standard Android resource resolution.
 
 ---
 

@@ -36,6 +36,11 @@ public:
 
         // Animation hooks. Used from Phase 5 (ripple) onwards; a host that
         // cannot post delayed work can leave these alone.
+        //
+        // `whenMs` is an absolute uptimeMillis() deadline, not a delay - the same
+        // as AOSP's Handler.postAtTime. An animation that computes its next
+        // deadline from the previous one therefore keeps its cadence instead of
+        // drifting a little later on every frame.
         virtual void scheduleDrawable(Drawable* who, std::function<void()> what, long long whenMs) {}
         virtual void unscheduleDrawable(Drawable* who) {}
     };
@@ -62,6 +67,13 @@ public:
     // Tells the owner to redraw. Silently does nothing when unowned, which is
     // the normal case for a drawable still being inflated.
     void invalidateSelf();
+
+    // Asks the owner to run `what` at absolute time `whenMs`, and to forget any
+    // work already queued for this drawable. Both are silent no-ops when unowned
+    // or when the host cannot post delayed work - which is the degradation an
+    // animating drawable has to survive, by looking correct at rest.
+    void scheduleSelf(std::function<void()> what, long long whenMs);
+    void unscheduleSelf();
 
     // 0..255, multiplied into whatever colours the drawable itself defines.
     virtual void setAlpha(int alpha) {}

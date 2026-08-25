@@ -21,6 +21,18 @@ void Drawable::invalidateSelf() {
     }
 }
 
+void Drawable::scheduleSelf(std::function<void()> what, long long whenMs) {
+    if (mCallback) {
+        mCallback->scheduleDrawable(this, std::move(what), whenMs);
+    }
+}
+
+void Drawable::unscheduleSelf() {
+    if (mCallback) {
+        mCallback->unscheduleDrawable(this);
+    }
+}
+
 bool Drawable::setState(const std::vector<int>& stateSet) {
     if (mStateSet == stateSet) return false;
     mStateSet = stateSet;

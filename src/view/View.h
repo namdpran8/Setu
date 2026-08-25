@@ -47,7 +47,7 @@ public:
 
     View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes);
     View();
-    virtual ~View() = default;
+    virtual ~View();
 
     int getId() const { return mId; }
     void setId(int id) { mId = id; }
@@ -134,6 +134,14 @@ public:
     // after changing anything getDrawableState() reports.
     void refreshDrawableState();
 
+    // Tells the background where the finger is, in this view's own coordinates.
+    //
+    // Order matters and AOSP is explicit about it: a widget calls this *before*
+    // setPressed(true), because a ripple starts from wherever the hotspot was when
+    // the pressed state arrived. Call it after, and every first touch ripples from
+    // the centre of the view instead of from under the finger.
+    void drawableHotspotChanged(float x, float y);
+
     bool isClickable() const { return mClickable; }
     virtual void setClickable(bool clickable) { mClickable = clickable; }
 
@@ -156,6 +164,9 @@ public:
 
     // graphics::Drawable::Callback
     void invalidateDrawable(graphics::Drawable* who) override;
+    void scheduleDrawable(graphics::Drawable* who, std::function<void()> what,
+                          long long whenMs) override;
+    void unscheduleDrawable(graphics::Drawable* who) override;
 
     void setOnClickListener(std::function<void()> listener) { mOnClickListener = listener; }
     virtual void performClick() { if (mOnClickListener) mOnClickListener(); }
@@ -221,6 +232,21 @@ public:
     // this is a hook rather than a direct call into WindowManager.
     static void setInvalidateHandler(std::function<void()> handler);
     static void requestHostRedraw();
+
+    // The animation clock, and the second half of the same bargain.
+    //
+    // An animating drawable asks its owner to run work at a deadline
+    // (Drawable::scheduleSelf). A View has no message queue of its own, so every
+    // such request lands in one process-wide queue and the host drains it.
+    //
+    // runScheduledWork() runs everything now due and returns true while anything
+    // is still queued - the host's cue to keep frames coming. The handler installed
+    // here fires only on the idle-to-animating edge, so the host arms a frame clock
+    // when an animation starts and can stop it again the moment the queue empties.
+    // Nothing is charged for a tick while the UI is at rest.
+    static void setAnimationHandler(std::function<void()> handler);
+    static bool runScheduledWork();
+    static bool hasScheduledWork();
 
     // Display metrics live here rather than in WindowManager for the same reason
     // the invalidate handler does: the view layer is built standalone, so
@@ -297,6 +323,22 @@ protected:
     bool mIsRenderNodeDirty = true;
 
 private:
+    // One queued animation callback. `who` is kept so the entry can be dropped
+    // when its drawable is replaced or its owner destroyed - the lambda captures
+    // the drawable raw, and running it afterwards would touch freed memory.
+    struct ScheduledWork {
+        graphics::Drawable* who;
+        std::function<void()> what;
+        long long whenMs;
+    };
+
+    static std::vector<ScheduledWork> s_scheduledWork;
+    // The batch runScheduledWork() is part-way through, while it is running one.
+    // unscheduleDrawable() has to reach into it as well as into the queue: a
+    // callback can drop the drawable that owns a later entry in the same batch, and
+    // that entry has already left the queue.
+    static std::vector<ScheduledWork>* s_runningWork;
+    static std::function<void()> s_animationHandler;
     static std::function<void()> s_invalidateHandler;
     static float s_density;
     static float s_scaledDensity;

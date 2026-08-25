@@ -6,11 +6,15 @@
 #include "../graphics/drawable/StateSet.h"
 #include "MotionEvent.h"
 #include "../utils/Logger.h"
+#include "../utils/SystemClock.h"
 
 namespace setu {
 namespace view {
 
 std::function<void()> View::s_invalidateHandler;
+std::vector<View::ScheduledWork> View::s_scheduledWork;
+std::vector<View::ScheduledWork>* View::s_runningWork = nullptr;
+std::function<void()> View::s_animationHandler;
 
 // xhdpi. Nothing queries the real display yet, so this is the value every dp in
 // every layout is scaled by; WindowManager::getDensity() reads it back out.
@@ -36,6 +40,55 @@ void View::requestHostRedraw() {
     }
 }
 
+void View::setAnimationHandler(std::function<void()> handler) {
+    s_animationHandler = std::move(handler);
+    // A drawable can start animating before the host installs its clock. Anything
+    // already queued would otherwise sit there until some later animation happened
+    // to arm the timer on its behalf.
+    if (s_animationHandler && !s_scheduledWork.empty()) {
+        s_animationHandler();
+    }
+}
+
+bool View::hasScheduledWork() { return !s_scheduledWork.empty(); }
+
+bool View::runScheduledWork() {
+    if (s_scheduledWork.empty()) return false;
+
+    const long long now = uptimeMillis();
+
+    // Everything due is moved out of the queue before any of it runs. An animating
+    // drawable reschedules itself from inside its own callback, so running the
+    // callbacks in place would append to the container being walked - and would run
+    // the *next* frame's work during this one, spinning the animation to its end in
+    // a single tick.
+    std::vector<ScheduledWork> due;
+    std::vector<ScheduledWork> pending;
+    for (auto& work : s_scheduledWork) {
+        if (work.whenMs <= now) {
+            due.push_back(std::move(work));
+        } else {
+            pending.push_back(std::move(work));
+        }
+    }
+    s_scheduledWork = std::move(pending);
+
+    // Published so unscheduleDrawable() can cancel entries in this batch too - one
+    // callback is allowed to drop a drawable that owns another entry in it.
+    s_runningWork = &due;
+    for (auto& work : due) {
+        // Moved out before it runs, for two reasons. The entry left behind is empty,
+        // so a callback that cancels its own drawable cannot null out - and destroy -
+        // the std::function it is currently executing inside. And the local copy keeps
+        // the callable alive for the duration of the call regardless.
+        std::function<void()> what = std::move(work.what);
+        if (what) what();
+    }
+    s_runningWork = nullptr;
+
+    return !s_scheduledWork.empty();
+}
+
 View::View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes) {
     // In a real implementation, we would extract View's styleables here (e.g. layout_width, layout_height, visibility, id)
     // using TypedArray ta(resManager, { R::styleable::View_id, R::styleable::View_visibility, ... });
@@ -44,6 +97,17 @@ View::View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* par
 }
 
 View::View() {}
+
+View::~View() {
+    // A queued callback captures its drawable raw, so anything still pending when
+    // the owner goes away would fire against freed memory on the next tick. The
+    // background dies with this View in the normal case, but getBackgroundDrawable()
+    // hands out a shared_ptr, so clear the callback rather than assume it does.
+    if (mBackground) {
+        unscheduleDrawable(mBackground.get());
+        mBackground->setCallback(nullptr);
+    }
+}
 
 std::shared_ptr<setu::view::View> View::findViewById(int targetId) {
     if (mId == targetId) return shared_from_this();
@@ -90,6 +154,10 @@ void View::setBackground(std::shared_ptr<graphics::Drawable> background) {
     if (mBackground == background) return;
 
     if (mBackground) {
+        // Drop any animation still in flight before letting go of it. An outgoing
+        // ripple would otherwise keep ticking against a drawable that is no longer
+        // drawn, and its callback would outlive the drawable itself.
+        unscheduleDrawable(mBackground.get());
         mBackground->setCallback(nullptr);
         mBackground->setVisible(false, false);
     }
@@ -157,6 +225,41 @@ void View::invalidateDrawable(graphics::Drawable* who) {
     }
 }
 
+void View::scheduleDrawable(graphics::Drawable* who, std::function<void()> what,
+                            long long whenMs) {
+    // Same filter as invalidateDrawable. The background is the only drawable a
+    // plain View owns, so a request from anything else is a stale callback from a
+    // drawable already swapped out - and must not be allowed to keep the clock
+    // running for a drawable nobody draws.
+    if (who != mBackground.get() || !what) return;
+
+    const bool wasIdle = s_scheduledWork.empty();
+    s_scheduledWork.push_back({who, std::move(what), whenMs});
+
+    // Idle-to-animating is the only edge the host needs telling about; while the
+    // queue is non-empty it is already ticking.
+    if (wasIdle && s_animationHandler) {
+        s_animationHandler();
+    }
+}
+
+void View::unscheduleDrawable(graphics::Drawable* who) {
+    s_scheduledWork.erase(
+        std::remove_if(s_scheduledWork.begin(), s_scheduledWork.end(),
+                       [who](const ScheduledWork& work) { return work.who == who; }),
+        s_scheduledWork.end());
+
+    // The batch being run right now, if there is one. Its entries have already left
+    // the queue, so erasing from the queue alone would still let a callback fire
+    // against a drawable an earlier callback in the same batch destroyed. Emptied
+    // rather than erased, because runScheduledWork() is walking this vector.
+    if (s_runningWork) {
+        for (auto& work : *s_runningWork) {
+            if (work.who == who) work.what = nullptr;
+        }
+    }
+}
+
 const std::vector<int>& View::getDrawableState() {
     if (mDrawableStateDirty) {
         mDrawableState = onCreateDrawableState();
@@ -203,6 +306,15 @@ void View::refreshDrawableState() {
     // AOSP also notifies the parent, so a ViewGroup with addStatesFromChildren can
     // fold a child's state into its own. Nothing sets that flag here yet, so there
     // is nobody to tell.
+}
+
+void View::drawableHotspotChanged(float x, float y) {
+    if (mBackground) {
+        mBackground->setHotspot(x, y);
+    }
+    // AOSP also forwards to children when dispatchHotspotChanged is on, so a
+    // duplicateParentState child ripples with its parent. Nothing reads that flag
+    // here yet.
 }
 
 void View::drawableStateChanged() {

@@ -11,6 +11,19 @@ static const int KONAMI_CODE[] = {VK_UP, VK_UP, VK_DOWN, VK_DOWN, VK_LEFT, VK_RI
 static int s_konamiIndex = 0;
 static bool s_showBsod = false;
 
+// Timer IDs. The ten-minute idle "ghost touch" already owned 1, and SetTimer
+// replaces rather than adds when an ID repeats, so the animation clock needs its
+// own or arming one would silently cancel the other.
+static const UINT_PTR TIMER_IDLE_GHOST = 1;
+static const UINT_PTR TIMER_ANIMATION = 2;
+
+// ~60fps. SetTimer's real resolution is coarser than this and WM_TIMER is a
+// low-priority message besides, so it is a floor on the frame interval rather
+// than a promise - which is exactly why animations read uptimeMillis() instead of
+// stepping themselves once per tick.
+static const UINT TIMER_ANIMATION_INTERVAL_MS = 16;
+static bool s_animationTimerRunning = false;
+
 HWND WindowManager::s_mainWindow = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
 std::shared_ptr<setu::view::View> WindowManager::s_rootView = nullptr;
@@ -184,6 +197,17 @@ bool WindowManager::initDirect2D() {
         }
     });
 
+    // And the frame clock, for drawables that animate rather than just change.
+    // Called only when the animation queue goes from empty to non-empty, so a UI
+    // at rest runs no timer at all; WM_TIMER stops the clock again on the frame
+    // the last animation finishes.
+    setu::view::View::setAnimationHandler([]() {
+        if (s_mainWindow && !s_animationTimerRunning) {
+            SetTimer(s_mainWindow, TIMER_ANIMATION, TIMER_ANIMATION_INTERVAL_MS, nullptr);
+            s_animationTimerRunning = true;
+        }
+    });
+
     return true;
 }
 
@@ -225,7 +249,16 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             }
             return 0;
         case WM_TIMER:
-            if (wParam == 1) {
+            if (wParam == TIMER_ANIMATION) {
+                // Nothing to repaint from here: a drawable whose appearance moved
+                // says so through invalidateSelf(), which already reaches
+                // InvalidateRect. When the last animation finishes the clock stops,
+                // rather than ticking at 60Hz over a still image.
+                if (!setu::view::View::runScheduledWork()) {
+                    KillTimer(hwnd, TIMER_ANIMATION);
+                    s_animationTimerRunning = false;
+                }
+            } else if (wParam == TIMER_IDLE_GHOST) {
                 Logger::i("IdleGhost", "Are you still there? (Ghost Touch)");
                 if (s_rootView) {
                     setu::view::MotionEvent eventDown(setu::view::MotionEvent::Action::DOWN, 100, 100);
@@ -245,7 +278,7 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             return DefWindowProc(hwnd, msg, wParam, lParam);
         }
         case WM_LBUTTONDOWN: {
-            SetTimer(hwnd, 1, 600000, nullptr); // Reset 10 min idle timer
+            SetTimer(hwnd, TIMER_IDLE_GHOST, 600000, nullptr); // Reset 10 min idle timer
             if (s_rootView) {
                 float x = (float)LOWORD(lParam);
                 float y = (float)HIWORD(lParam);
@@ -412,7 +445,7 @@ bool WindowManager::init() {
         return false;
     }
     
-    SetTimer(s_mainWindow, 1, 600000, nullptr); // 10 minute idle timer
+    SetTimer(s_mainWindow, TIMER_IDLE_GHOST, 600000, nullptr); // 10 minute idle timer
 
     ShowWindow(s_mainWindow, SW_SHOW);
     UpdateWindow(s_mainWindow);
