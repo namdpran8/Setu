@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "androidfw/ResourceTypes.h"
 
@@ -20,9 +21,15 @@ class Theme;
 // androidfw or ResourceManager, so the drawing code can be reasoned about (and
 // unit-tested) without a loaded APK.
 //
-// Root elements that belong to later phases (<bitmap>, <nine-patch>, <vector>)
-// are recognised and logged rather than silently dropped, so a missing
-// background in a real app names the phase that will fix it.
+// Root elements that belong to later phases (<vector>, <layer-list>) are
+// recognised and logged rather than silently dropped, so a missing background in
+// a real app names the phase that will fix it.
+//
+// <bitmap> and <nine-patch> land here rather than in graphics/ for the same
+// reason: choosing between the two classes means resolving a resource ID to a
+// file, opening it out of the APK, and reading the density off the configuration
+// it was selected for. All three are ResourceManager's job, and none of them is
+// anything BitmapDrawable or NinePatchDrawable should know about.
 class DrawableInflater {
 public:
     // Inflates the drawable a resource ID points at. Returns nullptr when the
@@ -54,6 +61,24 @@ private:
     static graphics::DrawablePtr inflateRipple(android::ResXMLParser* parser,
                                                ResourceManager* resManager,
                                                Theme* theme);
+
+    // <bitmap>. Always a BitmapDrawable, even when android:src names a 9-patch -
+    // see the note in the .cpp about why that matches a real device.
+    static graphics::DrawablePtr inflateBitmap(android::ResXMLParser* parser,
+                                               ResourceManager* resManager,
+                                               Theme* theme);
+
+    // <nine-patch>. Always a NinePatchDrawable, which degrades to a plain stretch
+    // when the source turns out to carry no npTc chunk.
+    static graphics::DrawablePtr inflateNinePatch(android::ResXMLParser* parser,
+                                                  ResourceManager* resManager,
+                                                  Theme* theme);
+
+    // The drawable a raw image file becomes when it is referenced directly, with no
+    // XML wrapper - @drawable/icon pointing at res/drawable-hdpi/icon.png. Picks
+    // between the two classes by looking for an npTc chunk in the decoded bytes.
+    static graphics::DrawablePtr inflateImageFile(ResourceManager* resManager, Theme* theme,
+                                                  uint32_t resId, const std::string& path);
 };
 
 } // namespace setu

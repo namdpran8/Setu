@@ -47,7 +47,13 @@ namespace graphics {
 // PREMULTIPLIED anyway - the only cost is that D2D cannot skip the blend), and
 // non-premultiplied ARGB_8888 (Android's setPremultiplied(false), which only
 // exists for pixel-copy interop and never for drawing).
-class Bitmap {
+//
+// enable_shared_from_this is what lets RecordingCanvas turn the const Bitmap& in
+// Canvas::drawBitmap into a shared_ptr<const Bitmap> for the display list, so a
+// recorded draw keeps the image alive without copying its pixels. It cannot fail:
+// the constructor is private and every factory returns a shared_ptr, so an unowned
+// Bitmap does not exist.
+class Bitmap : public std::enable_shared_from_this<Bitmap> {
 public:
     // Density values are DPI, as in DisplayMetrics: 160 is the baseline where
     // 1dp == 1px. DENSITY_NONE means "unspecified", and turns density scaling off
@@ -145,9 +151,21 @@ public:
     //
     // Returns nullptr on failure, having logged; a caller should skip the draw
     // rather than treat it as fatal.
-    ID2D1Bitmap* getD2DBitmap(ID2D1RenderTarget* target);
+    //
+    // const, with the cache mutable behind it, because uploading to the GPU does
+    // not change the image - two calls hand back the same pixels. That is what lets
+    // a canvas draw from a const Bitmap& and a display list hold a
+    // shared_ptr<const Bitmap>, with no const_cast anywhere on the draw path.
+    //
+    // The caveat that buys: this is not the thread-safe kind of const. Two threads
+    // calling getD2DBitmap on one Bitmap would race on the cache vector. Drawing
+    // here is single-threaded, and a lock would cost every draw call to protect
+    // against a caller that does not exist.
+    ID2D1Bitmap* getD2DBitmap(ID2D1RenderTarget* target) const;
 
-    // Drop one target's cached bitmap, or all of them.
+    // Drop one target's cached bitmap, or all of them. Non-const, unlike the
+    // accessor above: this is deliberate, so that discarding device resources reads
+    // as something done *to* the bitmap rather than something incidental.
     void releaseD2DBitmap(ID2D1RenderTarget* target);
     void invalidateD2DBitmaps();
 
@@ -185,7 +203,9 @@ private:
     uint32_t mGeneration = 1;
 
     struct D2DCache;
-    std::unique_ptr<D2DCache> mD2DCache; // allocated on first getD2DBitmap
+    // mutable: a GPU upload is a cache fill, not a change to the image, so
+    // getD2DBitmap is const. Allocated on first getD2DBitmap.
+    mutable std::unique_ptr<D2DCache> mD2DCache;
 };
 
 } // namespace graphics

@@ -1,5 +1,7 @@
 #include "Direct2DCanvas.h"
+#include <algorithm>
 #include <unordered_map>
+#include "Bitmap.h"
 #include "FontManager.h"
 #include "../utils/Logger.h"
 namespace setu {
@@ -232,6 +234,44 @@ void Direct2DCanvas::drawPath(const Path& path, const Paint& paint) {
     if (paint.getStyle() == Style::STROKE || paint.getStyle() == Style::FILL_AND_STROKE) {
         mContext->DrawGeometry(geometry.Get(), brush, paint.getStrokeWidth());
     }
+}
+
+void Direct2DCanvas::drawBitmap(const Bitmap& bitmap, const RectF& src, const RectF& dst,
+                                const Paint& paint) {
+    if (!mContext || dst.isEmpty()) return;
+
+    // getD2DBitmap is const: the upload it may do is a cache fill, not a change to
+    // the image.
+    ID2D1Bitmap* device = bitmap.getD2DBitmap(mContext.Get());
+    if (!device) return; // Bitmap has already logged why
+
+    // The device bitmap is created at 96 DPI (see Bitmap::getD2DBitmap), so one
+    // source DIP is one bitmap pixel and src needs no conversion.
+    const float w = (float)bitmap.getWidth();
+    const float h = (float)bitmap.getHeight();
+
+    // Empty src means the whole bitmap - Android's null Rect. Clamped in either
+    // case, because D2D fails the whole draw on a source rectangle that leaves the
+    // bitmap where Skia would have clamped to the edge.
+    D2D1_RECT_F srcRect =
+        src.isEmpty() ? D2D1::RectF(0.0f, 0.0f, w, h)
+                      : D2D1::RectF(std::max(0.0f, src.left), std::max(0.0f, src.top),
+                                    std::min(w, src.right), std::min(h, src.bottom));
+    if (srcRect.right <= srcRect.left || srcRect.bottom <= srcRect.top) return;
+
+    const D2D1_RECT_F dstRect = D2D1::RectF(dst.left, dst.top, dst.right, dst.bottom);
+
+    // Alpha only, per the contract on Canvas::drawBitmap. Fully transparent is a
+    // real case - a fading drawable - and skipping it saves the sampler.
+    const float opacity = (float)((paint.getColor() >> 24) & 0xFF) / 255.0f;
+    if (opacity <= 0.0f) return;
+
+    // Pointer arguments deliberately, to pin overload resolution to
+    // ID2D1DeviceContext::DrawBitmap. The ID2D1RenderTarget::DrawBitmap this also
+    // inherits takes a D2D1_BITMAP_INTERPOLATION_MODE instead, a different enum
+    // that has no LINEAR value of its own to confuse this with.
+    mContext->DrawBitmap(device, &dstRect, opacity, D2D1_INTERPOLATION_MODE_LINEAR, &srcRect,
+                         nullptr);
 }
 
 void Direct2DCanvas::drawRenderNode(RenderNode* node) {

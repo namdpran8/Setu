@@ -1,4 +1,5 @@
 #pragma once
+#include "Bitmap.h"
 #include "Canvas.h"
 #include <vector>
 #include <memory>
@@ -130,6 +131,34 @@ private:
     // Held by value like Paint: a Path is just two vectors of floats, and the
     // drawable that produced it may be gone by the time the list is replayed.
     Path path;
+    Paint paint;
+};
+
+class DrawBitmapCommand : public DrawCommand {
+public:
+    DrawBitmapCommand(std::shared_ptr<const Bitmap> bmp, const RectF& src, const RectF& dst,
+                      const Paint& p)
+        : bitmap(std::move(bmp)), src(src), dst(dst), paint(p) {}
+    void execute(Canvas& canvas) override {
+        if (bitmap) canvas.drawBitmap(*bitmap, src, dst, paint);
+    }
+private:
+    // A shared_ptr, not a by-value copy like Path and Paint above. Two reasons, and
+    // the first is the one that matters: a Bitmap is megabytes of pixels plus a
+    // cached GPU texture, and this command is re-recorded on every invalidate.
+    // Copying per draw call would mean copying the image per frame. The second is
+    // that Bitmap is deliberately non-copyable, so there is no by-value option.
+    //
+    // shared_ptr<const Bitmap>, because replaying a recorded draw only reads the
+    // image - the GPU upload behind getD2DBitmap is a const operation on a mutable
+    // cache. That const is what keeps this whole path free of const_cast.
+    //
+    // Sharing ownership rather than borrowing a raw pointer is also what makes the
+    // display list safe to replay after the Drawable that recorded it is gone -
+    // unlike DrawRenderNodeCommand below, which does borrow, and gets away with it
+    // because a RenderNode is owned by the View being drawn.
+    std::shared_ptr<const Bitmap> bitmap;
+    RectF src, dst;
     Paint paint;
 };
 

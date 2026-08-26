@@ -187,7 +187,7 @@ void Bitmap::eraseColor(uint32_t color) {
     ++mGeneration;
 }
 
-ID2D1Bitmap* Bitmap::getD2DBitmap(ID2D1RenderTarget* target) {
+ID2D1Bitmap* Bitmap::getD2DBitmap(ID2D1RenderTarget* target) const {
     if (!target || mPixels.empty()) return nullptr;
 
     if (!mD2DCache) mD2DCache = std::make_unique<D2DCache>();

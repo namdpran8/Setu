@@ -1,19 +1,26 @@
 #include "DrawableInflater.h"
 
+#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "StateSetInflater.h"
 #include "Theme.h"
+#include "WindowManager.h"
 #include "XmlAttrs.h"
 #include "../dex/ResourceManager.h"
+#include "../graphics/BitmapFactory.h"
+#include "../graphics/drawable/BitmapDrawable.h"
 #include "../graphics/drawable/ColorDrawable.h"
 #include "../graphics/drawable/GradientDrawable.h"
+#include "../graphics/drawable/NinePatchDrawable.h"
 #include "../graphics/drawable/RippleDrawable.h"
 #include "../graphics/drawable/StateListDrawable.h"
 #include "../graphics/drawable/StateSet.h"
+#include "../view/Gravity.h"
 #include "../utils/Logger.h"
 
 namespace setu {
@@ -31,6 +38,158 @@ constexpr uint32_t ANDROID_ID_MASK = 0x0102002e;
 bool endsWith(const std::string& str, const char* suffix) {
     const std::string s(suffix);
     return str.size() >= s.size() && str.compare(str.size() - s.size(), s.size(), s) == 0;
+}
+
+// The screen density in DPI, which is the unit both bitmap drawables want. Note the
+// conversion: WindowManager stores a float scale factor (3.0 for xxhdpi), and the
+// drawables want 480. Passing the scale straight through would scale every image by
+// 1/160th of its size.
+int displayDensityDpi() {
+    const float scale = view::WindowManager::getDensity();
+    if (scale <= 0.0f) return graphics::Bitmap::DENSITY_DEFAULT;
+    const int dpi = (int)std::lround(scale * (float)graphics::Bitmap::DENSITY_DEFAULT);
+    return dpi > 0 ? dpi : graphics::Bitmap::DENSITY_DEFAULT;
+}
+
+// The density a resource's own configuration declares, as a Bitmap density.
+//
+// Two zeroes that mean opposite things meet here, which is the whole reason this is
+// a function: ResTable_config::DENSITY_DEFAULT is 0 and means "no density qualifier
+// on the directory", i.e. res/drawable/, i.e. mdpi. Bitmap::DENSITY_NONE is also 0
+// and means "unknown, do not scale". Mapping the first onto the second would leave
+// every unqualified drawable unscaled.
+int sourceDensityFromConfig(uint16_t configDensity, int targetDensityDpi) {
+    switch (configDensity) {
+        case android::ResTable_config::DENSITY_DEFAULT:
+            // res/drawable/, no qualifier. AOSP's ResourcesImpl substitutes the
+            // baseline here, so the asset scales up on a dense screen.
+            return graphics::Bitmap::DENSITY_DEFAULT;
+        case android::ResTable_config::DENSITY_NONE:
+            // drawable-nodpi: authored in real pixels, never resampled.
+            return graphics::Bitmap::DENSITY_NONE;
+        case android::ResTable_config::DENSITY_ANY:
+            // drawable-anydpi, which is meant for vectors. A raster found there has
+            // no declared size, so treating it as already-correct for this screen is
+            // the only reading that does not invent a scale factor.
+            return targetDensityDpi;
+        default:
+            return (int)configDensity;
+    }
+}
+
+// Everything one image file yields. The chunk is kept alongside the pixels because
+// only the decode can recover it - WIC drops unknown PNG chunks, so it is harvested
+// from the encoded bytes and cannot be read back off the Bitmap later.
+struct DecodedImage {
+    std::shared_ptr<graphics::Bitmap> bitmap;
+    std::vector<uint8_t> ninePatchChunk;
+    bool pathSaysNinePatch = false;
+    int targetDensityDpi = graphics::Bitmap::DENSITY_DEFAULT;
+};
+
+// Resolves a drawable resource ID to a file, opens it out of the APK it was selected
+// from, and decodes it. False on any failure, having logged which one.
+bool decodeImageResource(ResourceManager* resManager, Theme* theme, uint32_t resId,
+                         DecodedImage& out) {
+    if (!resManager || resId == 0) return false;
+
+    auto* assets = resManager->getAssetManager();
+    if (!assets) return false;
+
+    const std::string path = resManager->getResourceFilePath(resId);
+    if (path.empty()) {
+        Logger::w(TAG, "Drawable 0x" + std::to_string(resId) + " is not a file");
+        return false;
+    }
+
+    if (endsWith(path, ".xml")) {
+        // android:src naming another XML drawable. Legal to write, meaningless to
+        // both classes, and diagnosed here rather than as a puzzling decode failure
+        // twenty lines down.
+        Logger::w(TAG, "android:src must name an image file, not " + path);
+        return false;
+    }
+
+    out.targetDensityDpi = displayDensityDpi();
+    out.pathSaysNinePatch = endsWith(path, ".9.png");
+
+    // A second lookup of the same ID. getResourceFilePath resolves aliases and hands
+    // back the path but keeps neither the cookie nor the configuration, and both are
+    // needed here: the cookie to open the file out of the *right* APK (the app and
+    // framework-res both ship res/drawable-hdpi paths), and the config for the
+    // density the directory name declares.
+    int sourceDensity = graphics::Bitmap::DENSITY_DEFAULT;
+    android::ApkAssetsCookie cookie = android::kInvalidCookie;
+    if (auto res = assets->GetResource(resId); res.has_value()) {
+        android::AssetManager2::SelectedValue val = res.value();
+        if (resManager->resolveValue(val, theme)) {
+            cookie = val.cookie;
+            sourceDensity = sourceDensityFromConfig(val.config.density, out.targetDensityDpi);
+        }
+    }
+
+    // Falling back to the path-only overload rather than bailing out: it searches
+    // every loaded APK in reverse order, which is what openXml does and is right far
+    // more often than it is wrong.
+    std::unique_ptr<android::Asset> asset =
+        cookie == android::kInvalidCookie
+            ? assets->OpenNonAsset(path, android::Asset::ACCESS_BUFFER)
+            : assets->OpenNonAsset(path, cookie, android::Asset::ACCESS_BUFFER);
+    if (!asset) {
+        Logger::w(TAG, "Could not open image asset: " + path);
+        return false;
+    }
+
+    graphics::BitmapFactory::Options options;
+    options.inDensity = sourceDensity;
+
+    out.bitmap = graphics::BitmapFactory::decodeAsset(asset.get(), &options);
+    if (!out.bitmap) {
+        // BitmapFactory has already logged the specific reason, which for a .webp on
+        // a machine without the Store codec is the one worth reading.
+        Logger::w(TAG, "Could not decode " + path);
+        return false;
+    }
+
+    out.ninePatchChunk = std::move(options.outNinePatchChunk);
+    return true;
+}
+
+// android:alpha is a 0..1 float on a drawable, unlike the 0..255 int setAlpha takes.
+float clampUnit(float alpha) {
+    return alpha < 0.0f ? 0.0f : (alpha > 1.0f ? 1.0f : alpha);
+}
+
+int alphaFloatToInt(float alpha) {
+    return (int)std::lround(clampUnit(alpha) * 255.0f);
+}
+
+// Wraps an already-decoded image, target density applied. Takes the DecodedImage
+// rather than a resource ID so that the raw-file path can decide which of the two
+// classes to build *after* decoding, instead of decoding twice to find out.
+//
+// Both consume image.bitmap.
+std::shared_ptr<graphics::BitmapDrawable> makeBitmapDrawable(DecodedImage& image) {
+    auto drawable = std::make_shared<graphics::BitmapDrawable>(std::move(image.bitmap));
+    drawable->setTargetDensity(image.targetDensityDpi);
+    return drawable;
+}
+
+// Returns a drawable even when the chunk is missing or unusable: the class documents
+// that case as a plain stretch, which is a better background than none. `what` names
+// the resource in the warning that says so.
+std::shared_ptr<graphics::NinePatchDrawable> makeNinePatchDrawable(DecodedImage& image,
+                                                                  const std::string& what) {
+    auto drawable = std::make_shared<graphics::NinePatchDrawable>(std::move(image.bitmap),
+                                                                 image.ninePatchChunk);
+    // After the chunk, not before: setTargetDensity rescales the padding the chunk
+    // supplied, so it has to see a parsed chunk to have anything to rescale.
+    drawable->setTargetDensity(image.targetDensityDpi);
+
+    if (!drawable->hasValidChunk()) {
+        Logger::w(TAG, what + " has no usable npTc chunk; it will stretch as a plain bitmap");
+    }
+    return drawable;
 }
 
 // Per-channel mean of two ARGB colours.
@@ -153,7 +312,6 @@ graphics::DrawablePtr inflateRippleItem(android::ResXMLParser* parser, ResourceM
 
 // The roadmap item that will make a given root element work, for the log line.
 const char* phaseFor(const std::string& tag) {
-    if (tag == "bitmap" || tag == "nine-patch") return "Phase 6 (bitmap pipeline)";
     if (tag == "vector" || tag == "animated-vector") return "not yet on the roadmap (vector drawables)";
     if (tag == "animated-selector") {
         // A different class, not a variant of <ripple>: AnimatedStateListDrawable
@@ -197,10 +355,9 @@ graphics::DrawablePtr DrawableInflater::inflate(ResourceManager* resManager, The
     }
 
     if (!endsWith(path, ".xml")) {
-        // .png, .9.png, .webp, .jpg - all of them need a decoder and a
-        // Canvas::drawBitmap, which is Phase 6.
-        Logger::d(TAG, "Skipping bitmap drawable (Phase 6): " + path);
-        return nullptr;
+        // A raw image referenced directly: @drawable/icon landing on
+        // res/drawable-hdpi/icon.png, with no <bitmap> wrapper to carry attributes.
+        return inflateImageFile(resManager, theme, resId, path);
     }
 
     auto tree = resManager->openXml(resId);
@@ -236,6 +393,12 @@ graphics::DrawablePtr DrawableInflater::inflateFromParser(android::ResXMLParser*
     }
     if (tag == "ripple") {
         return inflateRipple(parser, resManager, theme);
+    }
+    if (tag == "bitmap") {
+        return inflateBitmap(parser, resManager, theme);
+    }
+    if (tag == "nine-patch") {
+        return inflateNinePatch(parser, resManager, theme);
     }
 
     Logger::d(TAG, "<" + tag + "> is " + phaseFor(tag) + "; no background drawn");
@@ -385,6 +548,153 @@ graphics::DrawablePtr DrawableInflater::inflateRipple(android::ResXMLParser* par
     // ?selectableItemBackground, which is a real and very common resource. It draws
     // nothing at rest and touch feedback when touched, which is the whole point.
     return ripple;
+}
+
+graphics::DrawablePtr DrawableInflater::inflateImageFile(ResourceManager* resManager, Theme* theme,
+                                                        uint32_t resId, const std::string& path) {
+    DecodedImage image;
+    if (!decodeImageResource(resManager, theme, resId, image)) return nullptr;
+
+    // The chunk is the authority. aapt compiles the marker border of a .9.png into an
+    // npTc chunk and strips the border out of the pixels, so the chunk's presence is
+    // the only thing that proves the divs describe these particular pixels.
+    //
+    // The suffix is the fallback, and it only changes the outcome when the two
+    // disagree: a file named .9.png whose chunk did not survive the trip. That is a
+    // broken build rather than a plain bitmap, and NinePatchDrawable is what says so -
+    // it logs the missing chunk and then stretches, which is exactly what a
+    // BitmapDrawable would have done without mentioning it.
+    if (!image.ninePatchChunk.empty() || image.pathSaysNinePatch) {
+        return makeNinePatchDrawable(image, path);
+    }
+
+    // Gravity stays at BitmapDrawable's FILL default. A directly-referenced image has
+    // no android:gravity to read, and AOSP's createFromResourceStream builds exactly
+    // this - which is why @drawable/icon used as a background stretches to the view
+    // rather than sitting at its intrinsic size in the middle.
+    return makeBitmapDrawable(image);
+}
+
+graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* parser,
+                                                     ResourceManager* resManager, Theme* theme) {
+    using BD = graphics::BitmapDrawable;
+
+    // Every attribute has to come off the parser before anything advances it - the
+    // same ordering constraint inflateSelectorItem carries, because XmlAttrs reads
+    // through the parser live rather than taking a copy.
+    const XmlAttrs attrs(parser, resManager, theme);
+
+    const uint32_t srcId = attrs.getResourceId("src");
+    const int gravity = attrs.getInt("gravity", view::Gravity::FILL);
+    // TILE_MODE_UNDEFINED, not DISABLED: an absent android:tileModeY must not clear
+    // what an android:tileMode on the same element just set. AOSP's inflate() makes
+    // the same distinction with the same sentinel.
+    const int tileMode = attrs.getInt("tileMode", BD::TILE_MODE_UNDEFINED);
+    const int tileModeX = attrs.getInt("tileModeX", BD::TILE_MODE_UNDEFINED);
+    const int tileModeY = attrs.getInt("tileModeY", BD::TILE_MODE_UNDEFINED);
+    const bool antiAlias = attrs.getBool("antialias", false);
+    const bool filter = attrs.getBool("filter", true);
+    const float alpha = attrs.getFloat("alpha", 1.0f);
+    const bool hasTint = attrs.has("tint");
+    const bool hasMipMap = attrs.has("mipMap");
+    const bool hasAutoMirrored = attrs.has("autoMirrored");
+
+    skipCurrentElement(parser);
+
+    if (srcId == 0) {
+        // AOSP throws XmlPullParserException here. Nothing to draw either way, but a
+        // warning beats an abort: the rest of the view hierarchy still inflates.
+        Logger::w(TAG, "<bitmap> without a resolvable android:src; no background drawn");
+        return nullptr;
+    }
+
+    DecodedImage image;
+    if (!decodeImageResource(resManager, theme, srcId, image)) return nullptr;
+
+    // Deliberately a BitmapDrawable even when the source carries an npTc chunk, which
+    // is what a real device does: AOSP's BitmapDrawable holds a Bitmap and has no
+    // chunk field at all, so a <bitmap> wrapping a .9.png stretches there too. It is
+    // also the only answer that keeps the attributes below meaning anything - gravity
+    // and tileMode are BitmapDrawable's, and a lattice would override both.
+    if (!image.ninePatchChunk.empty()) {
+        Logger::d(TAG, "<bitmap> android:src is a 9-patch; its stretch regions are "
+                       "ignored, as on a real device. Use <nine-patch> to honour them");
+    }
+
+    auto drawable = makeBitmapDrawable(image);
+    drawable->setGravity(gravity);
+
+    // android:tileMode sets both axes and the per-axis attributes then override it,
+    // which is the order AOSP applies them in - so tileMode="repeat" tileModeY="clamp"
+    // repeats horizontally and clamps vertically.
+    if (tileMode != BD::TILE_MODE_UNDEFINED) {
+        const BD::TileMode mode = BD::parseTileMode(tileMode);
+        drawable->setTileModeXY(mode, mode);
+    }
+    if (tileModeX != BD::TILE_MODE_UNDEFINED) {
+        drawable->setTileModeX(BD::parseTileMode(tileModeX));
+    }
+    if (tileModeY != BD::TILE_MODE_UNDEFINED) {
+        drawable->setTileModeY(BD::parseTileMode(tileModeY));
+    }
+
+    drawable->setAntiAlias(antiAlias);
+    drawable->setFilterBitmap(filter);
+    if (alpha != 1.0f) {
+        drawable->setAlpha(alphaFloatToInt(alpha));
+    }
+
+    // android:dither is not mentioned: it means nothing at 32bpp, so silence is
+    // honest. These three are different - each would change the pixels.
+    if (hasTint) {
+        Logger::d(TAG, "<bitmap> android:tint ignored until a ColorFilter exists");
+    }
+    if (hasMipMap) {
+        Logger::d(TAG, "<bitmap> android:mipMap ignored; D2D picks its own sampling");
+    }
+    if (hasAutoMirrored) {
+        Logger::d(TAG, "<bitmap> android:autoMirrored ignored; this runtime is LTR-only");
+    }
+    return drawable;
+}
+
+graphics::DrawablePtr DrawableInflater::inflateNinePatch(android::ResXMLParser* parser,
+                                                        ResourceManager* resManager, Theme* theme) {
+    // Same ordering constraint as inflateBitmap.
+    const XmlAttrs attrs(parser, resManager, theme);
+
+    const uint32_t srcId = attrs.getResourceId("src");
+    const float alpha = attrs.getFloat("alpha", 1.0f);
+    const bool hasTint = attrs.has("tint");
+    const bool hasAutoMirrored = attrs.has("autoMirrored");
+
+    skipCurrentElement(parser);
+
+    if (srcId == 0) {
+        Logger::w(TAG, "<nine-patch> without a resolvable android:src; no background drawn");
+        return nullptr;
+    }
+
+    DecodedImage image;
+    if (!decodeImageResource(resManager, theme, srcId, image)) return nullptr;
+
+    // No chunk check before building. AOSP throws "<nine-patch> requires a valid
+    // 9-patch source image" here, but this class already degrades to a plain stretch
+    // and says so, and that is the more useful outcome for a widget that would
+    // otherwise lose its background entirely.
+    auto drawable = makeNinePatchDrawable(image, "<nine-patch> android:src");
+
+    if (alpha != 1.0f) {
+        drawable->setAlpha(alphaFloatToInt(alpha));
+    }
+    // android:dither omitted for the same reason as in <bitmap>.
+    if (hasTint) {
+        Logger::d(TAG, "<nine-patch> android:tint ignored until a ColorFilter exists");
+    }
+    if (hasAutoMirrored) {
+        Logger::d(TAG, "<nine-patch> android:autoMirrored ignored; this runtime is LTR-only");
+    }
+    return drawable;
 }
 
 graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* parser,

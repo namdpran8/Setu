@@ -50,6 +50,20 @@ void RecordingCanvas::drawPath(const Path& path, const Paint& paint) {
     mNode->addCommand(std::make_unique<DrawPathCommand>(path, paint));
 }
 
+void RecordingCanvas::drawBitmap(const Bitmap& bitmap, const RectF& src, const RectF& dst,
+                                 const Paint& paint) {
+    // Take a share of the bitmap rather than a copy of it, so the display list can
+    // outlive the Drawable that recorded this and still have pixels to replay.
+    //
+    // shared_from_this on a const Bitmap yields shared_ptr<const Bitmap>, which is
+    // exactly what the command wants: replaying a recorded draw only ever reads the
+    // image. It cannot throw here either - Bitmap's constructor is private and every
+    // factory hands back a shared_ptr, so a Bitmap that no shared_ptr already owns
+    // cannot be constructed.
+    mNode->addCommand(
+        std::make_unique<DrawBitmapCommand>(bitmap.shared_from_this(), src, dst, paint));
+}
+
 void RecordingCanvas::drawRenderNode(RenderNode* node) {
     mNode->addCommand(std::make_unique<DrawRenderNodeCommand>(node));
 }

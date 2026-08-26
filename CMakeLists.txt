@@ -47,6 +47,8 @@ add_executable(setu_runtime
     "src/graphics/drawable/DrawableContainer.cpp"
     "src/graphics/drawable/StateListDrawable.cpp"
     "src/graphics/drawable/RippleDrawable.cpp"
+    "src/graphics/drawable/BitmapDrawable.cpp"
+    "src/graphics/drawable/NinePatchDrawable.cpp"
     "src/view/View.cpp"
     "src/view/ViewGroup.cpp"
     "src/view/Choreographer.cpp"
@@ -68,6 +70,14 @@ target_include_directories(setu_runtime PRIVATE include)
 target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi windowscodecs ole32 setu_androidfw cassowary)
 target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
 
+# A deliberately minimal subset: only what the constraint solver test actually
+# touches, so it stays fast to build and independent of the resource pipeline. Note
+# what is absent - ResourceManager, Theme, TypedArray, the inflaters, Bitmap and the
+# bitmap drawables. RecordingCanvas::drawBitmap is compiled in here, but it only
+# stores a shared_ptr and re-dispatches through Canvas, so it pulls in no Bitmap
+# symbol; nothing in this target names BitmapDrawable or NinePatchDrawable at all.
+# Adding them would drag in Bitmap.cpp, BitmapFactory.cpp and the WIC link libraries
+# for code the test never runs.
 add_executable(constraint_layout_test src/test_constraint_layout.cpp
     "src/utils/Logger.cpp"
     "src/view/View.cpp"
