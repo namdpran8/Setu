@@ -8,28 +8,34 @@ namespace view {
 
 void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     int widthMode = getMode(widthMeasureSpec);
-    int widthSize = getSize(widthMeasureSpec);
     int heightMode = getMode(heightMeasureSpec);
-    int heightSize = getSize(heightMeasureSpec);
     
     bool isVertical = (mOrientation == Orientation::VERTICAL);
     
-    int totalWeight = 0;
+    float totalWeight = 0.0f;
     int usedSize = 0;
     int maxOrthogonal = 0;
-    
+    // Space taken in this pass by children that are sized from excess space alone
+    // (0 along the layout axis plus a weight). Those children have no intrinsic
+    // size of their own, so the space is credited back to the excess pool before
+    // distribution (AOSP's consumedExcessSpace).
+    int consumedExcessSpace = 0;
+    bool hasExcessOnlyChildren = false;
+
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::GONE) continue;
-        
+
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         if (!lp) lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
-        
+
         int childWidthSpec, childHeightSpec;
-        
+        bool useExcessSpace = false;
+
         if (isVertical) {
             childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin, lp->width);
             if (lp->weight > 0) {
                 totalWeight += lp->weight;
+                useExcessSpace = (lp->height == 0);
                 childHeightSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
             } else {
                 childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
@@ -38,14 +44,15 @@ void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
             if (lp->weight > 0) {
                 totalWeight += lp->weight;
+                useExcessSpace = (lp->width == 0);
                 childWidthSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
             } else {
                 childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin, lp->width);
             }
         }
-        
+
         child->measure(childWidthSpec, childHeightSpec);
-        
+
         if (isVertical) {
             usedSize += child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin;
             maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
@@ -53,38 +60,81 @@ void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             usedSize += child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin;
             maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);
         }
+
+        if (useExcessSpace) {
+            consumedExcessSpace += isVertical ? child->getMeasuredHeight() : child->getMeasuredWidth();
+            hasExcessOnlyChildren = true;
+        }
     }
     
-    if (totalWeight > 0) {
+    if (totalWeight > 0.0f) {
         if (isVertical) {
-            int remaining = heightSize - mPaddingTop - mPaddingBottom - usedSize;
-            if (remaining < 0) remaining = 0;
-            
-            for (auto& child : mChildren) {
-                if (child->getVisibility() == View::GONE) continue;
-                auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
-                if (lp && lp->weight > 0) {
-                    int childHeight = (remaining * lp->weight) / totalWeight;
-                    int childHeightSpec = View::makeMeasureSpec(childHeight, View::MEASURE_SPEC_EXACTLY);
-                    int childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin, lp->width);
-                    child->measure(childWidthSpec, childHeightSpec);
-                    usedSize += childHeight + lp->topMargin + lp->bottomMargin;
+            // Seed the excess pool from our resolved height, crediting back the space
+            // the excess-only children took in the first pass. This may be negative,
+            // in which case the weighted children shrink instead of growing.
+            int totalLength = usedSize + mPaddingTop + mPaddingBottom;
+            int remaining = resolveSize(totalLength, heightMeasureSpec) - totalLength + consumedExcessSpace;
+            bool mustRemeasure = hasExcessOnlyChildren && heightMode == View::MEASURE_SPEC_EXACTLY;
+
+            if (remaining != 0 || mustRemeasure) {
+                float remainingWeight = totalWeight;
+                usedSize = 0;
+
+                for (auto& child : mChildren) {
+                    if (child->getVisibility() == View::GONE) continue;
+                    auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
+                    if (!lp) lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
+
+                    if (lp->weight > 0) {
+                        // Take this child's share out of what is still left and deduct it,
+                        // so integer truncation cannot lose pixels across several children.
+                        int share = (int)(lp->weight * remaining / remainingWeight);
+                        remaining -= share;
+                        remainingWeight -= lp->weight;
+
+                        // A child with no size of its own along the axis is laid out from its
+                        // share alone; any other child keeps the size it measured to in the
+                        // first pass and gets the share added on top.
+                        int childHeight = (lp->height == 0) ? share : (child->getMeasuredHeight() + share);
+
+                        int childHeightSpec = View::makeMeasureSpec(std::max(0, childHeight), View::MEASURE_SPEC_EXACTLY);
+                        int childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin, lp->width);
+                        child->measure(childWidthSpec, childHeightSpec);
+                    }
+
+                    // Re-accumulate from what the children actually measured to, not from
+                    // the size we asked for.
+                    usedSize += child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin;
                     maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
                 }
             }
         } else {
-            int remaining = widthSize - mPaddingLeft - mPaddingRight - usedSize;
-            if (remaining < 0) remaining = 0;
-            
-            for (auto& child : mChildren) {
-                if (child->getVisibility() == View::GONE) continue;
-                auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
-                if (lp && lp->weight > 0) {
-                    int childWidth = (remaining * lp->weight) / totalWeight;
-                    int childWidthSpec = View::makeMeasureSpec(childWidth, View::MEASURE_SPEC_EXACTLY);
-                    int childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
-                    child->measure(childWidthSpec, childHeightSpec);
-                    usedSize += childWidth + lp->leftMargin + lp->rightMargin;
+            int totalLength = usedSize + mPaddingLeft + mPaddingRight;
+            int remaining = resolveSize(totalLength, widthMeasureSpec) - totalLength + consumedExcessSpace;
+            bool mustRemeasure = hasExcessOnlyChildren && widthMode == View::MEASURE_SPEC_EXACTLY;
+
+            if (remaining != 0 || mustRemeasure) {
+                float remainingWeight = totalWeight;
+                usedSize = 0;
+
+                for (auto& child : mChildren) {
+                    if (child->getVisibility() == View::GONE) continue;
+                    auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
+                    if (!lp) lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
+
+                    if (lp->weight > 0) {
+                        int share = (int)(lp->weight * remaining / remainingWeight);
+                        remaining -= share;
+                        remainingWeight -= lp->weight;
+
+                        int childWidth = (lp->width == 0) ? share : (child->getMeasuredWidth() + share);
+
+                        int childWidthSpec = View::makeMeasureSpec(std::max(0, childWidth), View::MEASURE_SPEC_EXACTLY);
+                        int childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
+                        child->measure(childWidthSpec, childHeightSpec);
+                    }
+
+                    usedSize += child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin;
                     maxOrthogonal = std::max(maxOrthogonal, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);
                 }
             }

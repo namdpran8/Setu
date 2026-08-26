@@ -46,6 +46,7 @@ add_executable(setu_runtime
     "src/graphics/drawable/StateSet.cpp"
     "src/graphics/drawable/DrawableContainer.cpp"
     "src/graphics/drawable/StateListDrawable.cpp"
+    "src/graphics/drawable/InsetDrawable.cpp"
     "src/graphics/drawable/RippleDrawable.cpp"
     "src/graphics/drawable/BitmapDrawable.cpp"
     "src/graphics/drawable/NinePatchDrawable.cpp"
