@@ -45,7 +45,7 @@ bool endsWith(const std::string& str, const char* suffix) {
 // drawables want 480. Passing the scale straight through would scale every image by
 // 1/160th of its size.
 int displayDensityDpi() {
-    const float scale = view::WindowManager::getDensity();
+    const float scale = WindowManager::getDensity();
     if (scale <= 0.0f) return graphics::Bitmap::DENSITY_DEFAULT;
     const int dpi = (int)std::lround(scale * (float)graphics::Bitmap::DENSITY_DEFAULT);
     return dpi > 0 ? dpi : graphics::Bitmap::DENSITY_DEFAULT;
