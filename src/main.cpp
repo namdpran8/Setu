@@ -30,6 +30,23 @@
 #include <chrono>
 #include <iomanip>
 
+/*
+    Hey, you.
+
+    Yes, you reading the raw main.cpp source code .
+
+    First of all, why?
+
+    Second, welcome.
+
+    This project was supposed to be a small experiment.
+    Somehow it turned into whatever this is.
+
+    If you're still reading, congratulations.
+    You have officially spent more time reading this comment
+    than I spent planning the architecture.
+*/
+
 struct LaunchArgs {
     std::string package;
     std::string logLevel = "info";
@@ -98,6 +115,9 @@ std::string resolveMainActivity(android::ResXMLParser* parser) {
                         if (val16) currentActivity = android::util::Utf16ToUtf8(android::StringPiece16(val16, valLen));
                     }
                 }
+// If you\'re reading this, you\'re probably trying to understand what this does.
+// Good luck. The comment above was written by AI because I didn\'t want to
+// explain it myself. I hope it was correct.
             } else if (tag == "action") {
                 for (size_t i = 0; i < parser->getAttributeCount(); i++) {
                     size_t nameLen;
