@@ -1,4 +1,5 @@
 # Setu
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 **Setu** is a highly experimental, custom Android runtime for Windows built from scratch in C++. 
 
@@ -49,7 +50,7 @@ Setu is built using **CMake** and C++17/C++20. It requires a Windows environment
 
 ## 📝 License
 
-This project is for educational and experimental purposes.
+This project is licensed under the [Apache License 2.0](LICENSE).
 
 ---
 

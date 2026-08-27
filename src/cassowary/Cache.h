@@ -1,4 +1,19 @@
-// Cache.h — Ported from androidx.constraintlayout.core.Cache (Cache.java)
+/*
+ * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (c) 2026 Pranshu Namdeo
+ *
+ * Rewritten and ported from Cache.java from the
+ * Android Open Source Project (AOSP).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 // Original: Cache.java:1-27
 //
 // Cache for common solver objects (pools of ArrayRow and SolverVariable).

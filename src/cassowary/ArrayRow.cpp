@@ -1,4 +1,19 @@
-// ArrayRow.cpp — Ported from androidx.constraintlayout.core.ArrayRow (ArrayRow.java)
+/*
+ * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (c) 2026 Pranshu Namdeo
+ *
+ * Rewritten and ported from AOSP Java Implementation from the
+ * Android Open Source Project (AOSP).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 // Original: ArrayRow.java:1-814
 //
 // Copyright (C) 2015 The Android Open Source Project — Apache 2.0

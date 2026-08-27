@@ -1,4 +1,19 @@
-// Pools.h — Ported from androidx.constraintlayout.core.Pools (Pools.java)
+/*
+ * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (c) 2026 Pranshu Namdeo
+ *
+ * Rewritten and ported from Pools.java from the
+ * Android Open Source Project (AOSP).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 // Original: https://github.com/nicklasbekkgaard/constraintlayout/blob/main/constraintlayout/core/src/main/java/androidx/constraintlayout/core/Pools.java
 //
 // Simple object pool template. In Java, this avoids GC churn; in C++ it avoids

@@ -1,4 +1,19 @@
-// SolverVariable.h — Ported from androidx.constraintlayout.core.SolverVariable (SolverVariable.java)
+/*
+ * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (c) 2026 Pranshu Namdeo
+ *
+ * Rewritten and ported from SolverVariable.java from the
+ * Android Open Source Project (AOSP).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 // Original: SolverVariable.java:1-344
 //
 // Represents a variable in the linear constraint system.

@@ -1,4 +1,16 @@
 /*
+ * Copyright (c) 2026 Pranshu Namdeo
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/*
  * NOTE: This file (dalvik_opcodes.cpp) was used in the initial phase as a standalone reference.
  * The actual, currently used interpreter loop is located in:
  * C:\Users\namde\Documents\Windroid\src\interpreter\Interpreter.cpp
