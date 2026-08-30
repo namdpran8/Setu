@@ -13,8 +13,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive # Fetch submodules in case thirdparty dependencies need it
+
+      # NOTE: Skia submodule is currently broken (no URL in .gitmodules).
+      # You will need to download/build Skia manually in the steps below.
 
       # NOTE: If Skia or other libraries need to be built from source (because the pre-built 
       # .lib files aren't in Git), you will need to add a step here to build/download them.
