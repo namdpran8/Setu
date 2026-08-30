@@ -147,6 +147,22 @@ float ResourceManager::resolveDimension(uint32_t resId) {
     return 0.0f;
 }
 
+float ResourceManager::applyDimension(int unit, float value) {
+    return applyDimensionPx(unit, value);
+}
+
+int ResourceManager::getInt(uint32_t resId) {
+    if (!m_assetManager) return 0;
+    auto res = m_assetManager->GetResource(resId);
+    if (!res.has_value()) return 0;
+    
+    if (res->type >= android::Res_value::TYPE_FIRST_INT &&
+        res->type <= android::Res_value::TYPE_LAST_INT) {
+        return (int)res->data;
+    }
+    return 0;
+}
+
 std::string ResourceManager::getResourceFilePath(uint32_t resId) {
     if (!m_assetManager) return "";
 

@@ -154,6 +154,25 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", using FrameLayout fallback");
         view = std::make_shared<setu::view::FrameLayout>();
     }
+    
+    if (view && !tag.empty()) {
+        std::string descriptor = tag;
+        // Transform "com.pkg.Class" to "Lcom/pkg/Class;" format for check-cast
+        if (descriptor.find('.') != std::string::npos) {
+            for (char& c : descriptor) {
+                if (c == '.') c = '/';
+            }
+            descriptor = "L" + descriptor + ";";
+        } else {
+            // Unprefixed classes are usually in android.widget. or android.view.
+            if (tag == "View" || tag == "ViewGroup" || tag == "SurfaceView" || tag == "TextureView") {
+                descriptor = "Landroid/view/" + tag + ";";
+            } else {
+                descriptor = "Landroid/widget/" + tag + ";";
+            }
+        }
+        view->setOriginalClassName(descriptor);
+    }
 
     parseViewAttributes(parser, view, resManager, theme);
     parseLayoutParams(parser, view, parent, resManager, theme);

@@ -107,6 +107,9 @@ public:
 
     virtual void dump(int depth = 0);
     virtual std::string getClassName() const { return "View"; }
+    
+    std::string getOriginalClassName() const { return mOriginalClassName; }
+    void setOriginalClassName(const std::string& name) { mOriginalClassName = name; }
 
     // Event handling
     virtual bool dispatchTouchEvent(class MotionEvent& event);
@@ -259,6 +262,7 @@ public:
     static void setAnimationHandler(std::function<void()> handler);
     static bool runScheduledWork();
     static bool hasScheduledWork();
+    static void postTask(std::function<void()> what);
 
     // Display metrics live here rather than in WindowManager for the same reason
     // the invalidate handler does: the view layer is built standalone, so
@@ -287,6 +291,8 @@ protected:
 
     // Pushes the current size into the background drawable.
     void updateBackgroundBounds();
+
+    std::string mOriginalClassName;
 
     int mId = 0;
     int mLeft = 0;

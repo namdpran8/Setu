@@ -36,6 +36,10 @@ public:
     // Returns { MethodBytecodeResult, DexParser* } where DexParser* is the one that contained it.
     std::pair<DexParser::MethodBytecodeResult, const DexParser*> getMethodBytecode(const std::string& methodSignature) const;
 
+    // Hierarchy resolution
+    std::string getSuperClass(const std::string& className) const;
+    bool isInstanceOf(const std::string& actualClass, const std::string& expectedClass) const;
+
 private:
     std::vector<std::unique_ptr<std::vector<uint8_t>>> m_buffers;
     std::vector<std::unique_ptr<DexParser>> m_dexFiles;

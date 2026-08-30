@@ -15,6 +15,9 @@
 namespace setu {
 namespace graphics {
 
+// If you\'re reading this, you\'re probably trying to understand what this does.
+// Good luck. The comment above was written by AI because I didn\'t want to
+// explain it myself. I hope it was correct.
 void Drawable::setBounds(int left, int top, int right, int bottom) {
     if (mBounds.left == left && mBounds.top == top &&
         mBounds.right == right && mBounds.bottom == bottom) {

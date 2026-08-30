@@ -15,13 +15,17 @@
 #include "../ui/WindowManager.h"
 #include "../ui/LayoutInflater.h"
 #include "../dex/ResourceManager.h"
+#include "../view/View.h"
 #include "../view/ViewGroup.h"
+#include "../view/OverlayPanelLayout.h"
 #include "../widget/TextView.h"
 #include "../widget/Button.h"
 #include "../widget/EditText.h"
 #include "Interpreter.h" // For recursive Interpreter execution
+#include "../Permission/PermissionManager.h"
 #include <windows.h>
 #include <shellapi.h>
+#include <cassert>
 
 std::unordered_map<std::string, StubFunc> StubRegistry::stubs;
 setu::ResourceManager* StubRegistry::m_resManager = nullptr;
@@ -31,7 +35,7 @@ std::unordered_map<int, InterpreterObject*> StubRegistry::clickListeners;
 static std::wstring utf8_to_utf16(const std::string& utf8) {
     if (utf8.empty()) return std::wstring();
     int size_needed = MultiByteToWideChar(CP_UTF8, 0, &utf8[0], (int)utf8.size(), NULL, 0);
-    std::wstring utf16(size_needed, 0);
+    std::wstring utf16(size_needed, L'\0');
     MultiByteToWideChar(CP_UTF8, 0, &utf8[0], (int)utf8.size(), &utf16[0], size_needed);
     return utf16;
 }
@@ -39,15 +43,20 @@ static std::wstring utf8_to_utf16(const std::string& utf8) {
 static std::string utf16_to_utf8(const std::wstring& utf16) {
     if (utf16.empty()) return std::string();
     int size_needed = WideCharToMultiByte(CP_UTF8, 0, &utf16[0], (int)utf16.size(), NULL, 0, NULL, NULL);
-    std::string utf8(size_needed, 0);
+    std::string utf8(size_needed, '\0');
     WideCharToMultiByte(CP_UTF8, 0, &utf16[0], (int)utf16.size(), &utf8[0], size_needed, NULL, NULL);
     return utf8;
 }
 
 static std::string getAndroidClassName(const setu::view::View* view) {
+    if (!view) return "Landroid/view/View;";
+    std::string orig = view->getOriginalClassName();
+    if (!orig.empty()) return orig;
+    
     if (dynamic_cast<const setu::widget::EditText*>(view)) return "Landroid/widget/EditText;";
     if (dynamic_cast<const setu::widget::Button*>(view)) return "Landroid/widget/Button;";
     if (dynamic_cast<const setu::widget::TextView*>(view)) return "Landroid/widget/TextView;";
+    if (dynamic_cast<const setu::view::OverlayPanelLayout*>(view)) return "Lcom/sothree/slidinguppanel/SlidingUpPanelLayout;";
     if (dynamic_cast<const setu::view::ViewGroup*>(view)) return "Landroid/view/ViewGroup;";
     return "Landroid/view/View;";
 }
@@ -106,6 +115,10 @@ bool StubRegistry::isStubbed(const std::string& methodSignature) {
     if (cls.find("Ljava/util/") == 0) return true;
     if (cls == "Landroid/content/Context;") return true;
     if (cls.find("Landroid/content/SharedPreferences") == 0) return true;
+    if (cls == "Landroid/app/Activity;") return true;
+    if (cls == "Landroid/app/Application;") return true;
+    if (cls == "Landroid/os/Process;") return true;
+    if (cls == "Ljava/lang/Runtime;") return true;
     if (methodSignature.find("Landroid/app/Activity;->getWindow") == 0) return true;
     if (cls == "Landroid/view/Window;") return true;
     if (cls.find("Landroidx/fragment/app/FragmentManager") == 0) return true;
@@ -224,8 +237,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                             InterpreterObject* strObj = (InterpreterObject*)uriObj->fields["uriString"].obj;
                             if (strObj) {
                                 std::string url = strObj->className; // Wait, string's value is usually stored differently? 
-                                // Actually, in our stub strings are sometimes just objects where className holds the string, or we have a special string class. 
-                                // Let's check how string is extracted.
+                                // Actually, in our stub strings are sometimes just objects where className holds the string, or we have a special string class.
                                 // It seems strObj->className is used for targetClass above: std::string targetClassName = strObj->className;
                                 // Wait, a String object usually has its data in a special field or we use className for it in this mock engine?
                                 // Assuming className holds the string based on line 152: std::string targetClassName = strObj->className;
@@ -605,6 +617,69 @@ void StubRegistry::registerActivityStubs() {
             if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
             return false;
         };
+
+    stubs["Landroid/app/Activity;->getApplication()Landroid/app/Application;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            Logger::d("StubRegistry", "Executed: Activity.getApplication()");
+            if (outReturn) {
+                InterpreterObject* appObj = new InterpreterObject();
+                appObj->className = "Landroid/app/Application;";
+                *outReturn = Value::MakeObject(appObj);
+            }
+            return false;
+        };
+
+    stubs["Landroid/os/Process;->myPid()I"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (outReturn) *outReturn = Value::MakeInt(GetCurrentProcessId());
+            return false;
+        };
+
+    stubs["Landroid/os/Process;->myUid()I"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (outReturn) *outReturn = Value::MakeInt(1000);
+            return false;
+        };
+
+    stubs["Ljava/lang/Runtime;->getRuntime()Ljava/lang/Runtime;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (outReturn) {
+                InterpreterObject* runtimeObj = new InterpreterObject();
+                runtimeObj->className = "Ljava/lang/Runtime;";
+                *outReturn = Value::MakeObject(runtimeObj);
+            }
+            return false;
+        };
+
+    stubs["Ljava/lang/Runtime;->availableProcessors()I"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (outReturn) {
+                SYSTEM_INFO sysInfo;
+                GetSystemInfo(&sysInfo);
+                *outReturn = Value::MakeInt(sysInfo.dwNumberOfProcessors);
+            }
+            return false;
+        };
+
+    stubs["Landroid/app/Activity;->getActionBar()Landroid/app/ActionBar;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            Logger::d("StubRegistry", "Executed: Activity.getActionBar() (No-op)");
+            if (outReturn) *outReturn = Value::MakeNull();
+            return false;
+        };
+
+    stubs["Ljava/lang/System;->lineSeparator()Ljava/lang/String;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (outReturn) {
+                InterpreterObject* strObj = new InterpreterObject();
+                strObj->className = "Ljava/lang/String;";
+                InterpreterObject* inner = new InterpreterObject();
+                inner->className = "\n";
+                strObj->fields["string_value"] = Value::MakeObject(inner);
+                *outReturn = Value::MakeObject(strObj);
+            }
+            return false;
+        };
 }
 
 void StubRegistry::registerViewStubs() {
@@ -615,6 +690,7 @@ void StubRegistry::registerViewStubs() {
         if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
             auto view = std::make_shared<setu::view::ViewGroup>(); // generic for now
+            view->setOriginalClassName(className);
             s_dynamicViews.push_back(view);
             viewObj->nativeHandle = view.get();
             Logger::d("StubRegistry", "Created dynamic view: " + className);
@@ -668,6 +744,20 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/view/ViewGroup;->removeAllViews()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         return false;
     };
+
+    stubs["Landroid/widget/TextView;->setText(I)V"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+                InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+                setu::widget::TextView* view = (setu::widget::TextView*)viewObj->nativeHandle;
+                if (view && m_resManager) {
+                    std::string strVal = m_resManager->getString(args[1].i);
+                    view->setText(utf8_to_utf16(strVal));
+                    Logger::i("StubRegistry", "Updated TextView text to: " + strVal);
+                }
+            }
+            return false;
+        };
 
     stubs["Landroid/widget/TextView;->setText(Ljava/lang/CharSequence;)V"] = 
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
@@ -805,11 +895,37 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/widget/TextView;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V"] = setOnLongClickListenerStub;
 
     auto emptyStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::e("StubRegistry", "FATAL: Unimplemented empty stub called!");
+        assert(false && "Unimplemented empty stub called!");
         if (outReturn) *outReturn = Value::MakeNull();
         return false;
     };
 
     // Added missing stubs
+    auto checkSelfPermissionStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            std::string permStr = "";
+            // ContextCompat.checkSelfPermission takes 2 args: Context and String.
+            // Context.checkSelfPermission takes 1 arg: String.
+            // We check the last argument for the permission string.
+            int permArgIdx = args.size() - 1;
+            if (permArgIdx >= 0 && args[permArgIdx].type == ValueType::OBJECT && args[permArgIdx].obj) {
+                InterpreterObject* strObj = (InterpreterObject*)args[permArgIdx].obj;
+                auto it = strObj->fields.find("string_value");
+                if (it != strObj->fields.end() && it->second.type == ValueType::OBJECT) {
+                    permStr = ((InterpreterObject*)it->second.obj)->className;
+                } else {
+                    permStr = strObj->className; // Fallback
+                }
+            }
+            int result = PermissionManager::instance().checkSelfPermission(permStr, "");
+            *outReturn = Value::MakeInt(result);
+        }
+        return false;
+    };
+    stubs["Landroidx/core/content/ContextCompat;->checkSelfPermission(Landroid/content/Context;Ljava/lang/String;)I"] = checkSelfPermissionStub;
+    stubs["Landroid/content/Context;->checkSelfPermission(Ljava/lang/String;)I"] = checkSelfPermissionStub;
+
     stubs["Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V"] = 
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
             Logger::d("StubRegistry", "Executed: Activity.onCreate() -> Showing Window");
@@ -841,6 +957,26 @@ void StubRegistry::registerViewStubs() {
             } else {
                 *outReturn = Value::MakeNull();
                 Logger::w("StubRegistry", "Executed: Context.getString() without valid arguments or ResourceManager");
+            }
+            return false;
+        };
+
+    stubs["Landroid/content/Context;->getText(I)Ljava/lang/CharSequence;"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 2 && args[1].type == ValueType::INT && m_resManager) {
+                int resId = args[1].i;
+                std::string strVal = m_resManager->getString(resId);
+                
+                InterpreterObject* strObj = new InterpreterObject();
+                strObj->className = "Ljava/lang/String;";
+                InterpreterObject* inner = new InterpreterObject();
+                inner->className = strVal;
+                strObj->fields["string_value"] = Value::MakeObject(inner);
+                *outReturn = Value::MakeObject(strObj);
+                Logger::d("StubRegistry", "Executed: Context.getText(id=" + std::to_string(resId) + ") -> '" + strVal + "'");
+            } else {
+                *outReturn = Value::MakeNull();
+                Logger::w("StubRegistry", "Executed: Context.getText() without valid arguments or ResourceManager");
             }
             return false;
         };
@@ -951,10 +1087,17 @@ void StubRegistry::registerViewStubs() {
         }
         return false;
     };
-    stubs["Landroid/app/Activity;->getResources()Landroid/content/res/Resources;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
+    auto getResourcesStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            InterpreterObject* resObj = new InterpreterObject();
+            resObj->className = "Landroid/content/res/Resources;";
+            *outReturn = Value::MakeObject(resObj);
+        }
         return false;
     };
+    stubs["Landroid/app/Activity;->getResources()Landroid/content/res/Resources;"] = getResourcesStub;
+    stubs["Landroid/content/Context;->getResources()Landroid/content/res/Resources;"] = getResourcesStub;
+
     stubs["Landroid/content/res/Resources;->getConfiguration()Landroid/content/res/Configuration;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
         return false;
@@ -1213,6 +1356,91 @@ void StubRegistry::registerViewStubs() {
             inner->className = resName;
             strObj->fields["string_value"] = Value::MakeObject(inner);
             *outReturn = Value::MakeObject(strObj);
+        }
+        return false;
+    };
+
+    stubs["Landroid/view/View;->getContext()Landroid/content/Context;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            InterpreterObject* ctxObj = new InterpreterObject();
+            ctxObj->className = "Landroid/content/Context;";
+            *outReturn = Value::MakeObject(ctxObj);
+        }
+        return false;
+    };
+
+    stubs["Landroid/widget/TextView;->setTextSize(F)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::FLOAT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            setu::widget::TextView* textView = dynamic_cast<setu::widget::TextView*>(view);
+            if (textView) {
+                // Note: Android's setTextSize(float) expects SP and does conversion.
+                // Here we treat it as raw pixels, consistent with current rendering.
+                textView->setTextSize(args[1].f);
+                Logger::d("StubRegistry", "Executed TextView.setTextSize(" + std::to_string(args[1].f) + ")");
+            }
+        }
+        return false;
+    };
+
+    stubs["Landroid/widget/TextView;->setTextSize(IF)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 3 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT && args[2].type == ValueType::FLOAT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
+            setu::widget::TextView* textView = dynamic_cast<setu::widget::TextView*>(view);
+            if (textView) {
+                float pixels = setu::ResourceManager::applyDimension(args[1].i, args[2].f);
+                textView->setTextSize(pixels);
+                Logger::d("StubRegistry", "Executed TextView.setTextSize(" + std::to_string(args[1].i) + ", " + std::to_string(args[2].f) + ") -> " + std::to_string(pixels) + "px");
+            }
+        }
+        return false;
+    };
+
+    stubs["Landroid/widget/TextView;->setTypeface(Landroid/graphics/Typeface;)V"] = emptyStub;
+    stubs["Landroid/view/View;->setOnKeyListener(Landroid/view/View$OnKeyListener;)V"] = emptyStub;
+
+    stubs["Landroid/view/View;->post(Ljava/lang/Runnable;)Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[1].type == ValueType::OBJECT && args[1].obj) {
+            InterpreterObject* runnable = (InterpreterObject*)args[1].obj;
+            std::string runMethod = runnable->className + "->run()V";
+            Logger::d("StubRegistry", "Executed View.post() - queuing Runnable: " + runnable->className);
+            setu::view::View::postTask([runnable, runMethod]() {
+                if (StubRegistry::m_multiDexManager) {
+                    Interpreter vm;
+                    auto [runBc, runDex] = StubRegistry::m_multiDexManager->getMethodBytecode(runMethod);
+                    if (!runBc.bytecode.empty() && runDex) {
+                        std::vector<Value> runArgs = { Value::MakeObject(runnable) };
+                        vm.executeMethod(runBc.bytecode, runDex, StubRegistry::m_multiDexManager, runArgs, runBc.registers_size, runBc.ins_size);
+                    } else {
+                        Logger::w("StubRegistry", "Could not find run() method for Runnable: " + runnable->className);
+                    }
+                }
+            });
+        }
+        if (outReturn) *outReturn = Value::MakeInt(1);
+        return false;
+    };
+
+    stubs["Landroid/content/res/Resources;->getDimensionPixelSize(I)I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() > 1 && m_resManager) {
+            int resId = args[1].i;
+            float dimen = m_resManager->resolveDimension(resId);
+            if (outReturn) *outReturn = Value::MakeInt(static_cast<int>(dimen));
+        } else {
+            if (outReturn) *outReturn = Value::MakeInt(0);
+        }
+        return false;
+    };
+
+    stubs["Landroid/content/res/Resources;->getInteger(I)I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() > 1 && m_resManager) {
+            int resId = args[1].i;
+            int val = m_resManager->getInt(resId);
+            if (outReturn) *outReturn = Value::MakeInt(val);
+        } else {
+            if (outReturn) *outReturn = Value::MakeInt(0);
         }
         return false;
     };

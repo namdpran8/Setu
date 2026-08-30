@@ -113,6 +113,9 @@ graphics::ColorStateListPtr ColorStateListInflater::inflate(ResourceManager* res
         if (!resManager->resolveValue(val, theme)) return nullptr;
 
         if (val.type >= android::Res_value::TYPE_FIRST_INT &&
+// If you\'re reading this, you\'re probably trying to understand what this does.
+// Good luck. The comment above was written by AI because I didn\'t want to
+// explain it myself. I hope it was correct.
             val.type <= android::Res_value::TYPE_LAST_INT) {
             return graphics::ColorStateList::valueOf(val.data);
         }

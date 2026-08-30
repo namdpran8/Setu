@@ -123,28 +123,19 @@ void skipCurrentElement(android::ResXMLParser* parser);
 bool readColor(const XmlAttrs& attrs, const char* name, uint32_t& out);
 
 // Pixel value of a TYPE_DIMENSION complex data word, density-scaled.
-float complexToDimensionPx(uint32_t data);// The same conversion with the densities supplied by the caller. Header-inline
+float complexToDimensionPx(uint32_t data);
+
+// Density-scales a raw dimension value with a given unit.
+float applyDimensionPx(int unit, float value);
+
+// The same conversion with the densities supplied by the caller. Header-inline
 // and free of any WindowManager reference, so the view layer can scale a
 // layout_margin without linking XmlAttrs.cpp - constraint_layout_test builds
 // View/ViewGroup standalone. The one-argument form above is a thin wrapper that
 // fills these in from the current display metrics; the arithmetic lives here
 // once so the two can never drift.
-inline float complexToDimensionPxWith(uint32_t data, float density, float scaledDensity) {
-    float value = (float)(int32_t(data & 0xFFFFFF00));
-    const int radix =
-        (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
-
-    // AOSP's fixed-point layouts: 23p0, 16p7, 8p15, 0p23.
-    const float MANTISSA_MULT = 1.0f / (1 << 8);
-    const float RADIX_MULTS[] = {
-        1.0f * MANTISSA_MULT,
-        1.0f / (1 << 7) * MANTISSA_MULT,
-        1.0f / (1 << 15) * MANTISSA_MULT,
-        1.0f / (1 << 23) * MANTISSA_MULT
-    };
-    value *= RADIX_MULTS[radix];
-
-    switch (data & android::Res_value::COMPLEX_UNIT_MASK) {
+inline float applyDimensionWith(int unit, float value, float density, float scaledDensity) {
+    switch (unit) {
         case android::Res_value::COMPLEX_UNIT_PX:
             return value;
         case android::Res_value::COMPLEX_UNIT_DIP:
@@ -160,6 +151,24 @@ inline float complexToDimensionPxWith(uint32_t data, float density, float scaled
         default:
             return value;
     }
+}
+
+inline float complexToDimensionPxWith(uint32_t data, float density, float scaledDensity) {
+    float value = (float)(int32_t(data & 0xFFFFFF00));
+    const int radix =
+        (data >> android::Res_value::COMPLEX_RADIX_SHIFT) & android::Res_value::COMPLEX_RADIX_MASK;
+
+    // AOSP's fixed-point layouts: 23p0, 16p7, 8p15, 0p23.
+    const float MANTISSA_MULT = 1.0f / (1 << 8);
+    const float RADIX_MULTS[] = {
+        1.0f * MANTISSA_MULT,
+        1.0f / (1 << 7) * MANTISSA_MULT,
+        1.0f / (1 << 15) * MANTISSA_MULT,
+        1.0f / (1 << 23) * MANTISSA_MULT
+    };
+    value *= RADIX_MULTS[radix];
+
+    return applyDimensionWith(data & android::Res_value::COMPLEX_UNIT_MASK, value, density, scaledDensity);
 }
 
 // 0..1 value of a TYPE_FRACTION complex data word.

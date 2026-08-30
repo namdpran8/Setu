@@ -181,20 +181,10 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     InterpreterObject* obj = static_cast<InterpreterObject*>(val.obj);
                     actualType = obj->className;
                     
-                    // Simple type checking: exact match or java.lang.Object
-                    if (expectedType == actualType || expectedType == "Ljava/lang/Object;") {
-                        castOk = true;
-                    } else if (actualType.find("Activity") != std::string::npos && expectedType.find("Context") != std::string::npos) {
-                        castOk = true;
-                    } else if (expectedType == "Ljava/lang/CharSequence;" && actualType == "java.lang.String") {
-                        castOk = true;
-                    } else if (expectedType.find("android/view/") != std::string::npos || 
-                               expectedType.find("android/widget/") != std::string::npos ||
-                               expectedType.find("androidx/") != std::string::npos ||
-                               expectedType.find("com/google/android/material/") != std::string::npos) {
-                        // In our stubbed UI environment, allow casting generic Views to specific types
-                        // since we only instantiate generic Button/TextView/ViewGroup
-                        castOk = true;
+                    if (multiDexManager) {
+                        castOk = multiDexManager->isInstanceOf(actualType, expectedType);
+                    } else {
+                        castOk = (expectedType == actualType || expectedType == "Ljava/lang/Object;");
                     }
                 } else if (val.type == ValueType::ARRAY && val.obj) {
                     // Array type checking
@@ -547,22 +537,11 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 if (state.registers[b].type == ValueType::OBJECT && state.registers[b].obj != nullptr) {
                     InterpreterObject* actualObj = static_cast<InterpreterObject*>(state.registers[b].obj);
                     std::string actualType = actualObj->className;
-                    if (expectedType == actualType || expectedType == "Ljava/lang/Object;") {
-                        result = 1;
-                    } else if (actualType == "Lcom/darkempire78/opencalculator/activities/MainActivity;") {
-                        if (expectedType.find("Activity") != std::string::npos || expectedType.find("Context") != std::string::npos) {
-                            result = 1;
-                        }
-                    } else if (actualType.find("Activity") != std::string::npos && expectedType.find("Context") != std::string::npos) {
-                        result = 1;
-                    } else if (actualType.find("TextView") != std::string::npos && expectedType.find("View") != std::string::npos) {
-                        result = 1;
-                    } else if (actualType.find("EditText") != std::string::npos && expectedType.find("TextView") != std::string::npos) {
-                        result = 1;
-                    } else if (actualType.find("Button") != std::string::npos && expectedType.find("View") != std::string::npos) {
-                        result = 1;
-                    } else if (expectedType == "Ljava/lang/CharSequence;" && actualType == "java.lang.String") {
-                        result = 1;
+                    
+                    if (multiDexManager) {
+                        result = multiDexManager->isInstanceOf(actualType, expectedType) ? 1 : 0;
+                    } else {
+                        result = (expectedType == actualType || expectedType == "Ljava/lang/Object;") ? 1 : 0;
                     }
                 }
                 

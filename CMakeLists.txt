@@ -4,6 +4,10 @@ project(setu_runtime LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (MSVC)
+    add_compile_options("/FS")
+endif()
+
 add_subdirectory(thirdparty/miniz)
 add_subdirectory(thirdparty/libbase)
 add_subdirectory(thirdparty/zlib)
@@ -23,6 +27,7 @@ add_executable(setu_runtime
     "src/interpreter/Interpreter.cpp"
     "src/dalvik_opcodes.cpp"
     "src/interpreter/StubRegistry.cpp"
+    "src/Permission/PermissionManager.cpp"
     "src/ui/WindowManager.cpp"
     "src/ui/Theme.cpp"
     "src/ui/TypedArray.cpp"
@@ -69,6 +74,7 @@ target_include_directories(setu_runtime PRIVATE include)
 # windowscodecs: WIC, for BitmapFactory's decoders. ole32: CoInitializeEx and
 # CoCreateInstance, which WIC needs and which nothing else here was using.
 target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi windowscodecs ole32 setu_androidfw cassowary)
+target_link_options(setu_runtime PRIVATE "/NODEFAULTLIB:LIBCMT")
 target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
 
 # A deliberately minimal subset: only what the constraint solver test actually
@@ -92,6 +98,8 @@ add_executable(constraint_layout_test src/test_constraint_layout.cpp
 )
 target_include_directories(constraint_layout_test PRIVATE include)
 target_link_libraries(constraint_layout_test PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary)
+target_link_options(constraint_layout_test PRIVATE "/NODEFAULTLIB:LIBCMT")
+target_compile_definitions(constraint_layout_test PRIVATE NO_RESOURCES)
 target_compile_options(constraint_layout_test PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
 
 

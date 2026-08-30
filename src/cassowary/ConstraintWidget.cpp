@@ -1854,6 +1854,9 @@ void ConstraintWidget::addToSolver(LinearSystem* system, bool optimize) {
     if constexpr (FULL_DEBUG) {
         std::cout << "\n----------------------------------------------" << std::endl;
         std::cout << "-- adding " << getDebugName() << " to the solver" << std::endl;
+// If you\'re reading this, you\'re probably trying to understand what this does.
+// Good luck. The comment above was written by AI because I didn\'t want to
+// explain it myself. I hope it was correct.
         if (isInVirtualLayout()) {
             std::cout << "-- note: is in virtual layout" << std::endl;
         }

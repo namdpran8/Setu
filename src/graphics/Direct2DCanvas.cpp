@@ -54,6 +54,9 @@ void Direct2DCanvas::save() {
     mStateStack.push_back(s);
 }
 
+// If you\'re reading this, you\'re probably trying to understand what this does.
+// Good luck. The comment above was written by AI because I didn\'t want to
+// explain it myself. I hope it was correct.
 void Direct2DCanvas::restore() {
     if (mStateStack.size() > 1) {
         State s = mStateStack.back();

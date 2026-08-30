@@ -1,3 +1,4 @@
+#include "../graphics/drawable/InsetDrawable.h"
 /*
  * Copyright (c) 2026 Pranshu Namdeo
  *
@@ -9,16 +10,13 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
-
 #include "DrawableInflater.h"
-
 #include <cmath>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
 #include "StateSetInflater.h"
 #include "Theme.h"
 #include "WindowManager.h"
@@ -34,24 +32,18 @@
 #include "../graphics/drawable/StateSet.h"
 #include "../view/Gravity.h"
 #include "../utils/Logger.h"
-
 namespace setu {
-
 namespace {
-
 const char* const TAG = "DrawableInflater";
-
 // @android:id/mask: the well-known ID a <ripple> gives the child that shapes it.
 // Hard-coded rather than looked up by name, because it is a *public* framework ID
 // and therefore frozen for good, and because this has to keep working with no
 // framework-res loaded - which is exactly when a name lookup would fail.
 constexpr uint32_t ANDROID_ID_MASK = 0x0102002e;
-
 bool endsWith(const std::string& str, const char* suffix) {
     const std::string s(suffix);
     return str.size() >= s.size() && str.compare(str.size() - s.size(), s.size(), s) == 0;
 }
-
 // The screen density in DPI, which is the unit both bitmap drawables want. Note the
 // conversion: WindowManager stores a float scale factor (3.0 for xxhdpi), and the
 // drawables want 480. Passing the scale straight through would scale every image by
@@ -62,7 +54,6 @@ int displayDensityDpi() {
     const int dpi = (int)std::lround(scale * (float)graphics::Bitmap::DENSITY_DEFAULT);
     return dpi > 0 ? dpi : graphics::Bitmap::DENSITY_DEFAULT;
 }
-
 // The density a resource's own configuration declares, as a Bitmap density.
 //
 // Two zeroes that mean opposite things meet here, which is the whole reason this is
@@ -88,7 +79,6 @@ int sourceDensityFromConfig(uint16_t configDensity, int targetDensityDpi) {
             return (int)configDensity;
     }
 }
-
 // Everything one image file yields. The chunk is kept alongside the pixels because
 // only the decode can recover it - WIC drops unknown PNG chunks, so it is harvested
 // from the encoded bytes and cannot be read back off the Bitmap later.
@@ -98,22 +88,18 @@ struct DecodedImage {
     bool pathSaysNinePatch = false;
     int targetDensityDpi = graphics::Bitmap::DENSITY_DEFAULT;
 };
-
 // Resolves a drawable resource ID to a file, opens it out of the APK it was selected
 // from, and decodes it. False on any failure, having logged which one.
 bool decodeImageResource(ResourceManager* resManager, Theme* theme, uint32_t resId,
                          DecodedImage& out) {
     if (!resManager || resId == 0) return false;
-
     auto* assets = resManager->getAssetManager();
     if (!assets) return false;
-
     const std::string path = resManager->getResourceFilePath(resId);
     if (path.empty()) {
         Logger::w(TAG, "Drawable 0x" + std::to_string(resId) + " is not a file");
         return false;
     }
-
     if (endsWith(path, ".xml")) {
         // android:src naming another XML drawable. Legal to write, meaningless to
         // both classes, and diagnosed here rather than as a puzzling decode failure
@@ -121,10 +107,8 @@ bool decodeImageResource(ResourceManager* resManager, Theme* theme, uint32_t res
         Logger::w(TAG, "android:src must name an image file, not " + path);
         return false;
     }
-
     out.targetDensityDpi = displayDensityDpi();
     out.pathSaysNinePatch = endsWith(path, ".9.png");
-
     // A second lookup of the same ID. getResourceFilePath resolves aliases and hands
     // back the path but keeps neither the cookie nor the configuration, and both are
     // needed here: the cookie to open the file out of the *right* APK (the app and
@@ -139,7 +123,6 @@ bool decodeImageResource(ResourceManager* resManager, Theme* theme, uint32_t res
             sourceDensity = sourceDensityFromConfig(val.config.density, out.targetDensityDpi);
         }
     }
-
     // Falling back to the path-only overload rather than bailing out: it searches
     // every loaded APK in reverse order, which is what openXml does and is right far
     // more often than it is wrong.
@@ -151,10 +134,8 @@ bool decodeImageResource(ResourceManager* resManager, Theme* theme, uint32_t res
         Logger::w(TAG, "Could not open image asset: " + path);
         return false;
     }
-
     graphics::BitmapFactory::Options options;
     options.inDensity = sourceDensity;
-
     out.bitmap = graphics::BitmapFactory::decodeAsset(asset.get(), &options);
     if (!out.bitmap) {
         // BitmapFactory has already logged the specific reason, which for a .webp on
@@ -162,20 +143,16 @@ bool decodeImageResource(ResourceManager* resManager, Theme* theme, uint32_t res
         Logger::w(TAG, "Could not decode " + path);
         return false;
     }
-
     out.ninePatchChunk = std::move(options.outNinePatchChunk);
     return true;
 }
-
 // android:alpha is a 0..1 float on a drawable, unlike the 0..255 int setAlpha takes.
 float clampUnit(float alpha) {
     return alpha < 0.0f ? 0.0f : (alpha > 1.0f ? 1.0f : alpha);
 }
-
 int alphaFloatToInt(float alpha) {
     return (int)std::lround(clampUnit(alpha) * 255.0f);
 }
-
 // Wraps an already-decoded image, target density applied. Takes the DecodedImage
 // rather than a resource ID so that the raw-file path can decide which of the two
 // classes to build *after* decoding, instead of decoding twice to find out.
@@ -186,7 +163,6 @@ std::shared_ptr<graphics::BitmapDrawable> makeBitmapDrawable(DecodedImage& image
     drawable->setTargetDensity(image.targetDensityDpi);
     return drawable;
 }
-
 // Returns a drawable even when the chunk is missing or unusable: the class documents
 // that case as a plain stretch, which is a better background than none. `what` names
 // the resource in the warning that says so.
@@ -197,13 +173,11 @@ std::shared_ptr<graphics::NinePatchDrawable> makeNinePatchDrawable(DecodedImage&
     // After the chunk, not before: setTargetDensity rescales the padding the chunk
     // supplied, so it has to see a parsed chunk to have anything to rescale.
     drawable->setTargetDensity(image.targetDensityDpi);
-
     if (!drawable->hasValidChunk()) {
         Logger::w(TAG, what + " has no usable npTc chunk; it will stretch as a plain bitmap");
     }
     return drawable;
 }
-
 // Per-channel mean of two ARGB colours.
 uint32_t meanColor(uint32_t x, uint32_t y) {
     uint32_t result = 0;
@@ -213,7 +187,6 @@ uint32_t meanColor(uint32_t x, uint32_t y) {
     }
     return result;
 }
-
 // Mean of a three-stop ramp: the middle stop covers half the run, the ends a
 // quarter each.
 uint32_t meanColor3(uint32_t start, uint32_t center, uint32_t end) {
@@ -226,7 +199,6 @@ uint32_t meanColor3(uint32_t start, uint32_t center, uint32_t end) {
     }
     return result;
 }
-
 // The drawable an android:drawable-style attribute names.
 //
 // This branches on the resolved *type* rather than just taking the resource ID,
@@ -236,7 +208,6 @@ graphics::DrawablePtr drawableFromAttr(const XmlAttrs& attrs, const char* name,
                                       ResourceManager* resManager, Theme* theme) {
     android::AssetManager2::SelectedValue val;
     if (!attrs.getValue(name, val)) return nullptr;
-
     if (val.type >= android::Res_value::TYPE_FIRST_INT &&
         val.type <= android::Res_value::TYPE_LAST_INT) {
         return std::make_shared<graphics::ColorDrawable>(val.data);
@@ -246,7 +217,6 @@ graphics::DrawablePtr drawableFromAttr(const XmlAttrs& attrs, const char* name,
     }
     return nullptr;
 }
-
 // The drawable a container's <item> wraps when it is a nested element rather than
 // an android:drawable reference. Leaves the parser on the <item>'s END_TAG.
 graphics::DrawablePtr inflateFirstChild(android::ResXMLParser* parser,
@@ -258,7 +228,6 @@ graphics::DrawablePtr inflateFirstChild(android::ResXMLParser* parser,
             return nullptr;   // </item> already: an item with nothing in it
         }
         if (event != android::ResXMLParser::START_TAG) continue;
-
         graphics::DrawablePtr child =
             DrawableInflater::inflateFromParser(parser, resManager, theme);
         // inflateFromParser left the parser on the child's END_TAG, so from here
@@ -269,7 +238,6 @@ graphics::DrawablePtr inflateFirstChild(android::ResXMLParser* parser,
     }
     return nullptr;
 }
-
 // One <item> of a <selector>. Consumes the element either way.
 void inflateSelectorItem(android::ResXMLParser* parser, ResourceManager* resManager, Theme* theme,
                          graphics::StateListDrawable& selector) {
@@ -279,7 +247,6 @@ void inflateSelectorItem(android::ResXMLParser* parser, ResourceManager* resMana
     const XmlAttrs attrs(parser, resManager, theme);
     const std::vector<int> states = extractStateSet(parser, attrs);
     graphics::DrawablePtr child = drawableFromAttr(attrs, "drawable", resManager, theme);
-
     if (child) {
         skipCurrentElement(parser);
     } else {
@@ -288,7 +255,6 @@ void inflateSelectorItem(android::ResXMLParser* parser, ResourceManager* resMana
         // look, and looking there also consumes the element when it is empty.
         child = inflateFirstChild(parser, resManager, theme);
     }
-
     if (!child) {
         // Dropping the item rather than adding a null child is the right
         // degradation: the selector falls through to whatever item comes next, which
@@ -299,7 +265,6 @@ void inflateSelectorItem(android::ResXMLParser* parser, ResourceManager* resMana
     }
     selector.addState(states, std::move(child));
 }
-
 // One <item> of a <ripple>. Consumes the element either way, and reports the
 // layer's android:id so the caller can tell the mask from the content.
 graphics::DrawablePtr inflateRippleItem(android::ResXMLParser* parser, ResourceManager* resManager,
@@ -309,7 +274,6 @@ graphics::DrawablePtr inflateRippleItem(android::ResXMLParser* parser, ResourceM
     const XmlAttrs attrs(parser, resManager, theme);
     outId = attrs.getResourceId("id");
     graphics::DrawablePtr child = drawableFromAttr(attrs, "drawable", resManager, theme);
-
     if (child) {
         skipCurrentElement(parser);
     } else {
@@ -321,7 +285,6 @@ graphics::DrawablePtr inflateRippleItem(android::ResXMLParser* parser, ResourceM
     // enough that AOSP's own Material resources never do.
     return child;
 }
-
 // The roadmap item that will make a given root element work, for the log line.
 const char* phaseFor(const std::string& tag) {
     if (tag == "vector" || tag == "animated-vector") return "not yet on the roadmap (vector drawables)";
@@ -336,27 +299,20 @@ const char* phaseFor(const std::string& tag) {
     }
     return "not yet supported";
 }
-
 } // namespace
-
 graphics::DrawablePtr DrawableInflater::inflate(ResourceManager* resManager, Theme* theme,
                                                uint32_t resId) {
     if (!resManager || resId == 0) return nullptr;
-
     const std::string path = resManager->getResourceFilePath(resId);
-
     if (path.empty()) {
         // Not a file. Most often @color/foo, which is a perfectly good background:
         // a flat colour is exactly what ColorDrawable is for.
         auto* assets = resManager->getAssetManager();
         if (!assets) return nullptr;
-
         auto res = assets->GetResource(resId);
         if (!res.has_value()) return nullptr;
-
         android::AssetManager2::SelectedValue val = res.value();
         if (!resManager->resolveValue(val, theme)) return nullptr;
-
         if (val.type >= android::Res_value::TYPE_FIRST_INT &&
             val.type <= android::Res_value::TYPE_LAST_INT) {
             return std::make_shared<graphics::ColorDrawable>(val.data);
@@ -365,16 +321,13 @@ graphics::DrawablePtr DrawableInflater::inflate(ResourceManager* resManager, The
                            " is neither a file nor a colour. Type=" + std::to_string(val.type));
         return nullptr;
     }
-
     if (!endsWith(path, ".xml")) {
         // A raw image referenced directly: @drawable/icon landing on
         // res/drawable-hdpi/icon.png, with no <bitmap> wrapper to carry attributes.
         return inflateImageFile(resManager, theme, resId, path);
     }
-
     auto tree = resManager->openXml(resId);
     if (!tree) return nullptr;
-
     android::ResXMLParser::event_code_t event;
     while ((event = tree->next()) != android::ResXMLParser::BAD_DOCUMENT &&
            event != android::ResXMLParser::END_DOCUMENT) {
@@ -385,15 +338,12 @@ graphics::DrawablePtr DrawableInflater::inflate(ResourceManager* resManager, The
     Logger::w(TAG, "No root element in drawable XML: " + path);
     return nullptr;
 }
-
 graphics::DrawablePtr DrawableInflater::inflateFromParser(android::ResXMLParser* parser,
                                                          ResourceManager* resManager,
                                                          Theme* theme) {
     if (!parser) return nullptr;
-
     const std::string tag = elementName(parser);
     if (tag.empty()) return nullptr;
-
     if (tag == "shape") {
         return inflateShape(parser, resManager, theme);
     }
@@ -412,31 +362,28 @@ graphics::DrawablePtr DrawableInflater::inflateFromParser(android::ResXMLParser*
     if (tag == "nine-patch") {
         return inflateNinePatch(parser, resManager, theme);
     }
-
+    if (tag == "inset") {
+        return inflateInset(parser, resManager, theme);
+    }
     Logger::d(TAG, "<" + tag + "> is " + phaseFor(tag) + "; no background drawn");
     skipCurrentElement(parser);
     return nullptr;
 }
-
 graphics::DrawablePtr DrawableInflater::inflateColor(android::ResXMLParser* parser,
                                                     ResourceManager* resManager, Theme* theme) {
     const XmlAttrs attrs(parser, resManager, theme);
-
     uint32_t color = 0;
     const bool hasColor = readColor(attrs, "color", color);
     skipCurrentElement(parser);
-
     if (!hasColor) {
         Logger::w(TAG, "<color> without a readable android:color");
         return nullptr;
     }
     return std::make_shared<graphics::ColorDrawable>(color);
 }
-
 graphics::DrawablePtr DrawableInflater::inflateSelector(android::ResXMLParser* parser,
                                                        ResourceManager* resManager, Theme* theme) {
     auto selector = std::make_shared<graphics::StateListDrawable>();
-
     {
         const XmlAttrs attrs(parser, resManager, theme);
         // Both default false in AOSP, and both are visible in a pixel diff:
@@ -446,7 +393,6 @@ graphics::DrawablePtr DrawableInflater::inflateSelector(android::ResXMLParser* p
         // when it is pressed.
         selector->setVariablePadding(attrs.getBool("variablePadding", false));
         selector->setConstantSize(attrs.getBool("constantSize", false));
-
         // android:enterFadeDuration / exitFadeDuration would cross-fade between
         // items. There is no frame clock yet, so the swap is instant - which is what
         // a selector without them does anyway, and that is nearly all of them.
@@ -457,7 +403,6 @@ graphics::DrawablePtr DrawableInflater::inflateSelector(android::ResXMLParser* p
         // android:visible, because View pushes its own visibility into a background
         // the moment it installs one.
     }
-
     android::ResXMLParser::event_code_t event;
     while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
            event != android::ResXMLParser::END_DOCUMENT) {
@@ -467,7 +412,6 @@ graphics::DrawablePtr DrawableInflater::inflateSelector(android::ResXMLParser* p
         // leaves it deliberately reads without consuming.
         if (event == android::ResXMLParser::END_TAG) break;
         if (event != android::ResXMLParser::START_TAG) continue;
-
         const std::string tag = elementName(parser);
         if (tag == "item") {
             inflateSelectorItem(parser, resManager, theme, *selector);
@@ -476,7 +420,6 @@ graphics::DrawablePtr DrawableInflater::inflateSelector(android::ResXMLParser* p
             skipCurrentElement(parser);
         }
     }
-
     if (selector->getStateCount() == 0) {
         // An empty selector is stateful and paints nothing, so installing it would
         // cost a repaint on every touch just to draw a hole. Better no background.
@@ -485,12 +428,10 @@ graphics::DrawablePtr DrawableInflater::inflateSelector(android::ResXMLParser* p
     }
     return selector;
 }
-
 graphics::DrawablePtr DrawableInflater::inflateRipple(android::ResXMLParser* parser,
                                                      ResourceManager* resManager, Theme* theme) {
     graphics::ColorStateListPtr color;
     int radius = graphics::RippleDrawable::RADIUS_AUTO;
-
     {
         const XmlAttrs attrs(parser, resManager, theme);
         // A ColorStateList rather than a colour: the usual value is
@@ -500,17 +441,14 @@ graphics::DrawablePtr DrawableInflater::inflateRipple(android::ResXMLParser* par
         // RADIUS_AUTO is AOSP's own sentinel for this attribute, so an absent
         // android:radius means "grow to the bounds" with no extra branch here.
         radius = attrs.getDimensionPixelSize("radius", graphics::RippleDrawable::RADIUS_AUTO);
-
         if (attrs.has("effectColor")) {
             Logger::d(TAG, "<ripple> android:effectColor ignored: it only colours the "
                            "patterned (Android 12 sparkle) style, and this draws the solid "
                            "one every version falls back to");
         }
     }
-
     graphics::DrawablePtr content;
     graphics::DrawablePtr mask;
-
     android::ResXMLParser::event_code_t event;
     while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
            event != android::ResXMLParser::END_DOCUMENT) {
@@ -518,18 +456,15 @@ graphics::DrawablePtr DrawableInflater::inflateRipple(android::ResXMLParser* par
         // seen at this level is always </ripple>.
         if (event == android::ResXMLParser::END_TAG) break;
         if (event != android::ResXMLParser::START_TAG) continue;
-
         const std::string tag = elementName(parser);
         if (tag != "item") {
             Logger::d(TAG, "<ripple> child <" + tag + "> is not an item; ignored");
             skipCurrentElement(parser);
             continue;
         }
-
         uint32_t id = 0;
         graphics::DrawablePtr child = inflateRippleItem(parser, resManager, theme, id);
         if (!child) continue;
-
         if (id == ANDROID_ID_MASK) {
             mask = std::move(child);
         } else if (!content) {
@@ -542,7 +477,6 @@ graphics::DrawablePtr DrawableInflater::inflateRipple(android::ResXMLParser* par
                            "dropped until drawable containers exist");
         }
     }
-
     if (!color) {
         // AOSP throws XmlPullParserException here, which aborts the inflation and
         // leaves the widget with no background at all. The content layer is the more
@@ -551,7 +485,6 @@ graphics::DrawablePtr DrawableInflater::inflateRipple(android::ResXMLParser* par
         Logger::w(TAG, "<ripple> without android:color; drawing its content layer only");
         return content;
     }
-
     auto ripple = std::make_shared<graphics::RippleDrawable>(std::move(color));
     ripple->setMaxRadius(radius);
     if (content) ripple->setContent(std::move(content));
@@ -561,12 +494,10 @@ graphics::DrawablePtr DrawableInflater::inflateRipple(android::ResXMLParser* par
     // nothing at rest and touch feedback when touched, which is the whole point.
     return ripple;
 }
-
 graphics::DrawablePtr DrawableInflater::inflateImageFile(ResourceManager* resManager, Theme* theme,
                                                         uint32_t resId, const std::string& path) {
     DecodedImage image;
     if (!decodeImageResource(resManager, theme, resId, image)) return nullptr;
-
     // The chunk is the authority. aapt compiles the marker border of a .9.png into an
     // npTc chunk and strips the border out of the pixels, so the chunk's presence is
     // the only thing that proves the divs describe these particular pixels.
@@ -579,23 +510,19 @@ graphics::DrawablePtr DrawableInflater::inflateImageFile(ResourceManager* resMan
     if (!image.ninePatchChunk.empty() || image.pathSaysNinePatch) {
         return makeNinePatchDrawable(image, path);
     }
-
     // Gravity stays at BitmapDrawable's FILL default. A directly-referenced image has
     // no android:gravity to read, and AOSP's createFromResourceStream builds exactly
     // this - which is why @drawable/icon used as a background stretches to the view
     // rather than sitting at its intrinsic size in the middle.
     return makeBitmapDrawable(image);
 }
-
 graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* parser,
                                                      ResourceManager* resManager, Theme* theme) {
     using BD = graphics::BitmapDrawable;
-
     // Every attribute has to come off the parser before anything advances it - the
     // same ordering constraint inflateSelectorItem carries, because XmlAttrs reads
     // through the parser live rather than taking a copy.
     const XmlAttrs attrs(parser, resManager, theme);
-
     const uint32_t srcId = attrs.getResourceId("src");
     const int gravity = attrs.getInt("gravity", view::Gravity::FILL);
     // TILE_MODE_UNDEFINED, not DISABLED: an absent android:tileModeY must not clear
@@ -610,19 +537,15 @@ graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* par
     const bool hasTint = attrs.has("tint");
     const bool hasMipMap = attrs.has("mipMap");
     const bool hasAutoMirrored = attrs.has("autoMirrored");
-
     skipCurrentElement(parser);
-
     if (srcId == 0) {
         // AOSP throws XmlPullParserException here. Nothing to draw either way, but a
         // warning beats an abort: the rest of the view hierarchy still inflates.
         Logger::w(TAG, "<bitmap> without a resolvable android:src; no background drawn");
         return nullptr;
     }
-
     DecodedImage image;
     if (!decodeImageResource(resManager, theme, srcId, image)) return nullptr;
-
     // Deliberately a BitmapDrawable even when the source carries an npTc chunk, which
     // is what a real device does: AOSP's BitmapDrawable holds a Bitmap and has no
     // chunk field at all, so a <bitmap> wrapping a .9.png stretches there too. It is
@@ -632,10 +555,8 @@ graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* par
         Logger::d(TAG, "<bitmap> android:src is a 9-patch; its stretch regions are "
                        "ignored, as on a real device. Use <nine-patch> to honour them");
     }
-
     auto drawable = makeBitmapDrawable(image);
     drawable->setGravity(gravity);
-
     // android:tileMode sets both axes and the per-axis attributes then override it,
     // which is the order AOSP applies them in - so tileMode="repeat" tileModeY="clamp"
     // repeats horizontally and clamps vertically.
@@ -649,13 +570,11 @@ graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* par
     if (tileModeY != BD::TILE_MODE_UNDEFINED) {
         drawable->setTileModeY(BD::parseTileMode(tileModeY));
     }
-
     drawable->setAntiAlias(antiAlias);
     drawable->setFilterBitmap(filter);
     if (alpha != 1.0f) {
         drawable->setAlpha(alphaFloatToInt(alpha));
     }
-
     // android:dither is not mentioned: it means nothing at 32bpp, so silence is
     // honest. These three are different - each would change the pixels.
     if (hasTint) {
@@ -669,33 +588,26 @@ graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* par
     }
     return drawable;
 }
-
 graphics::DrawablePtr DrawableInflater::inflateNinePatch(android::ResXMLParser* parser,
                                                         ResourceManager* resManager, Theme* theme) {
     // Same ordering constraint as inflateBitmap.
     const XmlAttrs attrs(parser, resManager, theme);
-
     const uint32_t srcId = attrs.getResourceId("src");
     const float alpha = attrs.getFloat("alpha", 1.0f);
     const bool hasTint = attrs.has("tint");
     const bool hasAutoMirrored = attrs.has("autoMirrored");
-
     skipCurrentElement(parser);
-
     if (srcId == 0) {
         Logger::w(TAG, "<nine-patch> without a resolvable android:src; no background drawn");
         return nullptr;
     }
-
     DecodedImage image;
     if (!decodeImageResource(resManager, theme, srcId, image)) return nullptr;
-
     // No chunk check before building. AOSP throws "<nine-patch> requires a valid
     // 9-patch source image" here, but this class already degrades to a plain stretch
     // and says so, and that is the more useful outcome for a widget that would
     // otherwise lose its background entirely.
     auto drawable = makeNinePatchDrawable(image, "<nine-patch> android:src");
-
     if (alpha != 1.0f) {
         drawable->setAlpha(alphaFloatToInt(alpha));
     }
@@ -708,13 +620,10 @@ graphics::DrawablePtr DrawableInflater::inflateNinePatch(android::ResXMLParser* 
     }
     return drawable;
 }
-
 graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* parser,
                                                     ResourceManager* resManager, Theme* theme) {
     using Shape = graphics::GradientDrawable::Shape;
-
     auto shape = std::make_shared<graphics::GradientDrawable>();
-
     {
         const XmlAttrs attrs(parser, resManager, theme);
         // The enum ordinals AAPT compiles android:shape to are the same numbers
@@ -727,7 +636,6 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
             default: shapeKind = Shape::RECTANGLE; break;
         }
         shape->setShape(shapeKind);
-
         if (shapeKind == Shape::RING) {
             // AOSP reads each absolute dimension first and only consults the
             // matching ratio when that dimension is absent, so an authored
@@ -749,12 +657,10 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
         // a ring a partial arc driven by setLevel(). Without it a ring is always the
         // full annulus, which is what an unlevelled one draws anyway.
     }
-
     // A <gradient> outranks a <solid> in AOSP regardless of which came first, so
     // its stand-in colour is held back and applied once the element is fully read.
     bool hasGradientColor = false;
     uint32_t gradientColor = 0;
-
     int depth = 0;
     android::ResXMLParser::event_code_t event;
     while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
@@ -768,10 +674,8 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
         // Grandchildren are not a thing inside <shape>; ignore anything nested
         // deeper rather than mistaking it for a direct child.
         if (depth++ > 0) continue;
-
         const std::string tag = elementName(parser);
         const XmlAttrs attrs(parser, resManager, theme);
-
         if (tag == "solid") {
             uint32_t color = 0;
             if (readColor(attrs, "color", color)) {
@@ -788,12 +692,10 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
             // it, and only builds the per-corner array when one of them differs.
             const int radius = attrs.getDimensionPixelSize("radius", 0);
             shape->setCornerRadius((float)radius);
-
             const int topLeft = attrs.getDimensionPixelSize("topLeftRadius", radius);
             const int topRight = attrs.getDimensionPixelSize("topRightRadius", radius);
             const int bottomLeft = attrs.getDimensionPixelSize("bottomLeftRadius", radius);
             const int bottomRight = attrs.getDimensionPixelSize("bottomRightRadius", radius);
-
             if (topLeft != radius || topRight != radius ||
                 bottomLeft != radius || bottomRight != radius) {
                 const float radii[8] = {
@@ -813,7 +715,6 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
             const float dashWidth = attrs.getDimension("dashWidth", 0.0f);
             const float dashGap = attrs.getDimension("dashGap", 0.0f);
             shape->setStroke((float)width, color, dashWidth, dashGap);
-
             if (!flat) {
                 // A stroke colour can be a selector too - an outlined button whose
                 // border greys out when disabled is exactly this. Applied after
@@ -841,7 +742,6 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
             const bool hasStart = readColor(attrs, "startColor", start);
             const bool hasCenter = readColor(attrs, "centerColor", center);
             const bool hasEnd = readColor(attrs, "endColor", end);
-
             if (hasStart && hasEnd) {
                 gradientColor = hasCenter ? meanColor3(start, center, end) : meanColor(start, end);
                 hasGradientColor = true;
@@ -856,11 +756,49 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
         // <shape> has no other children worth reading: everything else AAPT would
         // let through is a no-op on a real device too.
     }
-
     if (hasGradientColor) {
         shape->setColor(gradientColor);
     }
     return shape;
 }
 
+graphics::DrawablePtr DrawableInflater::inflateInset(android::ResXMLParser* parser,
+                                                     ResourceManager* resManager, Theme* theme) {
+    int insetLeft = 0, insetTop = 0, insetRight = 0, insetBottom = 0;
+    {
+        const XmlAttrs attrs(parser, resManager, theme);
+        int inset = attrs.getDimensionPixelOffset("inset", 0);
+        insetLeft = attrs.getDimensionPixelOffset("insetLeft", inset);
+        insetTop = attrs.getDimensionPixelOffset("insetTop", inset);
+        insetRight = attrs.getDimensionPixelOffset("insetRight", inset);
+        insetBottom = attrs.getDimensionPixelOffset("insetBottom", inset);
+    }
+    graphics::DrawablePtr child;
+    int depth = 0;
+    android::ResXMLParser::event_code_t event;
+    while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
+           event != android::ResXMLParser::END_DOCUMENT) {
+        if (event == android::ResXMLParser::END_TAG) {
+            if (depth == 0) break;
+            --depth;
+            continue;
+        }
+        if (event != android::ResXMLParser::START_TAG) continue;
+        
+        if (depth++ > 0) continue;
+        if (!child) {
+            child = inflateFromParser(parser, resManager, theme);
+        } else {
+            Logger::d(TAG, "<inset> has more than one child; ignored");
+            skipCurrentElement(parser);
+        }
+    }
+    if (!child) {
+        Logger::w(TAG, "<inset> without a drawable child");
+        return nullptr;
+    }
+    return std::make_shared<graphics::InsetDrawable>(std::move(child), insetLeft, insetTop, insetRight, insetBottom);
+}
 } // namespace setu
+
+

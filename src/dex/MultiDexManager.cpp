@@ -32,6 +32,31 @@ bool MultiDexManager::addDex(std::vector<uint8_t> dexBuffer) {
 }
 
 Value MultiDexManager::getStaticFieldValue(const std::string& className, const std::string& fieldName) const {
+    if (className == "Landroid/os/Build$VERSION;" && fieldName == "SDK_INT") {
+        return Value::MakeInt(33); // Mock SDK_INT
+    }
+    
+    if (className == "Landroid/graphics/Typeface;") {
+        static std::unordered_map<std::string, Value> s_typefaces;
+        if (s_typefaces.empty()) {
+            auto makeTypeface = []() {
+                InterpreterObject* obj = new InterpreterObject();
+                obj->className = "Landroid/graphics/Typeface;";
+                return Value::MakeObject(obj);
+            };
+            s_typefaces["DEFAULT"] = makeTypeface();
+            s_typefaces["DEFAULT_BOLD"] = makeTypeface();
+            s_typefaces["SANS_SERIF"] = makeTypeface();
+            s_typefaces["SERIF"] = makeTypeface();
+            s_typefaces["MONOSPACE"] = makeTypeface();
+        }
+        
+        auto it = s_typefaces.find(fieldName);
+        if (it != s_typefaces.end()) {
+            return it->second;
+        }
+    }
+    
     // First check the mutation cache
     std::string key = className + "->" + fieldName;
     auto it = m_staticFields.find(key);
@@ -66,4 +91,57 @@ std::pair<DexParser::MethodBytecodeResult, const DexParser*> MultiDexManager::ge
         }
     }
     return {{}, nullptr};
+}
+
+std::string MultiDexManager::getSuperClass(const std::string& className) const {
+    for (const auto& dex : m_dexFiles) {
+        std::string superClass = dex->getSuperClass(className);
+        if (!superClass.empty()) {
+            return superClass;
+        }
+    }
+    return "";
+}
+
+bool MultiDexManager::isInstanceOf(const std::string& actualClass, const std::string& expectedClass) const {
+    if (actualClass == expectedClass) return true;
+    if (expectedClass == "Ljava/lang/Object;") return true;
+
+    // Hardcoded overrides for stubbed framework (similar to what was in check-cast)
+    if (actualClass.find("Activity") != std::string::npos && expectedClass.find("Context") != std::string::npos) return true;
+    if (expectedClass == "Ljava/lang/CharSequence;" && actualClass == "java.lang.String") return true;
+
+    // Walk the merged hierarchy
+    std::string currentClass = actualClass;
+    while (!currentClass.empty()) {
+        if (currentClass == expectedClass) return true;
+        
+        // Custom framework short-circuits (fallback if missing from DEX)
+        if (currentClass.find("Activity") != std::string::npos && expectedClass.find("Context") != std::string::npos) return true;
+        if (currentClass.find("TextView") != std::string::npos && expectedClass.find("View") != std::string::npos) return true;
+        if (currentClass.find("EditText") != std::string::npos && expectedClass.find("TextView") != std::string::npos) return true;
+        if (currentClass.find("Button") != std::string::npos && expectedClass.find("View") != std::string::npos) return true;
+
+        currentClass = getSuperClass(currentClass);
+    }
+    
+    // Reverse check for UI stubs: if actualClass is a stubbed generic view, and expectedClass is a custom view in DEX that inherits from it
+    if (actualClass == "Landroid/view/ViewGroup;" || actualClass == "Landroid/view/View;" || actualClass == "Landroid/widget/FrameLayout;") {
+        currentClass = expectedClass;
+        while (!currentClass.empty()) {
+            if (currentClass == actualClass || currentClass == "Landroid/view/View;") return true;
+            currentClass = getSuperClass(currentClass);
+        }
+    }
+    
+    // Also, if the expected class is a generic View and actual is a ViewGroup variant not explicitly checked
+    if (expectedClass.find("android/view/") != std::string::npos || 
+        expectedClass.find("android/widget/") != std::string::npos ||
+        expectedClass.find("androidx/") != std::string::npos ||
+        expectedClass.find("com/google/android/material/") != std::string::npos) {
+        // Fallback for our UI stubbing, if the above walk didn't catch it
+        return true; 
+    }
+    
+    return false;
 }

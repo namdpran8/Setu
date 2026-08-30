@@ -1,3 +1,5 @@
+#include "ui/LayoutInflater.h"
+#include "ui/Theme.h"
 /*
  * Copyright (c) 2026 Pranshu Namdeo
  *
@@ -184,6 +186,7 @@ int main(int argc, char* argv[]) {
     Logger::i("Main", "Fun fact: Dalvik was named after a fishing village in Iceland! \xF0\x9F\x90\xA7");
 
     LaunchArgs launchArgs;
+    std::string apkPath;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg.find("--package=") == 0) {
@@ -192,35 +195,38 @@ int main(int argc, char* argv[]) {
             launchArgs.logLevel = arg.substr(12);
         } else if (arg.find("--framework=") == 0) {
             launchArgs.frameworkApk = arg.substr(12);
+        } else if (arg[0] != '-') {
+            // Positional argument, assume APK path
+            apkPath = arg;
         }
     }
 
-    std::string apkPath;
+    if (apkPath.empty()) {
+        if (launchArgs.package.empty()) {
+            OPENFILENAMEA ofn;
+            char szFile[MAX_PATH] = { 0 };
+            ZeroMemory(&ofn, sizeof(ofn));
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = NULL;
+            ofn.lpstrFile = szFile;
+            ofn.nMaxFile = sizeof(szFile);
+            ofn.lpstrFilter = "APK Files\0*.apk\0All Files\0*.*\0";
+            ofn.nFilterIndex = 1;
+            ofn.lpstrFileTitle = NULL;
+            ofn.nMaxFileTitle = 0;
+            ofn.lpstrInitialDir = NULL;
+            ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
 
-    if (launchArgs.package.empty()) {
-        OPENFILENAMEA ofn;
-        char szFile[MAX_PATH] = { 0 };
-        ZeroMemory(&ofn, sizeof(ofn));
-        ofn.lStructSize = sizeof(ofn);
-        ofn.hwndOwner = NULL;
-        ofn.lpstrFile = szFile;
-        ofn.nMaxFile = sizeof(szFile);
-        ofn.lpstrFilter = "APK Files\0*.apk\0All Files\0*.*\0";
-        ofn.nFilterIndex = 1;
-        ofn.lpstrFileTitle = NULL;
-        ofn.nMaxFileTitle = 0;
-        ofn.lpstrInitialDir = NULL;
-        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-
-        if (GetOpenFileNameA(&ofn) == TRUE) {
-            apkPath = ofn.lpstrFile;
+            if (GetOpenFileNameA(&ofn) == TRUE) {
+                apkPath = ofn.lpstrFile;
+            } else {
+                return 0;
+            }
         } else {
-            return 0;
+            const char* localAppData = getenv("LOCALAPPDATA");
+            std::string cacheDir = std::string(localAppData ? localAppData : "") + "\\Setu\\apps\\" + launchArgs.package;
+            apkPath = cacheDir + "\\base.apk";
         }
-    } else {
-        const char* localAppData = getenv("LOCALAPPDATA");
-        std::string cacheDir = std::string(localAppData ? localAppData : "") + "\\Setu\\apps\\" + launchArgs.package;
-        apkPath = cacheDir + "\\base.apk";
     }
 
     Logger::setConfiguredLevel(launchArgs.logLevel);
@@ -393,6 +399,8 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
+
 
 
 

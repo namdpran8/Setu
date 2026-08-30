@@ -158,6 +158,19 @@ std::string DexParser::getTypeString(uint32_t typeIdx) const {
     return "";
 }
 
+std::string DexParser::getSuperClass(const std::string& className) const {
+    if (!m_classDefs || !m_typeIds) return "";
+    for (uint32_t i = 0; i < m_classDefsSize; ++i) {
+        const class_def_item& classDef = m_classDefs[i];
+        std::string currentClassName = m_strings[m_typeIds[classDef.class_idx].descriptor_idx];
+        if (currentClassName == className) {
+            if (classDef.superclass_idx == 0xFFFFFFFF) return ""; // NO_INDEX
+            return m_strings[m_typeIds[classDef.superclass_idx].descriptor_idx];
+        }
+    }
+    return "";
+}
+
 DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& methodSignature) const {
     size_t arrowPos = methodSignature.find("->");
     if (arrowPos == std::string::npos) return {};
@@ -220,7 +233,7 @@ DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& 
                         Logger::w("DexParser", "Method " + methodSignature + " has code_off == 0 (abstract or native)");
                         return {};
                     }
-
+					// What are you doing here? You are trying to read the code_item structure from the DEX file. The code_item structure starts with a header that contains the number of registers, ins, outs, tries, and the size of the instructions. After the header, there is an array of 16-bit instructions (insns). You need to read the code_item structure and extract the bytecode. Dont know what is written in this comment as it written by AI , not me.
                     const uint8_t* codeItemPtr = m_dexBufferStart + codeOff;
                     const code_item_header* codeHeader = reinterpret_cast<const code_item_header*>(codeItemPtr);
                     
@@ -397,6 +410,7 @@ Value DexParser::getStaticFieldValue(uint32_t fieldIdx) const {
             }
             
             if (!found) {
+                //LOL cant what i have been looking 
                 Logger::w("DexParser", "Field " + className + "->" + fieldName + " is not static or not found in class_data_item");
                 return Value::MakeNull();
             }

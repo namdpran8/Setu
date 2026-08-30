@@ -73,6 +73,10 @@ private:
     static graphics::DrawablePtr inflateRipple(android::ResXMLParser* parser,
                                                ResourceManager* resManager,
                                                Theme* theme);
+    static graphics::DrawablePtr inflateInset(android::ResXMLParser* parser,
+                                              ResourceManager* resManager,
+                                              Theme* theme);
+
 
     // <bitmap>. Always a BitmapDrawable, even when android:src names a 9-patch -
     // see the note in the .cpp about why that matches a real device.

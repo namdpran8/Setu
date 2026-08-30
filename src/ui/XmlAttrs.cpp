@@ -84,6 +84,11 @@ bool readColor(const XmlAttrs& attrs, const char* name, uint32_t& out) {
     return true;
 }
 
+float applyDimensionPx(int unit, float value) {
+    return applyDimensionWith(unit, value, WindowManager::getDensity(),
+                              WindowManager::getScaledDensity());
+}
+
 float complexToDimensionPx(uint32_t data) {
     // Arithmetic lives in the header so ViewGroup can reuse it without dragging
     // WindowManager into the standalone view-layer build.

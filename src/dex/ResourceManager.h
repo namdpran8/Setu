@@ -50,6 +50,12 @@ public:
     // Resolves a dimension
     float resolveDimension(uint32_t resId);
 
+    // Applies unit scaling to a raw dimension value
+    static float applyDimension(int unit, float value);
+
+    // Gets an integer value by resource ID
+    int getInt(uint32_t resId);
+
     // Resolves references (@) and theme attributes (?)
     bool resolveValue(android::AssetManager2::SelectedValue& in_out_value, class Theme* theme = nullptr);
 

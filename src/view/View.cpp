@@ -101,6 +101,15 @@ bool View::runScheduledWork() {
     return !s_scheduledWork.empty();
 }
 
+void View::postTask(std::function<void()> what) {
+    if (!what) return;
+    const bool wasIdle = s_scheduledWork.empty();
+    s_scheduledWork.push_back({nullptr, std::move(what), uptimeMillis()});
+    if (wasIdle && s_animationHandler) {
+        s_animationHandler();
+    }
+}
+
 View::View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes) {
     // In a real implementation, we would extract View's styleables here (e.g. layout_width, layout_height, visibility, id)
     // using TypedArray ta(resManager, { R::styleable::View_id, R::styleable::View_visibility, ... });
