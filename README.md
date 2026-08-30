@@ -10,7 +10,7 @@ Rather than running an entire Android OS inside a heavy hardware emulator or a s
 ## 🚀 Key Features
 
 * **Dalvik Execution Engine:** A custom, lightweight bytecode interpreter written in C++ that dynamically parses and executes Dalvik opcodes (from `classes.dex`) line-by-line, without needing a full Java Virtual Machine.
-* **Native Win32 UI Bridging:** Intercepts Android UI inflation (`setContentView`) and seamlessly maps Android XML layouts (`ConstraintLayout`, `TextView`, `Button`, etc.) directly into native Windows rendering contexts (like Direct2D).
+* **Native UI & Rendering:** Intercepts Android UI inflation (`setContentView`) and renders views natively. Supports both **Direct2D** and **Google Skia** (via `SkiaCanvas`) for hardware-accelerated drawing, with a real-time side-by-side A/B comparison mode for rendering validation.
 * **Multi-DEX Support:** Automatically parses and manages cross-DEX execution for modern, large Android applications containing multiple `classes*.dex` files.
 * **AXML & ARSC Parsing:** Parses compiled Android Binary XML (AXML) and the global resource table (`resources.arsc`) to resolve strings, layouts, dimensions, and control properties.
 * **Framework Stubbing Engine:** A powerful interception registry (`StubRegistry`) that detects when the bytecode tries to call the standard Android Java Framework (which doesn't exist on Windows), catches it, and executes a native C++ alternative (e.g., UI callbacks, `setOnClickListener`, `startActivity`).
@@ -24,7 +24,8 @@ Rather than running an entire Android OS inside a heavy hardware emulator or a s
 2. **Interpreter (`interpreter/Interpreter.cpp`)**: The core execution engine. It sets up an `InterpreterState` (registers, stack) and steps through DEX opcodes. It handles object instantiation, virtual method invocation, and static field resolution.
 3. **Stub Registry (`interpreter/StubRegistry.cpp`)**: Since Setu does not ship with a 2GB Java runtime, all calls to `android.os.*`, `androidx.*`, or `java.*` are intercepted. The registry provides C++ lambda functions that simulate these calls (e.g., converting Android Intents to Win32 window transitions).
 4. **Layout Inflater (`ui/LayoutInflater.cpp`)**: Reads the AXML layout nodes requested by the APK, extracts attributes (padding, margins, constraints), and creates the corresponding native view tree using custom rendering components.
-5. **Cassowary Engine (`cassowary/`)**: Resolves view bounds mathematically for constraint-based layouts.
+5. **Rendering Pipeline (`graphics/`)**: Abstracts rendering through a unified `Canvas` interface, allowing hot-swappable rendering backends like `Direct2DCanvas` and `SkiaCanvas` (powered by Google Skia).
+6. **Cassowary Engine (`cassowary/`)**: Resolves view bounds mathematically for constraint-based layouts.
 
 ---
 
@@ -58,6 +59,7 @@ This project is licensed under the [Apache License 2.0](LICENSE).
 
 Setu leverages several open-source projects and concepts:
 * **[Android Open Source Project (AOSP)](https://source.android.com/)**: For the foundational components including ART (Android Runtime) structures, `libbase`, `libziparchive`, and `androidfw`.
+* **[Google Skia](https://skia.org/)**: An open source 2D graphics library which provides common APIs that work across a variety of hardware and software platforms.
 * **[fmt](https://github.com/fmtlib/fmt)**: A modern, safe, and fast formatting library for C++.
 * **[miniz](https://github.com/richgel999/miniz)**: A lightweight, drop-in replacement for zlib, used for ZIP and APK extraction.
 * **[ConstraintLayout](https://github.com/androidx/constraintlayout)** & **Cassowary**: Core solver engine implementations utilized for mimicking complex Android layout structures natively on Windows.

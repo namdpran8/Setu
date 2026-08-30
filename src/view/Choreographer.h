@@ -12,7 +12,7 @@
 
 #pragma once
 #include "View.h"
-#include "../graphics/Direct2DCanvas.h"
+#include "../graphics/Canvas.h"
 #include <memory>
 
 namespace setu {
@@ -25,7 +25,8 @@ public:
         return instance;
     }
 
-    void doFrame(std::shared_ptr<View> decorView, graphics::Direct2DCanvas& canvas, int windowWidth, int windowHeight);
+    // Renders the view tree and dispatches animations.
+    void doFrame(std::shared_ptr<View> decorView, graphics::Canvas& canvas, int windowWidth, int windowHeight);
 
 private:
     Choreographer() = default;

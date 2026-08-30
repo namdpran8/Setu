@@ -16,6 +16,12 @@ add_subdirectory(thirdparty/fmt)
 add_subdirectory(thirdparty/androidfw)
 add_subdirectory(src/cassowary)
 
+add_library(skia STATIC IMPORTED GLOBAL)
+set_target_properties(skia PROPERTIES
+    IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia.lib"
+    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia"
+)
+
 add_executable(setu_runtime
 
     src/main.cpp
@@ -44,6 +50,7 @@ add_executable(setu_runtime
     "src/graphics/ColorStateList.cpp"
     "src/graphics/FontManager.cpp"
     "src/graphics/Direct2DCanvas.cpp"
+    "src/graphics/SkiaCanvas.cpp"
     "src/graphics/RecordingCanvas.cpp"
     "src/graphics/drawable/Drawable.cpp"
     "src/graphics/drawable/ColorDrawable.cpp"
@@ -73,7 +80,7 @@ add_executable(setu_runtime
 target_include_directories(setu_runtime PRIVATE include)
 # windowscodecs: WIC, for BitmapFactory's decoders. ole32: CoInitializeEx and
 # CoCreateInstance, which WIC needs and which nothing else here was using.
-target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi windowscodecs ole32 setu_androidfw cassowary)
+target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi windowscodecs ole32 setu_androidfw cassowary skia)
 target_link_options(setu_runtime PRIVATE "/NODEFAULTLIB:LIBCMT")
 target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
 

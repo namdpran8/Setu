@@ -16,7 +16,7 @@
 namespace setu {
 namespace view {
 
-void Choreographer::doFrame(std::shared_ptr<View> decorView, graphics::Direct2DCanvas& canvas, int windowWidth, int windowHeight) {
+void Choreographer::doFrame(std::shared_ptr<View> decorView, graphics::Canvas& canvas, int windowWidth, int windowHeight) {
     if (!decorView) return;
 
     // 1. Measure Pass
@@ -32,15 +32,11 @@ void Choreographer::doFrame(std::shared_ptr<View> decorView, graphics::Direct2DC
     decorView->updateRenderNode();
 
     // 4. Render to screen
-    WindowManager::beginDraw();
-    
     // Clear screen
     canvas.drawColor(0xFFFFFFFF); // White background
     
     // Execute RenderNode display list
     canvas.drawRenderNode(decorView->getRenderNode());
-    
-    WindowManager::endDraw();
 }
 
 } // namespace view

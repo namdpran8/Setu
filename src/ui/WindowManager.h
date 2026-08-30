@@ -38,9 +38,7 @@ public:
     static IDWriteFactory* getDWriteFactory();
     static IDXGISwapChain1* getSwapChain();
 
-    // Render loop integration
-    static void beginDraw();
-    static void endDraw();
+
 
     static void clearWindow();
     static void setClickCallback(std::function<void(int)> cb);
@@ -68,11 +66,18 @@ private:
     static bool s_rootViewDumpPending;
     static std::function<void(int)> s_clickCallback;
     static HWND s_mainWindow;
+    static HWND s_skiaWindow;
 
     // Direct2D / DirectX resources
     static Microsoft::WRL::ComPtr<ID3D11Device> s_d3dDevice;
     static Microsoft::WRL::ComPtr<ID3D11DeviceContext> s_d3dContext;
+    
     static Microsoft::WRL::ComPtr<IDXGISwapChain1> s_swapChain;
+    static Microsoft::WRL::ComPtr<ID2D1Bitmap1> s_d2dTargetBitmap;
+    
+    static Microsoft::WRL::ComPtr<IDXGISwapChain1> s_skiaSwapChain;
+    static Microsoft::WRL::ComPtr<ID2D1Bitmap1> s_skiaTargetBitmap;
+    
     static Microsoft::WRL::ComPtr<ID2D1Factory1> s_d2dFactory;
     static Microsoft::WRL::ComPtr<ID2D1Device> s_d2dDevice;
     static Microsoft::WRL::ComPtr<ID2D1DeviceContext> s_d2dContext;
