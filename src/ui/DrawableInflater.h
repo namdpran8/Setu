@@ -22,6 +22,10 @@
 
 namespace setu {
 
+namespace graphics {
+struct VGroup;
+}
+
 class ResourceManager;
 class Theme;
 
@@ -82,7 +86,14 @@ private:
     static graphics::DrawablePtr inflateLevelList(android::ResXMLParser* parser,
                                                   ResourceManager* resManager,
                                                   Theme* theme);
+    static graphics::DrawablePtr inflateVector(android::ResXMLParser* parser,
+                                               ResourceManager* resManager,
+                                               Theme* theme);
 
+    static void inflateVectorGroup(android::ResXMLParser* parser,
+                                   ResourceManager* resManager,
+                                   Theme* theme,
+                                   graphics::VGroup* group);
 
     // <bitmap>. Always a BitmapDrawable, even when android:src names a 9-patch -
     // see the note in the .cpp about why that matches a real device.

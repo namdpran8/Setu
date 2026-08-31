@@ -57,6 +57,7 @@ add_executable(setu_runtime
     "src/graphics/drawable/GradientDrawable.cpp"
     "src/graphics/drawable/LayerDrawable.cpp"
     "src/graphics/drawable/LevelListDrawable.cpp"
+    "src/graphics/drawable/VectorDrawable.cpp"
     "src/graphics/drawable/StateSet.cpp"
     "src/graphics/drawable/DrawableContainer.cpp"
     "src/graphics/drawable/StateListDrawable.cpp"

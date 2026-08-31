@@ -30,9 +30,11 @@
 #include "../graphics/drawable/RippleDrawable.h"
 #include "../graphics/drawable/LayerDrawable.h"
 #include "../graphics/drawable/LevelListDrawable.h"
+#include "../graphics/drawable/VectorDrawable.h"
 #include "../graphics/drawable/StateListDrawable.h"
 #include "../graphics/drawable/StateSet.h"
 #include "../view/Gravity.h"
+#include "include/utils/SkParsePath.h"
 #include "../utils/Logger.h"
 namespace setu {
 namespace {
@@ -373,6 +375,20 @@ graphics::DrawablePtr DrawableInflater::inflateFromParser(android::ResXMLParser*
     if (tag == "level-list") {
         return inflateLevelList(parser, resManager, theme);
     }
+    if (tag == "vector") {
+        return inflateVector(parser, resManager, theme);
+    }
+    if (tag == "animated-vector") {
+        const XmlAttrs attrs(parser, resManager, theme);
+        uint32_t drawableId = attrs.getResourceId("drawable");
+        if (drawableId != 0) {
+            return inflate(resManager, theme, drawableId);
+        } else {
+            // It could be inline <aapt:attr name="android:drawable">
+            // For now just skip and return null if no drawable ID is specified.
+            Logger::d(TAG, "<animated-vector> missing android:drawable ID");
+        }
+    }
     Logger::d(TAG, "<" + tag + "> is " + phaseFor(tag) + "; no background drawn");
     skipCurrentElement(parser);
     return nullptr;
@@ -641,6 +657,95 @@ graphics::DrawablePtr DrawableInflater::inflateLevelList(android::ResXMLParser* 
     }
     
     return levelList;
+}
+
+void DrawableInflater::inflateVectorGroup(android::ResXMLParser* parser,
+                                       ResourceManager* resManager, Theme* theme,
+                                       graphics::VGroup* group) {
+    int depth = 0;
+    android::ResXMLParser::event_code_t event;
+    while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
+           event != android::ResXMLParser::END_DOCUMENT) {
+        if (event == android::ResXMLParser::END_TAG) {
+            if (depth == 0) break;
+            --depth;
+            continue;
+        }
+        if (event != android::ResXMLParser::START_TAG) continue;
+        
+        if (depth == 0) {
+            std::string tag = elementName(parser);
+            const XmlAttrs attrs(parser, resManager, theme);
+            
+            if (tag == "group") {
+                auto childGroup = std::make_unique<graphics::VGroup>();
+                childGroup->rotation = attrs.getFloat("rotation", 0.0f);
+                childGroup->pivotX = attrs.getFloat("pivotX", 0.0f);
+                childGroup->pivotY = attrs.getFloat("pivotY", 0.0f);
+                childGroup->scaleX = attrs.getFloat("scaleX", 1.0f);
+                childGroup->scaleY = attrs.getFloat("scaleY", 1.0f);
+                childGroup->translateX = attrs.getFloat("translateX", 0.0f);
+                childGroup->translateY = attrs.getFloat("translateY", 0.0f);
+                
+                inflateVectorGroup(parser, resManager, theme, childGroup.get());
+                group->groups.push_back(std::move(childGroup));
+                continue; // inflateVectorGroup advances the parser
+            } else if (tag == "path") {
+                graphics::VPath vpath;
+                
+                vpath.fillColor = 0;
+                readColor(attrs, "fillColor", vpath.fillColor);
+                vpath.fillAlpha = attrs.getFloat("fillAlpha", 1.0f);
+                
+                vpath.strokeColor = 0;
+                readColor(attrs, "strokeColor", vpath.strokeColor);
+                vpath.strokeWidth = attrs.getFloat("strokeWidth", 0.0f);
+                vpath.strokeAlpha = attrs.getFloat("strokeAlpha", 1.0f);
+                
+                vpath.trimPathStart = attrs.getFloat("trimPathStart", 0.0f);
+                vpath.trimPathEnd = attrs.getFloat("trimPathEnd", 1.0f);
+                vpath.trimPathOffset = attrs.getFloat("trimPathOffset", 0.0f);
+                
+                int lineCap = attrs.getInt("strokeLineCap", 0); // 0=butt, 1=round, 2=square
+                if (lineCap == 1) vpath.strokeLineCap = graphics::VPath::LineCap::ROUND;
+                else if (lineCap == 2) vpath.strokeLineCap = graphics::VPath::LineCap::SQUARE;
+                
+                int lineJoin = attrs.getInt("strokeLineJoin", 0); // 0=miter, 1=round, 2=bevel
+                if (lineJoin == 1) vpath.strokeLineJoin = graphics::VPath::LineJoin::ROUND;
+                else if (lineJoin == 2) vpath.strokeLineJoin = graphics::VPath::LineJoin::BEVEL;
+                
+                int fillType = attrs.getInt("fillType", 0); // 0=nonZero, 1=evenOdd
+                vpath.fillEvenOdd = (fillType != 0);
+                
+                std::string pathData = attrs.getString("pathData");
+                if (!pathData.empty()) {
+                    SkParsePath::FromSVGString(pathData.c_str(), &vpath.path);
+                }
+                
+                group->paths.push_back(std::move(vpath));
+            }
+        }
+        
+        depth++;
+    }
+}
+
+graphics::DrawablePtr DrawableInflater::inflateVector(android::ResXMLParser* parser,
+                                                     ResourceManager* resManager, Theme* theme) {
+    auto vectorDrawable = std::make_shared<graphics::VectorDrawable>();
+    
+    const XmlAttrs attrs(parser, resManager, theme);
+    float viewportWidth = attrs.getFloat("viewportWidth", 0.0f);
+    float viewportHeight = attrs.getFloat("viewportHeight", 0.0f);
+    vectorDrawable->setViewportSize(viewportWidth, viewportHeight);
+    
+    int width = attrs.getDimensionPixelSize("width", -1);
+    int height = attrs.getDimensionPixelSize("height", -1);
+    vectorDrawable->setIntrinsicSize(width, height);
+    
+    inflateVectorGroup(parser, resManager, theme, vectorDrawable->getRootGroup());
+    
+    return vectorDrawable;
 }
 
 graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* parser,

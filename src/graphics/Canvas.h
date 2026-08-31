@@ -17,6 +17,8 @@
 #include "Rect.h"
 #include <string>
 
+class SkCanvas;
+
 namespace setu {
 namespace graphics {
 
@@ -29,6 +31,9 @@ class Bitmap;
 class Canvas {
 public:
     virtual ~Canvas() = default;
+
+    // Backend escape hatch for Skia-only Drawables (e.g. VectorDrawable)
+    virtual ::SkCanvas* getSkCanvas() { return nullptr; }
 
     // State management
     virtual void save() = 0;

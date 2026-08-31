@@ -29,6 +29,8 @@ public:
     SkiaCanvas(int width, int height);
     ~SkiaCanvas() override;
 
+    ::SkCanvas* getSkCanvas() override { return mCanvas; }
+
     void save() override;
     void restore() override;
     void translate(float dx, float dy) override;
