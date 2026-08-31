@@ -63,5 +63,13 @@ bool Paint::isAntiAlias() const {
     return mAntiAlias;
 }
 
+void Paint::setShader(ShaderPtr shader) {
+    mShader = shader;
+}
+
+ShaderPtr Paint::getShader() const {
+    return mShader;
+}
+
 } // namespace graphics
 } // namespace setu

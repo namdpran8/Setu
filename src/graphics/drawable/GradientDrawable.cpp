@@ -229,8 +229,103 @@ uint32_t GradientDrawable::applyAlpha(uint32_t argb) const {
     return (scaled << 24) | (argb & 0x00FFFFFF);
 }
 
+void GradientDrawable::setGradient(GradientType type, float angle, float centerX, float centerY, float gradientRadius,
+                                   uint32_t startColor, uint32_t centerColor, uint32_t endColor, bool hasCenterColor,
+                                   TileMode tileMode) {
+    mHasGradient = true;
+    mGradientState.type = type;
+    mGradientState.angle = angle;
+    mGradientState.centerX = centerX;
+    mGradientState.centerY = centerY;
+    mGradientState.gradientRadius = gradientRadius;
+    mGradientState.startColor = startColor;
+    mGradientState.centerColor = centerColor;
+    mGradientState.endColor = endColor;
+    mGradientState.hasCenterColor = hasCenterColor;
+    mGradientState.tileMode = tileMode;
+    
+    updateShader();
+    invalidateSelf();
+}
+
+#include <cmath>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+void GradientDrawable::updateShader() {
+    if (!mHasGradient || mRect.isEmpty()) {
+        mShader.reset();
+        return;
+    }
+
+    std::vector<uint32_t> colors;
+    if (mGradientState.hasCenterColor) {
+        colors = {mGradientState.startColor, mGradientState.centerColor, mGradientState.endColor};
+    } else {
+        colors = {mGradientState.startColor, mGradientState.endColor};
+    }
+    std::vector<float> positions; // Empty implies even distribution
+
+    float w = mRect.width();
+    float h = mRect.height();
+
+    if (mGradientState.type == GradientType::LINEAR) {
+        // Android maps angle to a line crossing the bounds.
+        // angle is in degrees, counter-clockwise from 3 o'clock (0 degrees).
+        // For linear gradient, Android snaps to 45 degree intervals if specified in XML.
+        float angleRad = (float)(fmod(mGradientState.angle, 360.0f) * M_PI / 180.0f);
+        
+        // Simple bounding box intersection for gradient line
+        // Android's actual logic is a bit more complex (involving projecting the corners)
+        // A simplified version based on angle:
+        float x0 = mRect.left;
+        float y0 = mRect.bottom;
+        float x1 = mRect.right;
+        float y1 = mRect.top;
+
+        // Based on AOSP GradientDrawable orientation mapping (multiples of 45)
+        int angleInt = (int)fmod(mGradientState.angle, 360.0f);
+        if (angleInt < 0) angleInt += 360;
+
+        switch (angleInt) {
+            case 0:   x0 = mRect.left;  y0 = mRect.top;    x1 = mRect.right; y1 = mRect.top; break; // LEFT_RIGHT
+            case 45:  x0 = mRect.left;  y0 = mRect.bottom; x1 = mRect.right; y1 = mRect.top; break; // BL_TR
+            case 90:  x0 = mRect.left;  y0 = mRect.bottom; x1 = mRect.left;  y1 = mRect.top; break; // BOTTOM_TOP
+            case 135: x0 = mRect.right; y0 = mRect.bottom; x1 = mRect.left;  y1 = mRect.top; break; // BR_TL
+            case 180: x0 = mRect.right; y0 = mRect.top;    x1 = mRect.left;  y1 = mRect.top; break; // RIGHT_LEFT
+            case 225: x0 = mRect.right; y0 = mRect.top;    x1 = mRect.left;  y1 = mRect.bottom; break; // TR_BL
+            case 270: x0 = mRect.left;  y0 = mRect.top;    x1 = mRect.left;  y1 = mRect.bottom; break; // TOP_BOTTOM
+            case 315: x0 = mRect.left;  y0 = mRect.top;    x1 = mRect.right; y1 = mRect.bottom; break; // TL_BR
+            default:
+                // Fallback for non-45 degree multiples
+                float r = sqrt(w*w + h*h) / 2.0f;
+                x0 = mRect.centerX() - r * cos(angleRad);
+                y0 = mRect.centerY() + r * sin(angleRad);
+                x1 = mRect.centerX() + r * cos(angleRad);
+                y1 = mRect.centerY() - r * sin(angleRad);
+                break;
+        }
+
+        mShader = std::make_shared<LinearGradient>(x0, y0, x1, y1, colors, positions, mGradientState.tileMode);
+    } else if (mGradientState.type == GradientType::RADIAL) {
+        float cx = mRect.left + mRect.width() * mGradientState.centerX;
+        float cy = mRect.top + mRect.height() * mGradientState.centerY;
+        float r = mGradientState.gradientRadius;
+        if (r <= 0.0f) {
+            r = std::min(mRect.width(), mRect.height()) * 0.5f; // Fallback
+        }
+        mShader = std::make_shared<RadialGradient>(cx, cy, r, colors, positions, mGradientState.tileMode);
+    } else if (mGradientState.type == GradientType::SWEEP) {
+        float cx = mRect.left + mRect.width() * mGradientState.centerX;
+        float cy = mRect.top + mRect.height() * mGradientState.centerY;
+        mShader = std::make_shared<SweepGradient>(cx, cy, colors, positions);
+    }
+}
+
 void GradientDrawable::onBoundsChange(const Rect& bounds) {
     ensureValidRect();
+    updateShader();
     mPathDirty = true;
 }
 
@@ -249,12 +344,21 @@ void GradientDrawable::draw(Canvas& canvas) {
 
     const bool stroking = hasStroke();
     const uint32_t fillColor = applyAlpha(mSolidColor);
-    const bool filling = mHasSolid && (fillColor >> 24) != 0;
+    const bool filling = (mHasSolid && (fillColor >> 24) != 0) || mHasGradient;
     if (!filling && !stroking) return;
 
     Paint fillPaint;
     fillPaint.setStyle(Style::FILL);
-    fillPaint.setColor(fillColor);
+    if (mHasGradient) {
+        // When drawing a gradient, solid color acts as fallback/tint if we were doing tinting,
+        // but generally gradient overrides. We need to pass alpha down.
+        // Wait, applyAlpha on mShader's colors is hard since Shader holds colors, so we just
+        // rely on Canvas/Paint applying alpha? Direct2D doesn't automatically alpha the brush unless set.
+        // Since we don't have Paint alpha yet, we'll just ignore drawable alpha for gradients for now.
+        fillPaint.setShader(mShader);
+    } else {
+        fillPaint.setColor(fillColor);
+    }
 
     Paint strokePaint;
     strokePaint.setStyle(Style::STROKE);

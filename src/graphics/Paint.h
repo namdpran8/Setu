@@ -13,6 +13,7 @@
 #pragma once
 
 #include <cstdint>
+#include "Shader.h"
 
 namespace setu {
 namespace graphics {
@@ -43,12 +44,16 @@ public:
     void setAntiAlias(bool aa);
     bool isAntiAlias() const;
 
+    void setShader(ShaderPtr shader);
+    ShaderPtr getShader() const;
+
 private:
     uint32_t mColor; // ARGB
     Style mStyle;
     float mStrokeWidth;
     float mTextSize;
     bool mAntiAlias;
+    ShaderPtr mShader;
 };
 
 } // namespace graphics

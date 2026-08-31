@@ -45,6 +45,7 @@ public:
 
     // Helper to get or create a solid color brush based on Paint
     ID2D1SolidColorBrush* getCachedBrush(uint32_t color);
+    Microsoft::WRL::ComPtr<ID2D1Brush> getBrushForPaint(const Paint& paint);
 
 private:
     Microsoft::WRL::ComPtr<ID2D1DeviceContext> mContext;

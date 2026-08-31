@@ -28,6 +28,8 @@
 #include "../graphics/drawable/GradientDrawable.h"
 #include "../graphics/drawable/NinePatchDrawable.h"
 #include "../graphics/drawable/RippleDrawable.h"
+#include "../graphics/drawable/LayerDrawable.h"
+#include "../graphics/drawable/LevelListDrawable.h"
 #include "../graphics/drawable/StateListDrawable.h"
 #include "../graphics/drawable/StateSet.h"
 #include "../view/Gravity.h"
@@ -365,6 +367,12 @@ graphics::DrawablePtr DrawableInflater::inflateFromParser(android::ResXMLParser*
     if (tag == "inset") {
         return inflateInset(parser, resManager, theme);
     }
+    if (tag == "layer-list") {
+        return inflateLayerList(parser, resManager, theme);
+    }
+    if (tag == "level-list") {
+        return inflateLevelList(parser, resManager, theme);
+    }
     Logger::d(TAG, "<" + tag + "> is " + phaseFor(tag) + "; no background drawn");
     skipCurrentElement(parser);
     return nullptr;
@@ -516,6 +524,125 @@ graphics::DrawablePtr DrawableInflater::inflateImageFile(ResourceManager* resMan
     // rather than sitting at its intrinsic size in the middle.
     return makeBitmapDrawable(image);
 }
+graphics::DrawablePtr DrawableInflater::inflateLayerList(android::ResXMLParser* parser,
+                                                     ResourceManager* resManager, Theme* theme) {
+    auto layerDrawable = std::make_shared<graphics::LayerDrawable>();
+    
+    int depth = 0;
+    android::ResXMLParser::event_code_t event;
+    while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
+           event != android::ResXMLParser::END_DOCUMENT) {
+        if (event == android::ResXMLParser::END_TAG) {
+            if (depth == 0) break;
+            --depth;
+            continue;
+        }
+        if (event != android::ResXMLParser::START_TAG) continue;
+        
+        if (depth == 0 && elementName(parser) == "item") {
+            const XmlAttrs attrs(parser, resManager, theme);
+            int left = attrs.getDimensionPixelOffset("left", 0);
+            int top = attrs.getDimensionPixelOffset("top", 0);
+            int right = attrs.getDimensionPixelOffset("right", 0);
+            int bottom = attrs.getDimensionPixelOffset("bottom", 0);
+            
+            uint32_t drawableId = attrs.getResourceId("drawable");
+            graphics::DrawablePtr childDrawable;
+            
+            if (drawableId != 0) {
+                childDrawable = inflate(resManager, theme, drawableId);
+            }
+            
+            // Inflate nested drawable
+            int innerDepth = 0;
+            while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
+                   event != android::ResXMLParser::END_DOCUMENT) {
+                if (event == android::ResXMLParser::END_TAG) {
+                    if (innerDepth == 0) break;
+                    --innerDepth;
+                    continue;
+                }
+                if (event == android::ResXMLParser::START_TAG) {
+                    if (innerDepth == 0 && !childDrawable) {
+                        childDrawable = inflateFromParser(parser, resManager, theme);
+                    } else {
+                        skipCurrentElement(parser);
+                    }
+                    if (event != android::ResXMLParser::END_TAG) {
+                        innerDepth++;
+                    }
+                }
+            }
+            
+            if (childDrawable) {
+                layerDrawable->addLayer(childDrawable, left, top, right, bottom);
+            }
+        } else {
+            depth++;
+        }
+    }
+    
+    return layerDrawable;
+}
+
+graphics::DrawablePtr DrawableInflater::inflateLevelList(android::ResXMLParser* parser,
+                                                     ResourceManager* resManager, Theme* theme) {
+    auto levelList = std::make_shared<graphics::LevelListDrawable>();
+    
+    int depth = 0;
+    android::ResXMLParser::event_code_t event;
+    while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
+           event != android::ResXMLParser::END_DOCUMENT) {
+        if (event == android::ResXMLParser::END_TAG) {
+            if (depth == 0) break;
+            --depth;
+            continue;
+        }
+        if (event != android::ResXMLParser::START_TAG) continue;
+        
+        if (depth == 0 && elementName(parser) == "item") {
+            const XmlAttrs attrs(parser, resManager, theme);
+            int maxLevel = attrs.getInt("maxLevel", 0);
+            int minLevel = attrs.getInt("minLevel", 0);
+            
+            uint32_t drawableId = attrs.getResourceId("drawable");
+            graphics::DrawablePtr childDrawable;
+            
+            if (drawableId != 0) {
+                childDrawable = inflate(resManager, theme, drawableId);
+            }
+            
+            int innerDepth = 0;
+            while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
+                   event != android::ResXMLParser::END_DOCUMENT) {
+                if (event == android::ResXMLParser::END_TAG) {
+                    if (innerDepth == 0) break;
+                    --innerDepth;
+                    continue;
+                }
+                if (event == android::ResXMLParser::START_TAG) {
+                    if (innerDepth == 0 && !childDrawable) {
+                        childDrawable = inflateFromParser(parser, resManager, theme);
+                    } else {
+                        skipCurrentElement(parser);
+                    }
+                    if (event != android::ResXMLParser::END_TAG) {
+                        innerDepth++;
+                    }
+                }
+            }
+            
+            if (childDrawable) {
+                levelList->addLevel(minLevel, maxLevel, childDrawable);
+            }
+        } else {
+            depth++;
+        }
+    }
+    
+    return levelList;
+}
+
 graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* parser,
                                                      ResourceManager* resManager, Theme* theme) {
     using BD = graphics::BitmapDrawable;
@@ -659,8 +786,6 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
     }
     // A <gradient> outranks a <solid> in AOSP regardless of which came first, so
     // its stand-in colour is held back and applied once the element is fully read.
-    bool hasGradientColor = false;
-    uint32_t gradientColor = 0;
     int depth = 0;
     android::ResXMLParser::event_code_t event;
     while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
@@ -733,31 +858,29 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
             shape->setSize(attrs.getDimensionPixelSize("width", -1),
                            attrs.getDimensionPixelSize("height", -1));
         } else if (tag == "gradient") {
-            // Real gradients need a shader on Paint, which is a later roadmap
-            // item. Averaging the stops into one flat colour is wrong in a
-            // pixel diff, but a gradient-only <shape> has no <solid> to fall back
-            // on, so the alternative is a view that vanishes completely. Delete
-            // this branch when the shader lands.
             uint32_t start = 0, center = 0, end = 0;
             const bool hasStart = readColor(attrs, "startColor", start);
             const bool hasCenter = readColor(attrs, "centerColor", center);
             const bool hasEnd = readColor(attrs, "endColor", end);
-            if (hasStart && hasEnd) {
-                gradientColor = hasCenter ? meanColor3(start, center, end) : meanColor(start, end);
-                hasGradientColor = true;
-            } else if (hasStart) {
-                gradientColor = start;
-                hasGradientColor = true;
+            
+            float angle = attrs.getFloat("angle", 0.0f);
+            float centerX = attrs.getFraction("centerX", 0.5f);
+            float centerY = attrs.getFraction("centerY", 0.5f);
+            float gradientRadius = attrs.getDimensionPixelSize("gradientRadius", -1.0f);
+            if (gradientRadius == -1.0f) {
+                gradientRadius = attrs.getFraction("gradientRadius", -1.0f); // In case it's fraction
             }
-            if (hasGradientColor) {
-                Logger::d(TAG, "<gradient> approximated with a flat colour until shaders exist");
-            }
+            
+            int typeInt = attrs.getInt("type", 0);
+            graphics::GradientDrawable::GradientType type = graphics::GradientDrawable::GradientType::LINEAR;
+            if (typeInt == 1) type = graphics::GradientDrawable::GradientType::RADIAL;
+            else if (typeInt == 2) type = graphics::GradientDrawable::GradientType::SWEEP;
+
+            shape->setGradient(type, angle, centerX, centerY, gradientRadius,
+                               start, center, end, hasCenter, graphics::TileMode::CLAMP);
         }
         // <shape> has no other children worth reading: everything else AAPT would
         // let through is a no-op on a real device too.
-    }
-    if (hasGradientColor) {
-        shape->setColor(gradientColor);
     }
     return shape;
 }

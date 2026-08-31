@@ -26,6 +26,7 @@
 #include "include/core/SkTypeface.h"
 #include "include/core/SkFontMgr.h"
 #include "include/ports/SkTypeface_win.h"
+#include "include/effects/SkGradientShader.h"
 #include "include/core/SkString.h"
 #include "include/core/SkPixmap.h"
 #include "include/core/SkImage.h"
@@ -63,6 +64,48 @@ void SkiaCanvas::setupSkPaint(const Paint& paint, SkPaint* skPaint) {
     }
     
     skPaint->setStrokeWidth(paint.getStrokeWidth());
+
+    if (auto shader = paint.getShader()) {
+        auto toSkTileMode = [](TileMode mode) {
+            switch (mode) {
+                case TileMode::REPEAT: return SkTileMode::kRepeat;
+                case TileMode::MIRROR: return SkTileMode::kMirror;
+                default: return SkTileMode::kClamp;
+            }
+        };
+
+        if (shader->getType() == ShaderType::LINEAR_GRADIENT) {
+            auto linear = std::static_pointer_cast<LinearGradient>(shader);
+            SkPoint pts[2] = {
+                SkPoint::Make(linear->mX0, linear->mY0),
+                SkPoint::Make(linear->mX1, linear->mY1)
+            };
+            skPaint->setShader(SkGradientShader::MakeLinear(
+                pts, linear->mColors.data(),
+                linear->mPositions.empty() ? nullptr : linear->mPositions.data(),
+                linear->mColors.size(),
+                toSkTileMode(linear->mTileMode)
+            ));
+        } else if (shader->getType() == ShaderType::RADIAL_GRADIENT) {
+            auto radial = std::static_pointer_cast<RadialGradient>(shader);
+            skPaint->setShader(SkGradientShader::MakeRadial(
+                SkPoint::Make(radial->mCenterX, radial->mCenterY),
+                radial->mRadius,
+                radial->mColors.data(),
+                radial->mPositions.empty() ? nullptr : radial->mPositions.data(),
+                radial->mColors.size(),
+                toSkTileMode(radial->mTileMode)
+            ));
+        } else if (shader->getType() == ShaderType::SWEEP_GRADIENT) {
+            auto sweep = std::static_pointer_cast<SweepGradient>(shader);
+            skPaint->setShader(SkGradientShader::MakeSweep(
+                sweep->mCenterX, sweep->mCenterY,
+                sweep->mColors.data(),
+                sweep->mPositions.empty() ? nullptr : sweep->mPositions.data(),
+                sweep->mColors.size()
+            ));
+        }
+    }
 }
 
 void SkiaCanvas::save() {

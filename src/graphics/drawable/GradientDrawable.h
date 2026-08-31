@@ -116,6 +116,30 @@ public:
     // Only then does the owner push its drawable state in here.
     bool isStateful() const override;
 
+    enum class GradientType {
+        LINEAR,
+        RADIAL,
+        SWEEP
+    };
+
+    struct GradientState {
+        GradientType type = GradientType::LINEAR;
+        float angle = 0.0f;
+        float centerX = 0.5f;
+        float centerY = 0.5f;
+        float gradientRadius = -1.0f;
+        bool hasCenterColor = false;
+        uint32_t startColor = 0;
+        uint32_t centerColor = 0;
+        uint32_t endColor = 0;
+        TileMode tileMode = TileMode::CLAMP;
+    };
+
+    void setGradient(GradientType type, float angle, float centerX, float centerY, float gradientRadius,
+                     uint32_t startColor, uint32_t centerColor, uint32_t endColor, bool hasCenterColor,
+                     TileMode tileMode);
+    bool hasGradient() const { return mHasGradient; }
+
 protected:
     void onBoundsChange(const Rect& bounds) override;
 
@@ -130,6 +154,9 @@ private:
     // Builds the annulus for Shape::RING into mPath, following AOSP's buildRing.
     void buildRingPath();
 
+    // Rebuilds mShader if the bounds have changed
+    void updateShader();
+
     // Applies mAlpha on top of an authored colour.
     uint32_t applyAlpha(uint32_t argb) const;
 
@@ -139,6 +166,10 @@ private:
 
     bool mHasSolid = false;
     uint32_t mSolidColor = 0x00000000;
+
+    bool mHasGradient = false;
+    GradientState mGradientState;
+    ShaderPtr mShader;
 
     // The authored colour selectors, when the fill or stroke was given one.
     // mSolidColor and mStrokeColor above stay the single source of truth for

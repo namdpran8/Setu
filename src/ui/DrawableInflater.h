@@ -76,6 +76,12 @@ private:
     static graphics::DrawablePtr inflateInset(android::ResXMLParser* parser,
                                               ResourceManager* resManager,
                                               Theme* theme);
+    static graphics::DrawablePtr inflateLayerList(android::ResXMLParser* parser,
+                                                  ResourceManager* resManager,
+                                                  Theme* theme);
+    static graphics::DrawablePtr inflateLevelList(android::ResXMLParser* parser,
+                                                  ResourceManager* resManager,
+                                                  Theme* theme);
 
 
     // <bitmap>. Always a BitmapDrawable, even when android:src names a 9-patch -
