@@ -26,7 +26,8 @@ namespace setu {
 namespace graphics {
 
 // Structure for a single <path> inside a <vector>
-struct VPath {
+struct VPath : public std::enable_shared_from_this<VPath> {
+    std::string name;
     SkPath path;
     uint32_t fillColor = 0;
     float fillAlpha = 1.0f;
@@ -50,7 +51,8 @@ struct VPath {
 };
 
 // Structure for a <group> inside a <vector>
-struct VGroup {
+struct VGroup : public std::enable_shared_from_this<VGroup> {
+    std::string name;
     float rotation = 0.0f;
     float pivotX = 0.0f;
     float pivotY = 0.0f;
@@ -60,13 +62,31 @@ struct VGroup {
     float translateY = 0.0f;
 
     // Children can be groups or paths
-    std::vector<std::unique_ptr<VGroup>> groups;
-    std::vector<VPath> paths;
+    std::vector<std::shared_ptr<VGroup>> groups;
+    std::vector<std::shared_ptr<VPath>> paths;
+    
+    std::shared_ptr<void> getTargetByName(const std::string& targetName) {
+        if (!name.empty() && name == targetName) {
+            return shared_from_this();
+        }
+        for (auto& p : paths) {
+            if (!p->name.empty() && p->name == targetName) {
+                return p;
+            }
+        }
+        for (auto& g : groups) {
+            auto res = g->getTargetByName(targetName);
+            if (res) return res;
+        }
+        return nullptr;
+    }
 };
 
 class VectorDrawable : public Drawable {
 public:
-    VectorDrawable() = default;
+    VectorDrawable() {
+        mRootGroup = std::make_shared<VGroup>();
+    }
 
     void draw(Canvas& canvas) override;
     
@@ -86,7 +106,17 @@ public:
         mIntrinsicHeight = height;
     }
 
-    VGroup* getRootGroup() { return &mRootGroup; }
+    std::shared_ptr<VGroup> getRootGroup() { return mRootGroup; }
+    
+    std::shared_ptr<void> getTargetByName(const std::string& targetName) {
+        if (!mRootGroup) return nullptr;
+        return mRootGroup->getTargetByName(targetName);
+    }
+
+    void invalidate() {
+        // If animated, we need to mark dirty
+        invalidateSelf();
+    }
 
 protected:
     void onBoundsChange(const Rect& bounds) override;
@@ -95,7 +125,7 @@ private:
     void drawGroup(SkCanvas* canvas, const VGroup& group);
     void drawPath(SkCanvas* canvas, const VPath& vpath);
 
-    VGroup mRootGroup;
+    std::shared_ptr<VGroup> mRootGroup;
     
     float mViewportWidth = 0.0f;
     float mViewportHeight = 0.0f;

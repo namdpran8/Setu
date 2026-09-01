@@ -14,6 +14,9 @@ public:
     static std::shared_ptr<ObjectAnimator> ofFloat(std::shared_ptr<void> target, const std::string& targetClass, 
                                                    const std::string& propertyName, std::vector<float> values);
 
+    void setTarget(std::shared_ptr<void> target) override {
+        m_target = target;
+    }
     void setTarget(std::shared_ptr<void> target, const std::string& targetClass) {
         m_target = target;
         m_targetClass = targetClass;

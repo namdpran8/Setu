@@ -101,6 +101,8 @@ public:
     virtual void draw(graphics::Canvas& canvas);
 
     // To be overridden by subclasses
+    virtual void onAttachedToWindow() {}
+    virtual void onDetachedFromWindow() {}
     virtual void onMeasure(int widthMeasureSpec, int heightMeasureSpec);
     virtual void onLayout(bool changed, int l, int t, int r, int b);
     virtual void onDraw(graphics::Canvas& canvas);
@@ -242,6 +244,8 @@ public:
     void setMinimumHeight(int minHeight) { mMinHeight = minHeight; requestLayout(); }
 
     void invalidate();
+    void dispatchAttachedToWindow();
+    void dispatchDetachedFromWindow();
 
     float getAlpha() const { return mAlpha; }
     void setAlpha(float alpha) { mAlpha = alpha; invalidate(); }
@@ -347,6 +351,7 @@ protected:
     bool mIsSelected = false;
     bool mIsActivated = false;
     bool mIsHovered = false;
+    bool mAttachedToWindow = false;
     // Rebuilt lazily by getDrawableState().
     std::vector<int> mDrawableState;
     bool mDrawableStateDirty = true;

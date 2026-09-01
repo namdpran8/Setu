@@ -31,6 +31,10 @@
 #include "../graphics/drawable/LayerDrawable.h"
 #include "../graphics/drawable/LevelListDrawable.h"
 #include "../graphics/drawable/VectorDrawable.h"
+#include "../graphics/drawable/AnimatedVectorDrawable.h"
+#include "../animation/AnimatorInflater.h"
+#include "../animation/AnimatorSet.h"
+#include "../animation/ObjectAnimator.h"
 #include "../graphics/drawable/StateListDrawable.h"
 #include "../graphics/drawable/StateSet.h"
 #include "../view/Gravity.h"
@@ -381,13 +385,51 @@ graphics::DrawablePtr DrawableInflater::inflateFromParser(android::ResXMLParser*
     if (tag == "animated-vector") {
         const XmlAttrs attrs(parser, resManager, theme);
         uint32_t drawableId = attrs.getResourceId("drawable");
+        graphics::DrawablePtr vectorChild = nullptr;
+        
         if (drawableId != 0) {
-            return inflate(resManager, theme, drawableId);
+            vectorChild = inflate(resManager, theme, drawableId);
         } else {
-            // It could be inline <aapt:attr name="android:drawable">
-            // For now just skip and return null if no drawable ID is specified.
-            Logger::d(TAG, "<animated-vector> missing android:drawable ID");
+            // Check for inline drawable
+            // For now, if no ID, we check if there's a child <aapt:attr name="android:drawable">
+            // This is a simplified fallback.
         }
+        
+        auto avd = std::make_shared<graphics::AnimatedVectorDrawable>(std::dynamic_pointer_cast<graphics::VectorDrawable>(vectorChild));
+        
+        int depth = 1;
+        android::ResXMLParser::event_code_t event;
+        while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT &&
+               event != android::ResXMLParser::END_DOCUMENT) {
+            if (event == android::ResXMLParser::END_TAG) {
+                depth--;
+                if (depth == 0) break;
+            } else if (event == android::ResXMLParser::START_TAG) {
+                if (depth == 1) {
+                    std::string childTag = elementName(parser);
+                    if (childTag == "target") {
+                        const XmlAttrs targetAttrs(parser, resManager, theme);
+                        std::string targetName = targetAttrs.getString("name");
+                        uint32_t animId = targetAttrs.getResourceId("animation");
+                        
+                        if (!targetName.empty() && animId != 0) {
+                            auto anim = animation::AnimatorInflater::loadAnimator(resManager, theme, animId);
+                            if (anim && vectorChild) {
+                                auto targetPtr = std::dynamic_pointer_cast<graphics::VectorDrawable>(vectorChild)->getTargetByName(targetName);
+                                if (targetPtr) {
+                                    anim->setTarget(targetPtr);
+                                    avd->registerAnimator(anim);
+                                } else {
+                                    Logger::w(TAG, "Target not found in VectorDrawable: " + targetName);
+                                }
+                            }
+                        }
+                    }
+                }
+                depth++;
+            }
+        }
+        return avd;
     }
     Logger::d(TAG, "<" + tag + "> is " + phaseFor(tag) + "; no background drawn");
     skipCurrentElement(parser);
@@ -678,7 +720,10 @@ void DrawableInflater::inflateVectorGroup(android::ResXMLParser* parser,
             const XmlAttrs attrs(parser, resManager, theme);
             
             if (tag == "group") {
-                auto childGroup = std::make_unique<graphics::VGroup>();
+                auto childGroup = std::make_shared<graphics::VGroup>();
+                if (attrs.has("name")) {
+                    childGroup->name = attrs.getString("name");
+                }
                 childGroup->rotation = attrs.getFloat("rotation", 0.0f);
                 childGroup->pivotX = attrs.getFloat("pivotX", 0.0f);
                 childGroup->pivotY = attrs.getFloat("pivotY", 0.0f);
@@ -691,35 +736,38 @@ void DrawableInflater::inflateVectorGroup(android::ResXMLParser* parser,
                 group->groups.push_back(std::move(childGroup));
                 continue; // inflateVectorGroup advances the parser
             } else if (tag == "path") {
-                graphics::VPath vpath;
+                auto vpath = std::make_shared<graphics::VPath>();
+                if (attrs.has("name")) {
+                    vpath->name = attrs.getString("name");
+                }
                 
-                vpath.fillColor = 0;
-                readColor(attrs, "fillColor", vpath.fillColor);
-                vpath.fillAlpha = attrs.getFloat("fillAlpha", 1.0f);
+                vpath->fillColor = 0;
+                readColor(attrs, "fillColor", vpath->fillColor);
+                vpath->fillAlpha = attrs.getFloat("fillAlpha", 1.0f);
                 
-                vpath.strokeColor = 0;
-                readColor(attrs, "strokeColor", vpath.strokeColor);
-                vpath.strokeWidth = attrs.getFloat("strokeWidth", 0.0f);
-                vpath.strokeAlpha = attrs.getFloat("strokeAlpha", 1.0f);
+                vpath->strokeColor = 0;
+                readColor(attrs, "strokeColor", vpath->strokeColor);
+                vpath->strokeWidth = attrs.getFloat("strokeWidth", 0.0f);
+                vpath->strokeAlpha = attrs.getFloat("strokeAlpha", 1.0f);
                 
-                vpath.trimPathStart = attrs.getFloat("trimPathStart", 0.0f);
-                vpath.trimPathEnd = attrs.getFloat("trimPathEnd", 1.0f);
-                vpath.trimPathOffset = attrs.getFloat("trimPathOffset", 0.0f);
+                vpath->trimPathStart = attrs.getFloat("trimPathStart", 0.0f);
+                vpath->trimPathEnd = attrs.getFloat("trimPathEnd", 1.0f);
+                vpath->trimPathOffset = attrs.getFloat("trimPathOffset", 0.0f);
                 
                 int lineCap = attrs.getInt("strokeLineCap", 0); // 0=butt, 1=round, 2=square
-                if (lineCap == 1) vpath.strokeLineCap = graphics::VPath::LineCap::ROUND;
-                else if (lineCap == 2) vpath.strokeLineCap = graphics::VPath::LineCap::SQUARE;
+                if (lineCap == 1) vpath->strokeLineCap = graphics::VPath::LineCap::ROUND;
+                else if (lineCap == 2) vpath->strokeLineCap = graphics::VPath::LineCap::SQUARE;
                 
                 int lineJoin = attrs.getInt("strokeLineJoin", 0); // 0=miter, 1=round, 2=bevel
-                if (lineJoin == 1) vpath.strokeLineJoin = graphics::VPath::LineJoin::ROUND;
-                else if (lineJoin == 2) vpath.strokeLineJoin = graphics::VPath::LineJoin::BEVEL;
+                if (lineJoin == 1) vpath->strokeLineJoin = graphics::VPath::LineJoin::ROUND;
+                else if (lineJoin == 2) vpath->strokeLineJoin = graphics::VPath::LineJoin::BEVEL;
                 
                 int fillType = attrs.getInt("fillType", 0); // 0=nonZero, 1=evenOdd
-                vpath.fillEvenOdd = (fillType != 0);
+                vpath->fillEvenOdd = (fillType != 0);
                 
                 std::string pathData = attrs.getString("pathData");
                 if (!pathData.empty()) {
-                    SkParsePath::FromSVGString(pathData.c_str(), &vpath.path);
+                    SkParsePath::FromSVGString(pathData.c_str(), &vpath->path);
                 }
                 
                 group->paths.push_back(std::move(vpath));
@@ -743,7 +791,7 @@ graphics::DrawablePtr DrawableInflater::inflateVector(android::ResXMLParser* par
     int height = attrs.getDimensionPixelSize("height", -1);
     vectorDrawable->setIntrinsicSize(width, height);
     
-    inflateVectorGroup(parser, resManager, theme, vectorDrawable->getRootGroup());
+    inflateVectorGroup(parser, resManager, theme, vectorDrawable->getRootGroup().get());
     
     return vectorDrawable;
 }

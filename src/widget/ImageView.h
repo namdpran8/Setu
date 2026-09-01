@@ -131,6 +131,7 @@ public:
     std::string getClassName() const override { return "ImageView"; }
 
 protected:
+    void onDetachedFromWindow() override;
     // Pushes the view's state into the image, so an android:src naming a
     // <selector> tracks pressed/disabled the way a background does.
     void drawableStateChanged() override;

@@ -82,6 +82,7 @@ add_executable(setu_runtime
     src/animation/PropertyRegistry.cpp
     src/animation/ValueAnimator.cpp
     src/animation/ObjectAnimator.cpp
+    src/animation/AnimatorInflater.cpp
     src/animation/LayoutTransition.cpp
 
     "src/view/GridLayout.cpp"
@@ -128,8 +129,8 @@ add_executable(constraint_layout_test src/test_constraint_layout.cpp
     "src/graphics/drawable/Drawable.cpp"
     "src/graphics/drawable/ColorDrawable.cpp"
 )
-target_include_directories(constraint_layout_test PRIVATE include)
-target_link_libraries(constraint_layout_test PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary)
+target_include_directories(constraint_layout_test PRIVATE include thirdparty/skia)
+target_link_libraries(constraint_layout_test PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary skia)
 # target_link_options
 target_compile_definitions(constraint_layout_test PRIVATE NO_RESOURCES)
 target_compile_options(constraint_layout_test PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
@@ -137,3 +138,28 @@ target_compile_options(constraint_layout_test PRIVATE "/utf-8" "/FI" "${CMAKE_SO
 
 
 add_executable(looper_test "src/test_looper.cpp" "src/os/Looper.cpp" "src/os/Handler.cpp" "src/os/MessageQueue.cpp")
+
+# --- Install & Packaging Configuration ---
+
+# Install the main runtime executable
+install(TARGETS setu_runtime DESTINATION bin)
+
+# Install the framework resources folder
+# We install it to bin/apkresources because the runtime searches relative to the executable
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/apkresources/ DESTINATION bin/apkresources)
+
+# CPack configuration to generate a distributable ZIP file
+include(InstallRequiredSystemLibraries)
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+set(CPACK_PACKAGE_NAME "SetuRuntime")
+set(CPACK_PACKAGE_VERSION_MAJOR "1")
+set(CPACK_PACKAGE_VERSION_MINOR "0")
+set(CPACK_PACKAGE_VERSION_PATCH "0")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "Setu")
+
+# Use ZIP as the default generator for Windows
+if(WIN32)
+    set(CPACK_GENERATOR "ZIP")
+endif()
+
+include(CPack)

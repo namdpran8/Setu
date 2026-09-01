@@ -366,6 +366,16 @@ void View::internalSetPadding(int left, int top, int right, int bottom) {
     invalidate();
 }
 
+void View::dispatchAttachedToWindow() {
+    mAttachedToWindow = true;
+    onAttachedToWindow();
+}
+
+void View::dispatchDetachedFromWindow() {
+    mAttachedToWindow = false;
+    onDetachedFromWindow();
+}
+
 void View::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     // Default implementation: just take the provided size if exactly/at most, 
     // or a default minimum size if unspecified.

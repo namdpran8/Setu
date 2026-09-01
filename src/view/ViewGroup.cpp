@@ -23,9 +23,24 @@
 namespace setu {
 namespace view {
 
+void ViewGroup::dispatchAttachedToWindow() {
+    View::dispatchAttachedToWindow();
+    for (auto& child : mChildren) {
+        child->dispatchAttachedToWindow();
+    }
+}
+
+void ViewGroup::dispatchDetachedFromWindow() {
+    View::dispatchDetachedFromWindow();
+    for (auto& child : mChildren) {
+        child->dispatchDetachedFromWindow();
+    }
+}
+
 void ViewGroup::addView(std::shared_ptr<View> child) {
     if (child) {
         child->setParent(this);
+    if (mAttachedToWindow) child->dispatchAttachedToWindow();
         mChildren.push_back(child);
         if (mLayoutTransition) {
             mLayoutTransition->addChild(this, child);
@@ -40,7 +55,8 @@ void ViewGroup::removeView(std::shared_ptr<View> child) {
             mDisappearingChildren.push_back(child);
             mLayoutTransition->removeChild(this, child);
         } else {
-            (*it)->setParent(nullptr);
+            if (mAttachedToWindow) (*it)->dispatchDetachedFromWindow();
+        (*it)->setParent(nullptr);
         }
         mChildren.erase(it);
         invalidate();
@@ -50,6 +66,7 @@ void ViewGroup::removeView(std::shared_ptr<View> child) {
 void ViewGroup::finishRemoveView(std::shared_ptr<View> child) {
     auto it = std::find(mDisappearingChildren.begin(), mDisappearingChildren.end(), child);
     if (it != mDisappearingChildren.end()) {
+        if (mAttachedToWindow) (*it)->dispatchDetachedFromWindow();
         (*it)->setParent(nullptr);
         mDisappearingChildren.erase(it);
         invalidate();

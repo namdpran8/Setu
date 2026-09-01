@@ -124,6 +124,12 @@ public:
     virtual bool isVisible() const { return mVisible; }
     virtual bool setVisible(bool visible, bool restart);
 
+    // Animatable interface
+    virtual void start() {}
+    virtual void stop() {}
+    virtual bool isRunning() const { return false; }
+
+
     // Ripples and other touch-anchored effects need to know where the finger
     // went down. A no-op for everything else.
     virtual void setHotspot(float x, float y) {}

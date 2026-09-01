@@ -20,6 +20,7 @@ public:
     virtual void start();
     virtual void cancel();
     virtual void end();
+    virtual void setTarget(std::shared_ptr<void> target) {}
 
     void setDuration(long long durationMs) { m_duration = durationMs; }
     long long getDuration() const { return m_duration; }

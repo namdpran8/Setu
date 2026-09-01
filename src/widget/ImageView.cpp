@@ -641,5 +641,12 @@ void ImageView::drawableStateChanged() {
     }
 }
 
+void ImageView::onDetachedFromWindow() {
+    view::View::onDetachedFromWindow();
+    if (mDrawable) {
+        mDrawable->stop();
+    }
+}
+
 } // namespace widget
 } // namespace setu

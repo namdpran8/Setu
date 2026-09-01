@@ -99,7 +99,13 @@ void WindowManager::triggerClickCallback(int controlId) {
 }
 
 void WindowManager::setRootView(std::shared_ptr<setu::view::View> rootView) {
+    if (s_rootView) {
+        s_rootView->dispatchDetachedFromWindow();
+    }
     s_rootView = rootView;
+    if (s_rootView) {
+        s_rootView->dispatchAttachedToWindow();
+    }
     s_rootViewDumpPending = s_rootView != nullptr;
     if (s_mainWindow) {
         InvalidateRect(s_mainWindow, nullptr, FALSE);

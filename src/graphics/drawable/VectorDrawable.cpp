@@ -40,7 +40,7 @@ void VectorDrawable::draw(Canvas& canvas) {
     skCanvas->scale(mScaleX, mScaleY);
 
     // 2. Draw root group recursively
-    drawGroup(skCanvas, mRootGroup);
+    if (mRootGroup) drawGroup(skCanvas, *mRootGroup);
 
     skCanvas->restore();
 }
@@ -58,7 +58,7 @@ void VectorDrawable::drawGroup(SkCanvas* canvas, const VGroup& group) {
         drawGroup(canvas, *childGroup);
     }
     for (const auto& path : group.paths) {
-        drawPath(canvas, path);
+        drawPath(canvas, *path);
     }
 
     canvas->restore();
