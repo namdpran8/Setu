@@ -1,3 +1,7 @@
+#include "../animation/LayoutTransition.h"
+#include "../widget/ImageView.h"
+#include "../os/Handler.h"
+#include "../os/Looper.h"
 /*
  * Copyright (c) 2026 Pranshu Namdeo
  *
@@ -31,6 +35,7 @@ std::unordered_map<std::string, StubFunc> StubRegistry::stubs;
 setu::ResourceManager* StubRegistry::m_resManager = nullptr;
 MultiDexManager* StubRegistry::m_multiDexManager = nullptr;
 std::unordered_map<int, InterpreterObject*> StubRegistry::clickListeners;
+std::unordered_map<int, InterpreterObject*> StubRegistry::longClickListeners;
 
 static std::wstring utf8_to_utf16(const std::string& utf8) {
     if (utf8.empty()) return std::wstring();
@@ -53,11 +58,11 @@ static std::string getAndroidClassName(const setu::view::View* view) {
     std::string orig = view->getOriginalClassName();
     if (!orig.empty()) return orig;
     
-    if (dynamic_cast<const setu::widget::EditText*>(view)) return "Landroid/widget/EditText;";
-    if (dynamic_cast<const setu::widget::Button*>(view)) return "Landroid/widget/Button;";
-    if (dynamic_cast<const setu::widget::TextView*>(view)) return "Landroid/widget/TextView;";
-    if (dynamic_cast<const setu::view::OverlayPanelLayout*>(view)) return "Lcom/sothree/slidinguppanel/SlidingUpPanelLayout;";
-    if (dynamic_cast<const setu::view::ViewGroup*>(view)) return "Landroid/view/ViewGroup;";
+    if (static_cast<const setu::widget::EditText*>(view)) return "Landroid/widget/EditText;";
+    if (static_cast<const setu::widget::Button*>(view)) return "Landroid/widget/Button;";
+    if (static_cast<const setu::widget::TextView*>(view)) return "Landroid/widget/TextView;";
+    if (static_cast<const setu::view::OverlayPanelLayout*>(view)) return "Lcom/sothree/slidinguppanel/SlidingUpPanelLayout;";
+    if (static_cast<const setu::view::ViewGroup*>(view)) return "Landroid/view/ViewGroup;";
     return "Landroid/view/View;";
 }
 
@@ -589,6 +594,14 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
     }
 }
 
+InterpreterObject* StubRegistry::getLongClickListener(int controlId) {
+    auto it = longClickListeners.find(controlId);
+    if (it != longClickListeners.end()) {
+        return it->second;
+    }
+    return nullptr;
+}
+
 InterpreterObject* StubRegistry::getClickListener(int controlId) {
     auto it = clickListeners.find(controlId);
     if (it != clickListeners.end()) {
@@ -884,9 +897,21 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/widget/TextView;->setOnClickListener(Landroid/view/View$OnClickListener;)V"] = setOnClickListenerStub;
 
     auto setOnLongClickListenerStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        // We're just stubbing this to avoid crash, no actual long-click handling implemented yet
-        if (args.size() >= 2) {
-            Logger::d("StubRegistry", "Executed: setOnLongClickListener");
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::OBJECT) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::view::View* view = viewObj ? static_cast<setu::view::View*>(viewObj->nativeHandle) : nullptr;
+            InterpreterObject* listener = (InterpreterObject*)args[1].obj;
+            
+            int controlId = view ? view->getId() : 0;
+            if (controlId != 0 && listener != nullptr) {
+                longClickListeners[controlId] = listener;
+                if (view) {
+                    view->setOnLongClickListener([controlId]() -> bool {
+                        return WindowManager::triggerLongClickCallback(controlId);
+                    });
+                }
+                Logger::i("StubRegistry", "Registered onLongClickListener for control ID: " + std::to_string(controlId));
+            }
         }
         return false;
     };
@@ -937,10 +962,28 @@ void StubRegistry::registerViewStubs() {
             return false;
         };
         
-    stubs["Landroid/app/Activity;->setTheme(I)V"] = emptyStub;
-    stubs["Landroid/app/Fragment;-><init>()V"] = emptyStub;
-    stubs["Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V"] = emptyStub;
-    stubs["Landroid/view/View;->setTag(ILjava/lang/Object;)V"] = emptyStub;
+    stubs["Landroid/app/Activity;->setTheme(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] Activity.setTheme is intentionalNoOp, styling hook safely skipped for now.");
+        return true;
+    };
+    stubs["Landroid/app/Fragment;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] Fragment.<init> is intentionalNoOp for instantiation.");
+        return true;
+    };
+    stubs["Landroid/os/Handler;->removeCallbacks(Ljava/lang/Runnable;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 1 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            setu::os::Handler handler(setu::os::Looper::getMainLooper());
+            handler.removeCallbacks(args[0].obj);
+        }
+        return true;
+    };
+    stubs["Landroid/view/View;->setTag(ILjava/lang/Object;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 3 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            int key = args[1].i;
+            ((InterpreterObject*)args[0].obj)->fields["tag_" + std::to_string(key)] = args[2];
+        }
+        return true;
+    };
     stubs["Landroid/content/Context;->getString(I)Ljava/lang/String;"] = 
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
             if (args.size() >= 2 && args[1].type == ValueType::INT && m_resManager) {
@@ -980,31 +1023,102 @@ void StubRegistry::registerViewStubs() {
             }
             return false;
         };
-    stubs["Lz1/g;->e(Ljava/lang/Object;Ljava/lang/String;)V"] = emptyStub;
+    stubs["Lz1/g;->e(Ljava/lang/Object;Ljava/lang/String;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] Kotlin Intrinsic e() is intentionalNoOp (null check).");
+        return true;
+    };
     
-    stubs["Landroid/graphics/Rect;-><init>()V"] = emptyStub;
-    stubs["Landroid/animation/LayoutTransition;-><init>()V"] = emptyStub;
-    stubs["Landroid/animation/LayoutTransition;->disableTransitionType(I)V"] = emptyStub;
-    stubs["Landroid/view/ViewGroup;->setLayoutTransition(Landroid/animation/LayoutTransition;)V"] = emptyStub;
-    stubs["Landroid/widget/TextView;->setShowSoftInputOnFocus(Z)V"] = emptyStub;
-    stubs["Landroid/widget/OverScroller;->abortAnimation()V"] = emptyStub;
-    stubs["Landroid/widget/ImageView;->setImageResource(I)V"] = emptyStub;
-    stubs["Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V"] = emptyStub;
+    stubs["Landroid/graphics/Rect;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] Rect.<init> is intentionalNoOp for instantiation.");
+        return true;
+    };
+    stubs["Landroid/animation/LayoutTransition;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        auto* lt = new setu::animation::LayoutTransition();
+        if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject{"android.animation.LayoutTransition", {}, lt});
+        return false;
+    };
+    stubs["Landroid/animation/LayoutTransition;->disableTransitionType(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        // intentional no-op
+        return false;
+    };
+    stubs["Landroid/view/ViewGroup;->setLayoutTransition(Landroid/animation/LayoutTransition;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::OBJECT && args[1].obj) {
+            auto vg = static_cast<setu::view::ViewGroup*>(((InterpreterObject*)args[0].obj)->nativeHandle);
+            auto lt = static_cast<setu::animation::LayoutTransition*>(((InterpreterObject*)args[1].obj)->nativeHandle);
+            if (vg && lt) {
+                vg->setLayoutTransition(std::shared_ptr<setu::animation::LayoutTransition>(lt, [](setu::animation::LayoutTransition*){})); // Dummy deleter
+            }
+        }
+        return false;
+    };
+    stubs["Landroid/widget/TextView;->setShowSoftInputOnFocus(Z)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] TextView.setShowSoftInputOnFocus is intentionalNoOp, IME hook skipped.");
+        return true;
+    };
+    stubs["Landroid/widget/OverScroller;->abortAnimation()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::w("StubRegistry", "[STUB-NOOP] OverScroller.abortAnimation: OverScroller.abortAnimation is intentionalNoOp, real physics deferred.");
+        return true;
+    };
+    stubs["Landroid/widget/ImageView;->setImageResource(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            auto iv = static_cast<setu::widget::ImageView*>(((InterpreterObject*)args[0].obj)->nativeHandle);
+            if (iv) iv->setImageResource(args[1].i);
+        }
+        return true;
+    };
+    stubs["Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] IllegalStateException.<init> is intentionalNoOp.");
+        return true;
+    };
     
-    stubs["Landroidx/recyclerview/widget/RecyclerView;->r(Landroid/view/View;)V"] = emptyStub;
-    stubs["Landroid/view/View;->clearAnimation()V"] = emptyStub;
-    stubs["Landroid/widget/TextView;->addTextChangedListener(Landroid/text/TextWatcher;)V"] = emptyStub;
+    stubs["Landroidx/recyclerview/widget/RecyclerView;->r(Landroid/view/View;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] RecyclerView.r() is intentionalNoOp, unmatched AOSP method.");
+        return true;
+    };
+    stubs["Landroid/view/View;->clearAnimation()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] View.clearAnimation is intentionalNoOp, no visual effect without animation infra.");
+        return true;
+    };
+    stubs["Landroid/widget/TextView;->addTextChangedListener(Landroid/text/TextWatcher;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::w("StubRegistry", "[STUB-DEFERRED] TextView.addTextChangedListener: Needs TextWatcher/Spannable infra.");
+        return true;
+    };
     stubs["Landroid/view/ViewGroup;->requestLayout()V"] = emptyStub;
-    stubs["Ljava/lang/ThreadLocal;-><init>()V"] = emptyStub;
-    stubs["Landroid/util/SparseArray;-><init>()V"] = emptyStub;
+    stubs["Ljava/lang/ThreadLocal;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] ThreadLocal.<init> is intentionalNoOp.");
+        return true;
+    };
+    stubs["Landroid/util/SparseArray;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] SparseArray.<init> is intentionalNoOp.");
+        return true;
+    };
     stubs["Landroid/util/SparseArray;->size()I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (outReturn) *outReturn = Value::MakeInt(0);
         return false;
     };
-    stubs["Landroidx/recyclerview/widget/RecyclerView;->M(Landroid/view/View;)Lm0/g0;"] = emptyStub;
-    stubs["Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;"] = emptyStub;
-    stubs["Lz1/g;->b(Ljava/lang/Object;)V"] = emptyStub;
-    stubs["Lz1/g;->d(Ljava/lang/Object;Ljava/lang/String;)V"] = emptyStub;
+    stubs["Landroidx/recyclerview/widget/RecyclerView;->M(Landroid/view/View;)Lm0/g0;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] RecyclerView.M() is intentionalNoOp, unmatched AOSP method.");
+        return true;
+    };
+    stubs["Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj && outReturn) {
+            auto it = ((InterpreterObject*)args[0].obj)->fields.find("mLayoutParams");
+            if (it != ((InterpreterObject*)args[0].obj)->fields.end()) {
+                *outReturn = it->second;
+            } else {
+                *outReturn = Value::MakeNull();
+            }
+        }
+        return true;
+    };
+    stubs["Lz1/g;->b(Ljava/lang/Object;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] Kotlin Intrinsic b() is intentionalNoOp (null check).");
+        return true;
+    };
+    stubs["Lz1/g;->d(Ljava/lang/Object;Ljava/lang/String;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] Kotlin Intrinsic d() is intentionalNoOp (null check).");
+        return true;
+    };
     stubs["Lz1/g;->a(Ljava/lang/Object;Ljava/lang/Object;)Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (outReturn) {
             if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[1].type == ValueType::OBJECT) {
@@ -1118,8 +1232,17 @@ void StubRegistry::registerViewStubs() {
         if (outReturn) *outReturn = Value::MakeInt(0);
         return false;
     };
-    stubs["Landroid/widget/TextView;->setMinWidth(I)V"] = emptyStub;
-    stubs["Landroid/view/View;->setAccessibilityDelegate(Landroid/view/View$AccessibilityDelegate;)V"] = emptyStub;
+    stubs["Landroid/widget/TextView;->setMinWidth(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            auto view = static_cast<setu::view::View*>(((InterpreterObject*)args[0].obj)->nativeHandle);
+            if (view) view->setMinimumWidth(args[1].i);
+        }
+        return true;
+    };
+    stubs["Landroid/view/View;->setAccessibilityDelegate(Landroid/view/View$AccessibilityDelegate;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] View.setAccessibilityDelegate is intentionalNoOp, accessibility service hook.");
+        return true;
+    };
 
     
     stubs["Landroid/view/View;->removeCallbacks(Ljava/lang/Runnable;)Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
@@ -1157,7 +1280,7 @@ void StubRegistry::registerViewStubs() {
             setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
             if (view) {
                 std::string text = "stubbed_text";
-                setu::widget::TextView* tv = dynamic_cast<setu::widget::TextView*>(view);
+                setu::widget::TextView* tv = static_cast<setu::widget::TextView*>(view);
                 if (tv) {
                     std::wstring wtext = tv->getText();
                     text = utf16_to_utf8(wtext);
@@ -1296,7 +1419,7 @@ void StubRegistry::registerViewStubs() {
             }
             
             if (view) {
-                auto textView = dynamic_cast<setu::widget::TextView*>(view);
+                auto textView = static_cast<setu::widget::TextView*>(view);
                 if (textView) {
                     int size_needed = MultiByteToWideChar(CP_UTF8, 0, &text[0], (int)text.size(), NULL, 0);
                     std::wstring wstrTo(size_needed, 0);
@@ -1333,7 +1456,10 @@ void StubRegistry::registerViewStubs() {
         return false;
     };
 
-    stubs["Ljava/lang/NullPointerException;-><init>(Ljava/lang/String;)V"] = emptyStub;
+    stubs["Ljava/lang/NullPointerException;-><init>(Ljava/lang/String;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "[STUB-NOOP] NullPointerException.<init> is intentionalNoOp.");
+        return true;
+    };
     
     stubs["Landroid/view/View;->getResources()Landroid/content/res/Resources;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (outReturn) {
@@ -1373,7 +1499,7 @@ void StubRegistry::registerViewStubs() {
         if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::FLOAT) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
             setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
-            setu::widget::TextView* textView = dynamic_cast<setu::widget::TextView*>(view);
+            setu::widget::TextView* textView = static_cast<setu::widget::TextView*>(view);
             if (textView) {
                 // Note: Android's setTextSize(float) expects SP and does conversion.
                 // Here we treat it as raw pixels, consistent with current rendering.
@@ -1388,7 +1514,7 @@ void StubRegistry::registerViewStubs() {
         if (args.size() >= 3 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT && args[2].type == ValueType::FLOAT) {
             InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
             setu::view::View* view = (setu::view::View*)viewObj->nativeHandle;
-            setu::widget::TextView* textView = dynamic_cast<setu::widget::TextView*>(view);
+            setu::widget::TextView* textView = static_cast<setu::widget::TextView*>(view);
             if (textView) {
                 float pixels = setu::ResourceManager::applyDimension(args[1].i, args[2].f);
                 textView->setTextSize(pixels);
@@ -1398,8 +1524,16 @@ void StubRegistry::registerViewStubs() {
         return false;
     };
 
-    stubs["Landroid/widget/TextView;->setTypeface(Landroid/graphics/Typeface;)V"] = emptyStub;
-    stubs["Landroid/view/View;->setOnKeyListener(Landroid/view/View$OnKeyListener;)V"] = emptyStub;
+    stubs["Landroid/widget/TextView;->setTypeface(Landroid/graphics/Typeface;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::w("StubRegistry", "[STUB-DEFERRED] TextView.setTypeface: FontManager exists but lacks Typeface parsing/mapping infra.");
+        return true;
+    };
+    stubs["Landroid/view/View;->setOnKeyListener(Landroid/view/View$OnKeyListener;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            ((InterpreterObject*)args[0].obj)->fields["mOnKeyListener"] = args[1];
+        }
+        return true;
+    };
 
     stubs["Landroid/view/View;->post(Ljava/lang/Runnable;)Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (args.size() >= 2 && args[1].type == ValueType::OBJECT && args[1].obj) {

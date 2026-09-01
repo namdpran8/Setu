@@ -81,3 +81,6 @@ int main() {
     std::cout << "=== All Phase 1 tests passed! ===" << std::endl;
     return 0;
 }
+#include "ui/WindowManager.h"
+
+void WindowManager::wakeLooper(long long delayMs) {}

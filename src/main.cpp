@@ -23,6 +23,7 @@
 #include "interpreter/Interpreter.h"
 #include "interpreter/StubRegistry.h"
 #include "ui/WindowManager.h"
+#include "animation/PropertyRegistry.h"
 #include <windows.h>
 #include <commdlg.h>
 #include <functional>

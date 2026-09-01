@@ -17,6 +17,7 @@
 
 namespace android { class ResXMLParser; }
 namespace setu {
+namespace animation { class LayoutTransition; }
 namespace view {
 
 class ViewGroup : public View {
@@ -24,20 +25,12 @@ public:
     ViewGroup() = default;
     virtual ~ViewGroup() = default;
 
-    virtual void addView(std::shared_ptr<View> child) {
-        if (child) {
-            child->setParent(this);
-            mChildren.push_back(child);
-        }
-    }
+    virtual void addView(std::shared_ptr<View> child);
+    virtual void removeView(std::shared_ptr<View> child);
+    void finishRemoveView(std::shared_ptr<View> child);
 
-    virtual void removeView(std::shared_ptr<View> child) {
-        auto it = std::find(mChildren.begin(), mChildren.end(), child);
-        if (it != mChildren.end()) {
-            (*it)->setParent(nullptr);
-            mChildren.erase(it);
-        }
-    }
+    void setLayoutTransition(std::shared_ptr<animation::LayoutTransition> lt) { mLayoutTransition = lt; }
+    std::shared_ptr<animation::LayoutTransition> getLayoutTransition() const { return mLayoutTransition; }
 
     size_t getChildCount() const {
         return mChildren.size();
@@ -79,6 +72,8 @@ protected:
     static int getChildMeasureSpec(int spec, int padding, int childDimension);
     
     std::vector<std::shared_ptr<View>> mChildren;
+    std::vector<std::shared_ptr<View>> mDisappearingChildren;
+    std::shared_ptr<animation::LayoutTransition> mLayoutTransition;
 
     virtual void dump(int depth = 0) override;
     virtual std::string getClassName() const override { return "ViewGroup"; }

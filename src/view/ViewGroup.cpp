@@ -17,8 +17,45 @@
 #include "androidfw/ResourceTypes.h"
 #include "../ui/XmlAttrs.h"
 
+
+#include "../animation/LayoutTransition.h"
+
 namespace setu {
 namespace view {
+
+void ViewGroup::addView(std::shared_ptr<View> child) {
+    if (child) {
+        child->setParent(this);
+        mChildren.push_back(child);
+        if (mLayoutTransition) {
+            mLayoutTransition->addChild(this, child);
+        }
+    }
+}
+
+void ViewGroup::removeView(std::shared_ptr<View> child) {
+    auto it = std::find(mChildren.begin(), mChildren.end(), child);
+    if (it != mChildren.end()) {
+        if (mLayoutTransition) {
+            mDisappearingChildren.push_back(child);
+            mLayoutTransition->removeChild(this, child);
+        } else {
+            (*it)->setParent(nullptr);
+        }
+        mChildren.erase(it);
+        invalidate();
+    }
+}
+
+void ViewGroup::finishRemoveView(std::shared_ptr<View> child) {
+    auto it = std::find(mDisappearingChildren.begin(), mDisappearingChildren.end(), child);
+    if (it != mDisappearingChildren.end()) {
+        (*it)->setParent(nullptr);
+        mDisappearingChildren.erase(it);
+        invalidate();
+    }
+}
+
 
 namespace {
 
@@ -95,11 +132,12 @@ void ViewGroup::dispatchDraw(graphics::Canvas& canvas) {
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::VISIBLE) {
             child->updateRenderNode();
-            
-            // Note: View::draw already records canvas.translate(mLeft, mTop) in the child's RenderNode,
-            // so drawing the RenderNode here natively applies the translation relative to this ViewGroup.
             canvas.drawRenderNode(child->getRenderNode());
         }
+    }
+    for (auto& child : mDisappearingChildren) {
+        child->updateRenderNode();
+        canvas.drawRenderNode(child->getRenderNode());
     }
 }
 

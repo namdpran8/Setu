@@ -11,12 +11,17 @@
  */
 
 #include "Choreographer.h"
+#include "../animation/ValueAnimator.h"
+#include "../utils/SystemClock.h"
 #include "../ui/WindowManager.h"
 
 namespace setu {
 namespace view {
 
 void Choreographer::doFrame(std::shared_ptr<View> decorView, graphics::Canvas& canvas, int windowWidth, int windowHeight) {
+    long long frameTimeNanos = setu::uptimeMillis() * 1000000LL;
+    setu::animation::ValueAnimator::doFrame(frameTimeNanos);
+
     if (!decorView) return;
 
     // 1. Measure Pass

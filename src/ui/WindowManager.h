@@ -12,6 +12,10 @@
 
 #pragma once
 #include <windows.h>
+
+constexpr UINT WM_LOOPER_WAKE = WM_USER + 1;
+constexpr UINT_PTR TIMER_LOOPER = 3;
+
 #include <string>
 #include <functional>
 #include <memory>
@@ -31,6 +35,10 @@ class WindowManager {
 public:
     static bool init();
     static void runMessageLoop();
+
+    static void wakeLooper(long long delayMs);
+    static void pumpLooper();
+
     static HWND getMainWindow();
 
     // D2D getters
@@ -42,6 +50,9 @@ public:
 
     static void clearWindow();
     static void setClickCallback(std::function<void(int)> cb);
+    static void setLongClickCallback(std::function<bool(int)> cb);
+    static std::function<bool(int)> s_longClickCallback;
+    static bool triggerLongClickCallback(int controlId);
     static void triggerClickCallback(int controlId);
 
     // C++ View Hierarchy root

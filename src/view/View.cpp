@@ -11,6 +11,8 @@
  */
 
 #include "View.h"
+#include "../os/Handler.h"
+#include "../os/Looper.h"
 #include "ViewGroup.h"
 #include <algorithm>
 #include "../graphics/RecordingCanvas.h"
@@ -24,8 +26,6 @@ namespace setu {
 namespace view {
 
 std::function<void()> View::s_invalidateHandler;
-std::vector<View::ScheduledWork> View::s_scheduledWork;
-std::vector<View::ScheduledWork>* View::s_runningWork = nullptr;
 std::function<void()> View::s_animationHandler;
 
 // xhdpi. Nothing queries the real display yet, so this is the value every dp in
@@ -52,62 +52,28 @@ void View::requestHostRedraw() {
     }
 }
 
+
+static setu::os::Handler& getMainHandler() {
+    static setu::os::Handler handler(setu::os::Looper::getMainLooper());
+    return handler;
+}
+
 void View::setAnimationHandler(std::function<void()> handler) {
     s_animationHandler = std::move(handler);
     // A drawable can start animating before the host installs its clock. Anything
     // already queued would otherwise sit there until some later animation happened
     // to arm the timer on its behalf.
-    if (s_animationHandler && !s_scheduledWork.empty()) {
+    if (s_animationHandler ) {
         s_animationHandler();
     }
 }
 
-bool View::hasScheduledWork() { return !s_scheduledWork.empty(); }
 
-bool View::runScheduledWork() {
-    if (s_scheduledWork.empty()) return false;
-
-    const long long now = uptimeMillis();
-
-    // Everything due is moved out of the queue before any of it runs. An animating
-    // drawable reschedules itself from inside its own callback, so running the
-    // callbacks in place would append to the container being walked - and would run
-    // the *next* frame's work during this one, spinning the animation to its end in
-    // a single tick.
-    std::vector<ScheduledWork> due;
-    std::vector<ScheduledWork> pending;
-    for (auto& work : s_scheduledWork) {
-        if (work.whenMs <= now) {
-            due.push_back(std::move(work));
-        } else {
-            pending.push_back(std::move(work));
-        }
-    }
-    s_scheduledWork = std::move(pending);
-
-    // Published so unscheduleDrawable() can cancel entries in this batch too - one
-    // callback is allowed to drop a drawable that owns another entry in it.
-    s_runningWork = &due;
-    for (auto& work : due) {
-        // Moved out before it runs, for two reasons. The entry left behind is empty,
-        // so a callback that cancels its own drawable cannot null out - and destroy -
-        // the std::function it is currently executing inside. And the local copy keeps
-        // the callable alive for the duration of the call regardless.
-        std::function<void()> what = std::move(work.what);
-        if (what) what();
-    }
-    s_runningWork = nullptr;
-
-    return !s_scheduledWork.empty();
-}
 
 void View::postTask(std::function<void()> what) {
     if (!what) return;
-    const bool wasIdle = s_scheduledWork.empty();
-    s_scheduledWork.push_back({nullptr, std::move(what), uptimeMillis()});
-    if (wasIdle && s_animationHandler) {
-        s_animationHandler();
-    }
+    getMainHandler().post(std::move(what));
+    if (s_animationHandler) s_animationHandler();
 }
 
 View::View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* parser, uint32_t defStyleAttr, uint32_t defStyleRes) {
@@ -248,37 +214,15 @@ void View::invalidateDrawable(graphics::Drawable* who) {
 
 void View::scheduleDrawable(graphics::Drawable* who, std::function<void()> what,
                             long long whenMs) {
-    // Same filter as invalidateDrawable. The background is the only drawable a
-    // plain View owns, so a request from anything else is a stale callback from a
-    // drawable already swapped out - and must not be allowed to keep the clock
-    // running for a drawable nobody draws.
     if (who != mBackground.get() || !what) return;
-
-    const bool wasIdle = s_scheduledWork.empty();
-    s_scheduledWork.push_back({who, std::move(what), whenMs});
-
-    // Idle-to-animating is the only edge the host needs telling about; while the
-    // queue is non-empty it is already ticking.
-    if (wasIdle && s_animationHandler) {
-        s_animationHandler();
-    }
+    long long delay = whenMs - uptimeMillis();
+    if (delay < 0) delay = 0;
+    getMainHandler().postDelayedWithDalvikObj(std::move(what), delay, who);
+    if (s_animationHandler) s_animationHandler();
 }
 
 void View::unscheduleDrawable(graphics::Drawable* who) {
-    s_scheduledWork.erase(
-        std::remove_if(s_scheduledWork.begin(), s_scheduledWork.end(),
-                       [who](const ScheduledWork& work) { return work.who == who; }),
-        s_scheduledWork.end());
-
-    // The batch being run right now, if there is one. Its entries have already left
-    // the queue, so erasing from the queue alone would still let a callback fire
-    // against a drawable an earlier callback in the same batch destroyed. Emptied
-    // rather than erased, because runScheduledWork() is walking this vector.
-    if (s_runningWork) {
-        for (auto& work : *s_runningWork) {
-            if (work.who == who) work.what = nullptr;
-        }
-    }
+    getMainHandler().removeCallbacks(who);
 }
 
 const std::vector<int>& View::getDrawableState() {
@@ -482,12 +426,46 @@ bool View::dispatchTouchEvent(MotionEvent& event) {
 
 bool View::onTouchEvent(MotionEvent& event) {
     if (event.getAction() == MotionEvent::Action::DOWN) {
-        if (mOnClickListener) {
-            performClick();
-            return true;
+        setPressed(true);
+        if (mOnLongClickListener) {
+            std::weak_ptr<View> weakSelf = weak_from_this();
+            mPendingCheckForLongPress = getMainHandler().postDelayed([weakSelf]() {
+                if (auto self = weakSelf.lock()) {
+                    self->performLongClick();
+                }
+            }, 500);
         }
+        return true; // Handle touch
+    } else if (event.getAction() == MotionEvent::Action::UP) {
+        if (mPendingCheckForLongPress) {
+            getMainHandler().removeCallbacksByToken(mPendingCheckForLongPress);
+            mPendingCheckForLongPress = 0;
+        }
+        if (isPressed()) {
+            if (mOnClickListener) performClick();
+            setPressed(false);
+        }
+        return true;
+    } else if (event.getAction() == MotionEvent::Action::CANCEL || event.getAction() == MotionEvent::Action::MOVE) {
+        // Simple bounds check omitted for brevity in MOVE, just cancel on CANCEL
+        if (event.getAction() == MotionEvent::Action::CANCEL) {
+            if (mPendingCheckForLongPress) {
+                getMainHandler().removeCallbacksByToken(mPendingCheckForLongPress);
+                mPendingCheckForLongPress = 0;
+            }
+            setPressed(false);
+        }
+        return true;
     }
     return false;
+}
+
+void View::performLongClick() {
+    mPendingCheckForLongPress = 0;
+    if (mOnLongClickListener) {
+        mOnLongClickListener();
+    }
+    // AOSP clears pressed state after long click usually (or keeps it until UP)
 }
 
 bool View::dispatchKeyEvent(const KeyEvent& event) {

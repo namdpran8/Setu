@@ -12,6 +12,7 @@
 
 #pragma once
 #include <memory>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <functional>
@@ -184,6 +185,8 @@ public:
     void unscheduleDrawable(graphics::Drawable* who) override;
 
     void setOnClickListener(std::function<void()> listener) { mOnClickListener = listener; }
+    void setOnLongClickListener(std::function<bool()> listener) { mOnLongClickListener = listener; }
+    void performLongClick();
     virtual void performClick() { if (mOnClickListener) mOnClickListener(); }
 
     // MeasureSpec constants
@@ -240,6 +243,18 @@ public:
 
     void invalidate();
 
+    float getAlpha() const { return mAlpha; }
+    void setAlpha(float alpha) { mAlpha = alpha; invalidate(); }
+    float getTranslationX() const { return mTranslationX; }
+    void setTranslationX(float x) { mTranslationX = x; invalidate(); }
+    float getTranslationY() const { return mTranslationY; }
+    void setTranslationY(float y) { mTranslationY = y; invalidate(); }
+    float getScaleX() const { return mScaleX; }
+    void setScaleX(float x) { mScaleX = x; invalidate(); }
+    float getScaleY() const { return mScaleY; }
+    void setScaleY(float y) { mScaleY = y; invalidate(); }
+
+
     // Installed once by the host so that invalidate() actually reaches the
     // screen. Without it, marking a render node dirty updated the display list
     // and stopped there, which is why widgets used to call InvalidateRect() by
@@ -260,8 +275,6 @@ public:
     // when an animation starts and can stop it again the moment the queue empties.
     // Nothing is charged for a tick while the UI is at rest.
     static void setAnimationHandler(std::function<void()> handler);
-    static bool runScheduledWork();
-    static bool hasScheduledWork();
     static void postTask(std::function<void()> what);
 
     // Display metrics live here rather than in WindowManager for the same reason
@@ -275,6 +288,12 @@ public:
     static void setDisplayMetrics(float density, float scaledDensity);
 
 protected:
+    float mAlpha = 1.0f;
+    float mTranslationX = 0.0f;
+    float mTranslationY = 0.0f;
+    float mScaleX = 1.0f;
+    float mScaleY = 1.0f;
+
     // The states this view is in. AOSP passes an extraSpace count so a subclass
     // can size the array up front; a vector makes that pointless, so a subclass
     // just appends to what the base returns - a CheckBox would add
@@ -315,6 +334,8 @@ protected:
 
     std::unique_ptr<graphics::RenderNode> mRenderNode;
     std::function<void()> mOnClickListener;
+    std::function<bool()> mOnLongClickListener;
+    uint64_t mPendingCheckForLongPress = 0;
     std::shared_ptr<LayoutParams> mLayoutParams;
     bool mIsFocused = false;
     bool mIsPressed = false;
@@ -344,18 +365,6 @@ private:
     // One queued animation callback. `who` is kept so the entry can be dropped
     // when its drawable is replaced or its owner destroyed - the lambda captures
     // the drawable raw, and running it afterwards would touch freed memory.
-    struct ScheduledWork {
-        graphics::Drawable* who;
-        std::function<void()> what;
-        long long whenMs;
-    };
-
-    static std::vector<ScheduledWork> s_scheduledWork;
-    // The batch runScheduledWork() is part-way through, while it is running one.
-    // unscheduleDrawable() has to reach into it as well as into the queue: a
-    // callback can drop the drawable that owns a later entry in the same batch, and
-    // that entry has already left the queue.
-    static std::vector<ScheduledWork>* s_runningWork;
     static std::function<void()> s_animationHandler;
     static std::function<void()> s_invalidateHandler;
     static float s_density;

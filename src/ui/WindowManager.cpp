@@ -11,6 +11,7 @@
  */
 
 #include "WindowManager.h"
+#include "../os/Looper.h"
 #include "../utils/Logger.h"
 #include "../view/View.h"
 #include "../view/MotionEvent.h"
@@ -41,6 +42,7 @@ static bool s_animationTimerRunning = false;
 HWND WindowManager::s_mainWindow = nullptr;
 HWND WindowManager::s_skiaWindow = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
+std::function<bool(int)> WindowManager::s_longClickCallback = nullptr;
 std::shared_ptr<setu::view::View> WindowManager::s_rootView = nullptr;
 bool WindowManager::s_rootViewDumpPending = false;
 
@@ -74,6 +76,17 @@ Microsoft::WRL::ComPtr<IDWriteFactory> WindowManager::s_dWriteFactory;
 
 void WindowManager::setClickCallback(std::function<void(int)> cb) {
     s_clickCallback = cb;
+}
+
+void WindowManager::setLongClickCallback(std::function<bool(int)> cb) {
+    s_longClickCallback = cb;
+}
+
+bool WindowManager::triggerLongClickCallback(int controlId) {
+    if (s_longClickCallback) {
+        return s_longClickCallback(controlId);
+    }
+    return false;
 }
 
 void WindowManager::triggerClickCallback(int controlId) {
@@ -270,17 +283,16 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                 }
             }
             return 0;
+                case WM_LOOPER_WAKE:
+            pumpLooper();
+            return 0;
         case WM_TIMER:
-            if (wParam == TIMER_ANIMATION) {
-                // Nothing to repaint from here: a drawable whose appearance moved
-                // says so through invalidateSelf(), which already reaches
-                // InvalidateRect. When the last animation finishes the clock stops,
-                // rather than ticking at 60Hz over a still image.
-                if (!setu::view::View::runScheduledWork()) {
-                    KillTimer(hwnd, TIMER_ANIMATION);
-                    s_animationTimerRunning = false;
-                }
-            } else if (wParam == TIMER_IDLE_GHOST) {
+            if (wParam == TIMER_LOOPER) {
+                KillTimer(hwnd, TIMER_LOOPER);
+                pumpLooper();
+                return 0;
+            }
+            if (wParam == TIMER_IDLE_GHOST) {
                 Logger::i("IdleGhost", "Are you still there? (Ghost Touch)");
                 if (s_rootView) {
                     setu::view::MotionEvent eventDown(setu::view::MotionEvent::Action::DOWN, 100, 100);
@@ -536,6 +548,7 @@ bool WindowManager::init() {
 }
 
 void WindowManager::runMessageLoop() {
+    setu::os::Looper::prepareMainLooper();
     Logger::i("WindowManager", "Starting message loop...");
     MSG msg;
     
@@ -550,4 +563,23 @@ void WindowManager::runMessageLoop() {
 
 HWND WindowManager::getMainWindow() {
     return s_mainWindow;
+}
+
+void WindowManager::wakeLooper(long long delayMs) {
+    if (s_mainWindow) {
+        if (delayMs <= 0) {
+            PostMessage(s_mainWindow, WM_LOOPER_WAKE, 0, 0);
+        } else {
+            SetTimer(s_mainWindow, TIMER_LOOPER, delayMs, nullptr);
+        }
+    }
+}
+
+void WindowManager::pumpLooper() {
+    setu::os::Looper* looper = setu::os::Looper::getMainLooper();
+    if (looper) {
+        while (looper->loopOnce()) {
+            // Keep pumping while there are messages due
+        }
+    }
 }

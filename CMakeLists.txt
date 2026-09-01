@@ -65,6 +65,12 @@ add_executable(setu_runtime
     "src/graphics/drawable/RippleDrawable.cpp"
     "src/graphics/drawable/BitmapDrawable.cpp"
     "src/graphics/drawable/NinePatchDrawable.cpp"
+    "src/os/Looper.cpp"
+    "src/os/MessageQueue.cpp"
+    "src/os/Handler.cpp"
+    "src/os/Looper.cpp"
+    "src/os/MessageQueue.cpp"
+    "src/os/Handler.cpp"
     "src/view/View.cpp"
     "src/view/ViewGroup.cpp"
     "src/view/Choreographer.cpp"
@@ -73,6 +79,11 @@ add_executable(setu_runtime
     "src/view/OverlayPanelLayout.cpp"
     "src/view/RelativeLayout.cpp"
     "src/view/ConstraintLayout.cpp"
+    src/animation/PropertyRegistry.cpp
+    src/animation/ValueAnimator.cpp
+    src/animation/ObjectAnimator.cpp
+    src/animation/LayoutTransition.cpp
+
     "src/view/GridLayout.cpp"
     "src/widget/TextView.cpp"
     "src/widget/Button.cpp"
@@ -84,7 +95,7 @@ target_include_directories(setu_runtime PRIVATE include)
 # windowscodecs: WIC, for BitmapFactory's decoders. ole32: CoInitializeEx and
 # CoCreateInstance, which WIC needs and which nothing else here was using.
 target_link_libraries(setu_runtime PRIVATE miniz d2d1 dwrite d3d11 dxgi windowscodecs ole32 setu_androidfw cassowary skia)
-target_link_options(setu_runtime PRIVATE "/NODEFAULTLIB:LIBCMT")
+# target_link_options
 target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
 
 # A deliberately minimal subset: only what the constraint solver test actually
@@ -97,9 +108,20 @@ target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/
 # for code the test never runs.
 add_executable(constraint_layout_test src/test_constraint_layout.cpp
     "src/utils/Logger.cpp"
+    "src/os/Looper.cpp"
+    "src/os/MessageQueue.cpp"
+    "src/os/Handler.cpp"
+    "src/os/Looper.cpp"
+    "src/os/MessageQueue.cpp"
+    "src/os/Handler.cpp"
     "src/view/View.cpp"
     "src/view/ViewGroup.cpp"
     "src/view/ConstraintLayout.cpp"
+    src/animation/PropertyRegistry.cpp
+    src/animation/ValueAnimator.cpp
+    src/animation/ObjectAnimator.cpp
+    src/animation/LayoutTransition.cpp
+
     "src/graphics/Paint.cpp"
     "src/graphics/Path.cpp"
     "src/graphics/RecordingCanvas.cpp"
@@ -108,8 +130,10 @@ add_executable(constraint_layout_test src/test_constraint_layout.cpp
 )
 target_include_directories(constraint_layout_test PRIVATE include)
 target_link_libraries(constraint_layout_test PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary)
-target_link_options(constraint_layout_test PRIVATE "/NODEFAULTLIB:LIBCMT")
+# target_link_options
 target_compile_definitions(constraint_layout_test PRIVATE NO_RESOURCES)
 target_compile_options(constraint_layout_test PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
 
 
+
+add_executable(looper_test "src/test_looper.cpp" "src/os/Looper.cpp" "src/os/Handler.cpp" "src/os/MessageQueue.cpp")

@@ -20,11 +20,22 @@ PermissionManager& PermissionManager::instance() {
 }
 
 int PermissionManager::checkPermission(const std::string& permission, int pid, int uid) const {
-    Logger::i("PermissionManager", "checkPermission requested for: " + permission + ". Policy: GRANTED by default.");
+    if (permission.empty()) {
+        return -1; // PERMISSION_DENIED
+    }
+    
+    // In AOSP, this usually routes to ActivityManagerService::checkComponentPermission
+    // which checks against the application's granted permissions list from PackageManager.
+    // For Setu, we simulate a system where the app holds all declared permissions,
+    // but we log the check for auditing.
+    Logger::i("PermissionManager", "checkPermission requested for: " + permission + " (pid=" + std::to_string(pid) + ", uid=" + std::to_string(uid) + "). Policy: GRANTED by default.");
     return 0; // PERMISSION_GRANTED
 }
 
 int PermissionManager::checkSelfPermission(const std::string& permission, const std::string& packageName) const {
+    if (permission.empty()) {
+        return -1; // PERMISSION_DENIED
+    }
     Logger::i("PermissionManager", "checkSelfPermission requested for: " + permission + ". Policy: GRANTED by default.");
     return 0; // PERMISSION_GRANTED
 }
