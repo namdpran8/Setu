@@ -14,6 +14,13 @@
 #include <memory>
 #include "view/ConstraintLayout.h"
 #include "cassowary/ConstraintWidget.h"
+#include "graphics/drawable/AnimatedVectorDrawable.h"
+#include "graphics/drawable/VectorDrawable.h"
+#include "animation/ObjectAnimator.h"
+#include "animation/PropertyRegistry.h"
+#include "utils/SystemClock.h"
+#include "os/Looper.h"
+
 
 using namespace setu::view;
 
@@ -79,6 +86,49 @@ int main() {
     check_eq(v2->getWidth(), 200, "v2 width");
 
     std::cout << "=== All Phase 1 tests passed! ===" << std::endl;
+    
+    std::cout << "\n=== Phase 3: AnimatedVectorDrawable Test ===" << std::endl;
+    // 1. Setup Looper
+    if (!setu::os::Looper::myLooper()) {
+        setu::os::Looper::prepareMainLooper();
+    }
+
+    // 2. Create VectorDrawable with a path
+    auto vd = std::make_shared<setu::graphics::VectorDrawable>();
+    auto path = std::make_shared<setu::graphics::VPath>();
+    path->name = "my_path";
+    path->trimPathEnd = 0.0f; // initial value
+    vd->getRootGroup()->paths.push_back(path);
+
+    // 3. Create AnimatedVectorDrawable
+    auto avd = std::make_shared<setu::graphics::AnimatedVectorDrawable>(vd);
+
+    // 4. Create ObjectAnimator to animate trimPathEnd from 0 to 1
+    setu::animation::PropertyRegistry::init();
+    auto animator = setu::animation::ObjectAnimator::ofFloat(vd->getTargetByName("my_path"), "", "trimPathEnd", {0.0f, 1.0f});
+    animator->setDuration(1000); // 1 second
+
+    // 5. Register animator with AVD
+    avd->registerAnimator(animator);
+
+    // 6. Start the animation
+    std::cout << "Starting animation..." << std::endl;
+    avd->start();
+    check(avd->isRunning(), "AVD is running after start()");
+
+    std::cout << "Initial trimPathEnd: " << path->trimPathEnd << std::endl;
+    
+    long long startTime = setu::uptimeMillis();
+    for (int i = 1; i <= 5; ++i) {
+        long long tickTime = startTime + (i * 200);
+        setu::animation::ValueAnimator::doFrame(tickTime * 1000000LL);
+        std::cout << "Frame " << i << " (+" << (i*200) << "ms) trimPathEnd: " << path->trimPathEnd << std::endl;
+    }
+    
+    // Stop the animation
+    avd->stop();
+    check(!avd->isRunning(), "AVD is stopped after stop()");
+
     return 0;
 }
 #include "ui/WindowManager.h"

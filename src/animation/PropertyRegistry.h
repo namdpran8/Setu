@@ -36,13 +36,24 @@ public:
         classProps[propertyName] = {setter, getter};
     }
 
-    static const FloatProperty* getFloatProperty(const std::string& className, const std::string& propertyName) {
+        static const FloatProperty* getFloatProperty(const std::string& className, const std::string& propertyName) {
         auto& reg = getRegistry();
-        auto classIt = reg.find(className);
-        if (classIt != reg.end()) {
-            auto propIt = classIt->second.find(propertyName);
-            if (propIt != classIt->second.end()) {
-                return &propIt->second;
+        
+        if (className.empty()) {
+            // Search all classes if empty (for AnimatedVectorDrawable)
+            for (auto& pair : reg) {
+                auto propIt = pair.second.find(propertyName);
+                if (propIt != pair.second.end()) {
+                    return &propIt->second;
+                }
+            }
+        } else {
+            auto classIt = reg.find(className);
+            if (classIt != reg.end()) {
+                auto propIt = classIt->second.find(propertyName);
+                if (propIt != classIt->second.end()) {
+                    return &propIt->second;
+                }
             }
         }
         Logger::w("PropertyRegistry", "Property not found: " + className + "." + propertyName);

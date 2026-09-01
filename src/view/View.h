@@ -244,8 +244,8 @@ public:
     void setMinimumHeight(int minHeight) { mMinHeight = minHeight; requestLayout(); }
 
     void invalidate();
-    void dispatchAttachedToWindow();
-    void dispatchDetachedFromWindow();
+    virtual void dispatchAttachedToWindow();
+    virtual void dispatchDetachedFromWindow();
 
     float getAlpha() const { return mAlpha; }
     void setAlpha(float alpha) { mAlpha = alpha; invalidate(); }

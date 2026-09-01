@@ -50,7 +50,7 @@ void ValueAnimator::start() {
 void ValueAnimator::processTick(long long frameTimeNanos) {
     if (!m_running) return;
     
-    long long now = setu::uptimeMillis(); // Eventually sync with frameTimeNanos
+    long long now = frameTimeNanos / 1000000LL;
     long long elapsed = now - m_startTime;
     
     if (elapsed >= m_duration) {

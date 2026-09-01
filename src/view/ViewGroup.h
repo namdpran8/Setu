@@ -27,8 +27,8 @@ public:
 
     virtual void addView(std::shared_ptr<View> child);
     virtual void removeView(std::shared_ptr<View> child);
-    void dispatchAttachedToWindow();
-    void dispatchDetachedFromWindow();
+    void dispatchAttachedToWindow() override;
+    void dispatchDetachedFromWindow() override;
     void finishRemoveView(std::shared_ptr<View> child);
 
     void setLayoutTransition(std::shared_ptr<animation::LayoutTransition> lt) { mLayoutTransition = lt; }
