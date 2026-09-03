@@ -23,6 +23,8 @@ namespace winrt::SetuShell::implementation
         m_apps.Append(winrt::make<AppTileViewModel>(L"Calendar", L"\xE787"));
 
         InitializeComponent();
+        
+
     }
 
     IObservableVector<SetuShell::AppTileViewModel> LibraryPage::Apps()

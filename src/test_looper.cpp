@@ -11,11 +11,11 @@
 
 using namespace setu::os;
 
-// Mock WindowManager to satisfy linker
-void WindowManager::wakeLooper(long long delayMs) {}
 
-int main() {
-    Looper::prepareMainLooper();
+int looper_test_main() {
+    if (!setu::os::Looper::myLooper()) {
+        Looper::prepareMainLooper();
+    }
     Looper* looper = Looper::getMainLooper();
     Handler handler(looper);
 

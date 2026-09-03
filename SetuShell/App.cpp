@@ -13,6 +13,10 @@ namespace winrt::SetuShell::implementation
     App::App()
     {
         InitializeComponent();
+        
+        
+        
+
     }
 
     void App::OnLaunched(LaunchActivatedEventArgs const&)

@@ -20,7 +20,9 @@ add_subdirectory(src/cassowary)
 
 add_library(skia STATIC IMPORTED GLOBAL)
 set_target_properties(skia PROPERTIES
-    IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia.lib"
+    IMPORTED_LOCATION_DEBUG "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia.lib"
+    IMPORTED_LOCATION_RELEASE "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia_release.lib"
+    IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia.lib" # Default fallback
     INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia"
 )
 
@@ -109,11 +111,13 @@ target_compile_options(setu_runtime PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/
 # symbol; nothing in this target names BitmapDrawable or NinePatchDrawable at all.
 # Adding them would drag in Bitmap.cpp, BitmapFactory.cpp and the WIC link libraries
 # for code the test never runs.
-add_executable(constraint_layout_test src/test_constraint_layout.cpp
+add_executable(setu_tests 
+    src/test_main.cpp
+    src/test_constraint_layout.cpp
+    src/test_looper.cpp
+    src/cassowary/cassowary_test.cpp
+    src/cassowary/cassowary_widget_test.cpp
     "src/utils/Logger.cpp"
-    "src/os/Looper.cpp"
-    "src/os/MessageQueue.cpp"
-    "src/os/Handler.cpp"
     "src/os/Looper.cpp"
     "src/os/MessageQueue.cpp"
     "src/os/Handler.cpp"
@@ -124,22 +128,18 @@ add_executable(constraint_layout_test src/test_constraint_layout.cpp
     src/animation/ValueAnimator.cpp
     src/animation/ObjectAnimator.cpp
     src/animation/LayoutTransition.cpp
-
     "src/graphics/Paint.cpp"
     "src/graphics/Path.cpp"
     "src/graphics/RecordingCanvas.cpp"
     "src/graphics/drawable/Drawable.cpp"
     "src/graphics/drawable/ColorDrawable.cpp"
+    "src/graphics/drawable/VectorDrawable.cpp"
+    "src/graphics/drawable/AnimatedVectorDrawable.cpp"
 )
-target_include_directories(constraint_layout_test PRIVATE include thirdparty/skia)
-target_link_libraries(constraint_layout_test PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary skia)
-# target_link_options
-target_compile_definitions(constraint_layout_test PRIVATE NO_RESOURCES)
-target_compile_options(constraint_layout_test PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
-
-
-
-add_executable(looper_test "src/test_looper.cpp" "src/os/Looper.cpp" "src/os/Handler.cpp" "src/os/MessageQueue.cpp")
+target_include_directories(setu_tests PRIVATE include thirdparty/skia src/cassowary)
+target_link_libraries(setu_tests PRIVATE miniz d2d1 dwrite d3d11 dxgi setu_androidfw cassowary skia)
+target_compile_definitions(setu_tests PRIVATE NO_RESOURCES)
+target_compile_options(setu_tests PRIVATE "/utf-8" "/FI" "${CMAKE_SOURCE_DIR}/thirdparty/androidfw_compat.h")
 
 # --- Install & Packaging Configuration ---
 

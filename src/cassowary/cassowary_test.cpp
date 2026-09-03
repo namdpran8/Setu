@@ -219,7 +219,7 @@ static void test9_synonym() {
           "a is synonym of b (expected true)");
 }
 
-int main() {
+int cassowary_test_main() {
     disableAssertDialog();
     std::cout << "=== Cassowary Tier 1 Solver Tests ===\n\n";
 

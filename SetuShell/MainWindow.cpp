@@ -20,6 +20,8 @@ namespace winrt::SetuShell::implementation
     MainWindow::MainWindow()
     {
         InitializeComponent();
+        
+
         this->Title(L"Setu");
         this->ExtendsContentIntoTitleBar(true);
 

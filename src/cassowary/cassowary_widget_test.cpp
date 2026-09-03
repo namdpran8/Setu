@@ -20,7 +20,7 @@
 
 using namespace setu::cassowary;
 
-void check(bool condition, const std::string& message) {
+static void check(bool condition, const std::string& message) {
     if (condition) {
         std::cout << "  [PASS] " << message << std::endl;
     } else {
@@ -29,7 +29,7 @@ void check(bool condition, const std::string& message) {
     }
 }
 
-void check_eq(int actual, int expected, const std::string& name) {
+static void check_eq(int actual, int expected, const std::string& name) {
     if (actual == expected) {
         std::cout << "  [PASS] " << name << " is " << expected << std::endl;
     } else {
@@ -292,7 +292,7 @@ void test7_barrier() {
     check_eq(ptrC->getX(), 300, "C x (after barrier)");
 }
 
-int main() {
+int cassowary_widget_test_main() {
     std::cout << "=== Cassowary Tier 2 Widget Tests ===" << std::endl;
     
     test1_basic_layout();

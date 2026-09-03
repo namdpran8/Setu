@@ -24,7 +24,7 @@
 
 using namespace setu::view;
 
-void check(bool condition, const std::string& message) {
+static void check(bool condition, const std::string& message) {
     if (condition) {
         std::cout << "  [PASS] " << message << std::endl;
     } else {
@@ -33,7 +33,7 @@ void check(bool condition, const std::string& message) {
     }
 }
 
-void check_eq(int actual, int expected, const std::string& name) {
+static void check_eq(int actual, int expected, const std::string& name) {
     if (actual == expected) {
         std::cout << "  [PASS] " << name << " is " << expected << std::endl;
     } else {
@@ -42,7 +42,7 @@ void check_eq(int actual, int expected, const std::string& name) {
     }
 }
 
-int main() {
+int constraint_layout_test_main() {
     std::cout << "=== Phase 1: ConstraintLayout View class (isolated) ===" << std::endl;
 
     auto layout = std::make_shared<ConstraintLayout>();
@@ -133,4 +133,4 @@ int main() {
 }
 #include "ui/WindowManager.h"
 
-void WindowManager::wakeLooper(long long delayMs) {}
+

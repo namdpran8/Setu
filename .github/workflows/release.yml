@@ -4,6 +4,16 @@ on:
   push:
     tags:
       - 'v*' # Trigger on tags starting with v (e.g., v1.0.0, v2.1)
+  workflow_dispatch:
+    inputs:
+      build_config:
+        description: 'Build Configuration (Debug or Release)'
+        required: true
+        default: 'Debug'
+        type: choice
+        options:
+          - Debug
+          - Release
 
 permissions:
   contents: write
@@ -12,26 +22,26 @@ jobs:
   build:
     name: Build and Release
     runs-on: windows-latest
+    env:
+      BUILD_CONFIG: ${{ github.event.inputs.build_config || 'Debug' }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-
-
       # NOTE: If Skia or other libraries need to be built from source (because the pre-built 
       # .lib files aren't in Git), you will need to add a step here to build/download them.
 
       - name: Configure CMake
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=${{ env.BUILD_CONFIG }}
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config ${{ env.BUILD_CONFIG }}
 
       - name: Create Release Package
         run: |
           New-Item -ItemType Directory -Force -Path release_package
-          Copy-Item build\Release\setu_runtime.exe -Destination release_package\
+          Copy-Item build\${{ env.BUILD_CONFIG }}\setu_runtime.exe -Destination release_package\
           Copy-Item apkresources -Destination release_package\ -Recurse
           Compress-Archive -Path release_package\* -DestinationPath setu_release.zip
           
