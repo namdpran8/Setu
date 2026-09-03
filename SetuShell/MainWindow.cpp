@@ -21,6 +21,7 @@ namespace winrt::SetuShell::implementation
     {
         InitializeComponent();
         this->Title(L"Setu");
+        this->ExtendsContentIntoTitleBar(true);
 
         auto windowNative = this->try_as<IWindowNative>();
         HWND hwnd = nullptr;
