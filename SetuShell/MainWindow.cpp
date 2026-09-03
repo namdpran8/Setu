@@ -20,6 +20,7 @@ namespace winrt::SetuShell::implementation
     MainWindow::MainWindow()
     {
         InitializeComponent();
+        this->Content(RootGrid());
         
 
         this->Title(L"Setu");

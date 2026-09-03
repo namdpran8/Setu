@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:local="using:SetuShell">
 
-    <Grid>
+    <Grid x:Name="RootGrid">
         <NavigationView x:Name="NavView" 
                         PaneDisplayMode="Left"
                         IsBackButtonVisible="Collapsed"
