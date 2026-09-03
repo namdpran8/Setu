@@ -150,12 +150,36 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         view = ll;
     } else if (tag == "com.sothree.slidinguppanel.SlidingUpPanelLayout" || tag == "SlidingUpPanelLayout") {
         view = std::make_shared<setu::view::OverlayPanelLayout>();
+    } else if (tag == "include") {
+        uint32_t layoutResId = 0;
+        for (size_t i = 0; i < parser->getAttributeCount(); i++) {
+            size_t nameLen;
+            const char16_t* name16 = parser->getAttributeName(i, &nameLen);
+            std::string attrName = name16 ? android::util::Utf16ToUtf8(android::StringPiece16(name16, nameLen)) : "";
+            if (attrName == "layout") {
+                if (parser->getAttributeDataType(i) == android::Res_value::TYPE_REFERENCE) {
+                    layoutResId = parser->getAttributeData(i);
+                }
+                break;
+            }
+        }
+        if (layoutResId != 0 && resManager) {
+            auto includedParser = resManager->openXml(layoutResId);
+            if (includedParser) {
+                // Inflate returns the root view of the included layout
+                view = inflate(includedParser.get(), resManager, theme);
+            } else {
+                Logger::w("LayoutInflater", "include tag failed to open layout resource.");
+            }
+        } else {
+            Logger::w("LayoutInflater", "include tag missing 'layout' attribute or resManager is null.");
+        }
     } else {
         Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", using FrameLayout fallback");
         view = std::make_shared<setu::view::FrameLayout>();
     }
     
-    if (view && !tag.empty()) {
+    if (view && !tag.empty() && tag != "include") {
         std::string descriptor = tag;
         // Transform "com.pkg.Class" to "Lcom/pkg/Class;" format for check-cast
         if (descriptor.find('.') != std::string::npos) {
@@ -193,7 +217,7 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         }
     }
 
-    view->onFinishInflate();
+    if (view) view->onFinishInflate();
     return view;
 }
 
@@ -221,6 +245,7 @@ int LayoutInflater::parseComplexDimension(uint32_t data) {
 }
 
 void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::shared_ptr<setu::view::View> view, ResourceManager* resManager, Theme* theme) {
+    if (!view) return;
     for (size_t i = 0; i < parser->getAttributeCount(); i++) {
         size_t nameLen;
         const char16_t* name16 = parser->getAttributeName(i, &nameLen);
@@ -378,6 +403,7 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
 }
 
 void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::shared_ptr<setu::view::View> view, std::shared_ptr<setu::view::ViewGroup> parent, ResourceManager* resManager, Theme* theme) {
+    if (!view) return;
     std::shared_ptr<setu::view::View::LayoutParams> lp;
     if (parent) {
         lp = parent->generateLayoutParams(parser);

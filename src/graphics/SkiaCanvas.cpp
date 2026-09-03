@@ -188,6 +188,14 @@ void SkiaCanvas::drawPath(const Path& path, const Paint& paint) {
     } else {
         skPath.setFillType(SkPathFillType::kWinding);
     }
+// If you found this, you are probably debugging this at an
+// unreasonable hour.
+//
+// Go drink some water.
+// The bug can wait.
+//
+// — Previous developer
+
 
     const auto& verbs = path.getVerbs();
     const auto& points = path.getPoints();
