@@ -1820,8 +1820,8 @@ base::expected<std::monostate, IOError> Theme::SetTo(const Theme& source) {
           package_map[src_package_id] = dest_package_id;
         }
 
-        src_to_dest_asset_cookies.insert(std::make_pair(i, j));
-        src_asset_cookie_id_map.insert(std::make_pair(i, std::move(package_map)));
+        src_to_dest_asset_cookies.insert(std::make_pair(static_cast<ApkAssetsCookie>(i), static_cast<ApkAssetsCookie>(j)));
+        src_asset_cookie_id_map.insert(std::make_pair(static_cast<ApkAssetsCookie>(i), std::move(package_map)));
         break;
       }
     }
