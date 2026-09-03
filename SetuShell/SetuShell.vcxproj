@@ -24,6 +24,8 @@
     <ResolveNuGetPackages>false</ResolveNuGetPackages>
     <WindowsTargetPlatformMinVersion>10.0.17763.0</WindowsTargetPlatformMinVersion>
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsPackageType>None</WindowsPackageType>
+    <AppxPackage>false</AppxPackage>
     <AppxPackage>false</AppxPackage>
     <DefaultLanguage>en-US</DefaultLanguage>
   </PropertyGroup>
