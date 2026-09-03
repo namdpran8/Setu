@@ -28,5 +28,6 @@
         </NavigationView>
     
         
+        <Button Content="BIG RED BUTTON" Background="Red" Foreground="White" Width="300" Height="200" HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Grid>
 </Window>
