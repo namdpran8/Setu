@@ -163,3 +163,20 @@ if(WIN32)
 endif()
 
 include(CPack)
+
+
+add_executable(test_avd "C:/Users/namde/.gemini/antigravity/brain/2793ac40-3b54-4c10-bfb3-aac1f5ab48f5/scratch/test_avd.cpp"
+    "src/os/Looper.cpp"
+    "src/os/MessageQueue.cpp"
+    "src/os/Handler.cpp"
+    "src/view/Choreographer.cpp"
+    "src/animation/ValueAnimator.cpp"
+    "src/animation/ObjectAnimator.cpp"
+    "src/animation/PropertyRegistry.cpp"
+    "src/graphics/drawable/VectorDrawable.cpp"
+    "src/graphics/Path.cpp"
+    "src/graphics/Paint.cpp"
+    "src/graphics/drawable/Drawable.cpp"
+)
+target_include_directories(test_avd PRIVATE src include "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia")
+target_link_libraries(test_avd PRIVATE setu_androidfw skia)

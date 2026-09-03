@@ -411,6 +411,16 @@ void LayoutInflater::parseLayoutParams(android::ResXMLParser* parser, std::share
         lp = std::make_shared<setu::view::View::LayoutParams>(setu::view::View::WRAP_CONTENT, setu::view::View::WRAP_CONTENT);
     }
 
+    auto existingParams = view->getLayoutParams();
+    if (existingParams) {
+        lp->width = existingParams->width;
+        lp->height = existingParams->height;
+        lp->leftMargin = existingParams->leftMargin;
+        lp->topMargin = existingParams->topMargin;
+        lp->rightMargin = existingParams->rightMargin;
+        lp->bottomMargin = existingParams->bottomMargin;
+    }
+
     if (resManager) {
         std::vector<uint32_t> styleables = {
             0x010100f4, // layout_width (0)
