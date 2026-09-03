@@ -1,0 +1,10 @@
+import "AppTileViewModel.idl";
+namespace SetuShell
+{
+    [default_interface]
+    runtimeclass LibraryPage : Microsoft.UI.Xaml.Controls.Page
+    {
+        LibraryPage();
+        Windows.Foundation.Collections.IObservableVector<AppTileViewModel> Apps { get; };
+    }
+}

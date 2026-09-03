@@ -1,0 +1,10 @@
+namespace SetuShell
+{
+    [default_interface]
+    runtimeclass AppTileViewModel
+    {
+        AppTileViewModel(String name, String glyph);
+        String Name { get; };
+        String Glyph { get; };
+    }
+}

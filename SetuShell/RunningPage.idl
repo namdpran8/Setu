@@ -1,0 +1,8 @@
+namespace SetuShell
+{
+    [default_interface]
+    runtimeclass RunningPage : Microsoft.UI.Xaml.Controls.Page
+    {
+        RunningPage();
+    }
+}

@@ -1,0 +1,30 @@
+<Window
+    x:Class="SetuShell.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:SetuShell">
+
+    <Grid>
+        <NavigationView x:Name="NavView" 
+                        PaneDisplayMode="Left"
+                        IsBackButtonVisible="Collapsed"
+                        IsSettingsVisible="True"
+                        SelectionChanged="NavView_SelectionChanged"
+                        Loaded="NavView_Loaded">
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="LibraryItem" Content="Library" Tag="LibraryPage">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE718;" /> <!-- Apps Grid Glyph -->
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="RunningItem" Content="Running" Tag="RunningPage">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE768;" /> <!-- Play/Process Glyph -->
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+            </NavigationView.MenuItems>
+
+            <Frame x:Name="ContentFrame" />
+        </NavigationView>
+    </Grid>
+</Window>
