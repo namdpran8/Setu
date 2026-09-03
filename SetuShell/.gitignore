@@ -1,0 +1,13 @@
+# Visual Studio
+.vs/
+x64/
+x86/
+ARM64/
+Debug/
+Release/
+obj/
+Generated Files/
+*.user
+*.suo
+*.db
+*.log
