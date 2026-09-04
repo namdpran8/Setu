@@ -27,7 +27,7 @@ set_target_properties(skia PROPERTIES
 )
 
 add_executable(setu_runtime
-
+    src/resource.rc
     src/main.cpp
     "src/apk_extractor/ApkExtractor.cpp"
     "src/dex/DexParser.h" "src/dex/DexParser.cpp"

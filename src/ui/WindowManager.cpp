@@ -472,6 +472,8 @@ bool WindowManager::init() {
     wc.lpszClassName = "SetuMainWindow";
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(101));
+    wc.hIconSm = LoadIcon(hInstance, MAKEINTRESOURCE(101));
     
     if (!RegisterClassEx(&wc)) {
         Logger::e("WindowManager", "Failed to register main window class!");
