@@ -1,12 +1,15 @@
 namespace SetuShell
 {
     [default_interface]
-    runtimeclass AppTileViewModel
+    runtimeclass AppTileViewModel : Microsoft.UI.Xaml.Data.INotifyPropertyChanged
     {
         AppTileViewModel(String packageName, String name, String iconPath, String installPath);
         String PackageName { get; };
         String Name { get; };
         String IconPath { get; };
         String InstallPath { get; };
+        
+        Boolean IsRunning { get; set; };
+        Microsoft.UI.Xaml.Visibility BoolToVis(Boolean value);
     }
 }

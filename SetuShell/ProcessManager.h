@@ -21,12 +21,17 @@ namespace winrt::SetuShell::implementation
     public:
         static ProcessManager& Get();
 
-        void LaunchApp(const std::wstring& package, const std::wstring& appPath);
+        void LaunchApp(const std::wstring& package, const std::wstring& appPath, const std::wstring& iconPath = L"");
         void ForceStop(const std::wstring& package);
         bool IsAppRunning(const std::wstring& package);
         
         std::map<std::wstring, ProcessInfo> GetRunningApps();
         
+        // Fired when a process is launched
+        using ProcessLaunchedHandler = std::function<void(const std::wstring&)>;
+        int AddProcessLaunchedHandler(ProcessLaunchedHandler handler);
+        void RemoveProcessLaunchedHandler(int token);
+
         // Fired when a process exits
         using ProcessExitedHandler = std::function<void(const std::wstring&)>;
         int AddProcessExitedHandler(ProcessExitedHandler handler);
@@ -43,6 +48,7 @@ namespace winrt::SetuShell::implementation
         std::thread m_monitorThread;
         std::atomic<bool> m_running;
 
+        std::map<int, ProcessLaunchedHandler> m_processLaunchedHandlers;
         std::map<int, ProcessExitedHandler> m_processExitedHandlers;
         int m_nextHandlerToken = 1;
         std::mutex m_handlersMutex;

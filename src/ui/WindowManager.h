@@ -49,6 +49,8 @@ public:
 
 
     static void clearWindow();
+    static void setWindowIcon(const std::string& iconPath);
+    static void cleanupIcon();
     static void setClickCallback(std::function<void(int)> cb);
     static void setLongClickCallback(std::function<bool(int)> cb);
     static std::function<bool(int)> s_longClickCallback;
@@ -78,6 +80,8 @@ private:
     static std::function<void(int)> s_clickCallback;
     static HWND s_mainWindow;
     static HWND s_skiaWindow;
+    static HICON s_customIconSmall;
+    static HICON s_customIconBig;
 
     // Direct2D / DirectX resources
     static Microsoft::WRL::ComPtr<ID3D11Device> s_d3dDevice;

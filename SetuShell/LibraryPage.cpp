@@ -10,6 +10,7 @@
 #include "ProcessManager.h"
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Microsoft.UI.Interop.h>
+#include <winrt/Microsoft.UI.Dispatching.h>
 #include <shobjidl_core.h> // IInitializeWithWindow
 #include <shlobj.h> // SHGetKnownFolderPath
 #include <wincodec.h>
@@ -31,8 +32,37 @@ using namespace winrt::Windows::Foundation::Collections;
 
 namespace winrt::SetuShell::implementation
 {
+    LibraryPage::LibraryPage()
+    {
+        m_apps = winrt::single_threaded_observable_vector<SetuShell::AppTileViewModel>();
+        
+        InitializeComponent();
+        LoadApps();
+
+        auto& pm = ProcessManager::Get();
+        m_launchedHandlerToken = pm.AddProcessLaunchedHandler([this](const std::wstring& package) {
+            UpdateRunningState(package, true);
+        });
+        m_exitedHandlerToken = pm.AddProcessExitedHandler([this](const std::wstring& package) {
+            UpdateRunningState(package, false);
+        });
+    }
+
+    LibraryPage::~LibraryPage()
+    {
+        auto& pm = ProcessManager::Get();
+        if (m_launchedHandlerToken != 0) pm.RemoveProcessLaunchedHandler(m_launchedHandlerToken);
+        if (m_exitedHandlerToken != 0) pm.RemoveProcessExitedHandler(m_exitedHandlerToken);
+    }
+
+    winrt::Windows::Foundation::Collections::IObservableVector<SetuShell::AppTileViewModel> LibraryPage::Apps()
+    {
+        return m_apps;
+    }
+
     void LibraryPage::LoadApps()
     {
+        m_allApps.clear();
         m_apps.Clear();
         
         PWSTR localAppData = nullptr;
@@ -45,6 +75,8 @@ namespace winrt::SetuShell::implementation
         }
 
         if (!std::filesystem::exists(appsDirPath)) return;
+
+        auto runningApps = ProcessManager::Get().GetRunningApps();
 
         for (const auto& entry : std::filesystem::directory_iterator(appsDirPath)) {
             if (entry.is_directory()) {
@@ -66,34 +98,28 @@ namespace winrt::SetuShell::implementation
                         std::wstring absoluteIconPath = entry.path().wstring() + L"\\" + iconPath.c_str();
                         std::wstring absoluteInstallPath = entry.path().wstring() + L"\\" + installPath.c_str();
                         
-                        m_apps.Append(winrt::make<AppTileViewModel>(pkgName, displayName, winrt::hstring(absoluteIconPath.c_str()), winrt::hstring(absoluteInstallPath.c_str())));
+                        auto vm = winrt::make<AppTileViewModel>(pkgName, displayName, winrt::hstring(absoluteIconPath.c_str()), winrt::hstring(absoluteInstallPath.c_str()));
+                        if (runningApps.find(pkgName.c_str()) != runningApps.end()) {
+                            vm.IsRunning(true);
+                        }
+                        
+                        m_allApps.push_back(vm);
                     } catch (...) {
                         // ignore broken manifests
                     }
                 }
             }
         }
-    }
-
-    LibraryPage::LibraryPage()
-    {
-        m_apps = winrt::single_threaded_observable_vector<SetuShell::AppTileViewModel>();
         
-        InitializeComponent();
-        LoadApps();
-    }
-
-    winrt::Windows::Foundation::Collections::IObservableVector<SetuShell::AppTileViewModel> LibraryPage::Apps()
-    {
-        return m_apps;
+        for (auto const& vm : m_allApps) {
+            m_apps.Append(vm);
+        }
     }
 
     winrt::Windows::Foundation::IAsyncAction LibraryPage::InstallApk_Click(
         winrt::Windows::Foundation::IInspectable const& sender, 
         winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e)
     {
-        winrt::apartment_context ui_thread; // Capture the UI thread context
-
         auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker();
         picker.ViewMode(winrt::Windows::Storage::Pickers::PickerViewMode::Thumbnail);
         picker.SuggestedStartLocation(winrt::Windows::Storage::Pickers::PickerLocationId::ComputerFolder);
@@ -387,8 +413,9 @@ namespace winrt::SetuShell::implementation
 
             Logger::i("InstallPipeline", "Successfully installed " + packageName);
             
-            co_await ui_thread;
-            LoadApps();
+            DispatcherQueue().TryEnqueue([this]() {
+                LoadApps();
+            });
 
         } catch (const std::exception& ex) {
             Logger::e("InstallPipeline", "Install aborted due to error: " + std::string(ex.what()));
@@ -408,7 +435,175 @@ namespace winrt::SetuShell::implementation
         auto viewModel = grid.Tag().as<SetuShell::AppTileViewModel>();
         
         if (viewModel) {
-            ProcessManager::Get().LaunchApp(viewModel.PackageName().c_str(), viewModel.InstallPath().c_str());
+            ProcessManager::Get().LaunchApp(viewModel.PackageName().c_str(), viewModel.InstallPath().c_str(), viewModel.IconPath().c_str());
         }
+    }
+
+    void LibraryPage::UpdateRunningState(const std::wstring& package, bool isRunning)
+    {
+        DispatcherQueue().TryEnqueue([this, package, isRunning]() {
+            for (auto const& vm : m_allApps) {
+                if (vm.PackageName() == package) {
+                    vm.IsRunning(isRunning);
+                    break;
+                }
+            }
+        });
+    }
+
+    void LibraryPage::SearchBox_TextChanged(winrt::Microsoft::UI::Xaml::Controls::AutoSuggestBox const& sender, winrt::Microsoft::UI::Xaml::Controls::AutoSuggestBoxTextChangedEventArgs const& args)
+    {
+        if (args.Reason() == winrt::Microsoft::UI::Xaml::Controls::AutoSuggestionBoxTextChangeReason::UserInput) {
+            std::wstring query = sender.Text().c_str();
+            std::transform(query.begin(), query.end(), query.begin(), ::towlower);
+
+            m_apps.Clear();
+            for (auto const& vm : m_allApps) {
+                std::wstring name = vm.Name().c_str();
+                std::wstring package = vm.PackageName().c_str();
+                std::transform(name.begin(), name.end(), name.begin(), ::towlower);
+                std::transform(package.begin(), package.end(), package.begin(), ::towlower);
+
+                if (query.empty() || name.find(query) != std::wstring::npos || package.find(query) != std::wstring::npos) {
+                    m_apps.Append(vm);
+                }
+            }
+        }
+    }
+
+    void LibraryPage::AppTileMenu_Opening(winrt::Windows::Foundation::IInspectable const& sender, winrt::Windows::Foundation::IInspectable const& e)
+    {
+        auto flyout = sender.as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyout>();
+        auto target = flyout.Target().as<winrt::Microsoft::UI::Xaml::Controls::Grid>();
+        auto vm = target.Tag().as<SetuShell::AppTileViewModel>();
+
+        for (auto const& item : flyout.Items()) {
+            if (auto flyoutItem = item.try_as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>()) {
+                flyoutItem.Tag(vm);
+                if (flyoutItem.Text() == L"Force Stop") {
+                    flyoutItem.IsEnabled(vm.IsRunning());
+                }
+            }
+        }
+    }
+
+    void LibraryPage::AppTile_Launch(winrt::Windows::Foundation::IInspectable const& sender, winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e)
+    {
+        auto item = sender.as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>();
+        if (auto vm = item.Tag().as<SetuShell::AppTileViewModel>()) {
+            ProcessManager::Get().LaunchApp(vm.PackageName().c_str(), vm.InstallPath().c_str(), vm.IconPath().c_str());
+        }
+    }
+
+    void LibraryPage::AppTile_ForceStop(winrt::Windows::Foundation::IInspectable const& sender, winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e)
+    {
+        auto item = sender.as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>();
+        if (auto vm = item.Tag().as<SetuShell::AppTileViewModel>()) {
+            ProcessManager::Get().ForceStop(vm.PackageName().c_str());
+        }
+    }
+
+    void LibraryPage::AppTile_ShowExplorer(winrt::Windows::Foundation::IInspectable const& sender, winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e)
+    {
+        auto item = sender.as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>();
+        if (auto vm = item.Tag().as<SetuShell::AppTileViewModel>()) {
+            std::wstring installPath = vm.InstallPath().c_str();
+            std::wstring parentPath = installPath.substr(0, installPath.find_last_of(L"\\"));
+            ShellExecuteW(NULL, L"open", parentPath.c_str(), NULL, NULL, SW_SHOWDEFAULT);
+        }
+    }
+
+    void LibraryPage::AppTile_ViewPermissions(winrt::Windows::Foundation::IInspectable const& sender, winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e)
+    {
+        auto item = sender.as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>();
+        auto vm = item.Tag().as<SetuShell::AppTileViewModel>();
+        if (!vm) return;
+
+        std::wstring installPath = vm.InstallPath().c_str();
+        std::wstring parentPath = installPath.substr(0, installPath.find_last_of(L"\\"));
+        std::wstring manifestPath = parentPath + L"\\manifest.json";
+
+        std::wstring permsStr = L"No permissions requested.";
+        std::ifstream inFile(manifestPath);
+        if (inFile.is_open()) {
+            std::string jsonStr((std::istreambuf_iterator<char>(inFile)), std::istreambuf_iterator<char>());
+            inFile.close();
+            
+            try {
+                auto json = winrt::Windows::Data::Json::JsonObject::Parse(winrt::to_hstring(jsonStr));
+                if (json.HasKey(L"permissions_granted")) {
+                    auto perms = json.GetNamedArray(L"permissions_granted");
+                    if (perms.Size() > 0) {
+                        permsStr = L"";
+                        for (auto const& p : perms) {
+                            permsStr += L"• " + p.GetString() + L"\n";
+                        }
+                    }
+                }
+            } catch (...) {}
+        }
+
+        winrt::Microsoft::UI::Xaml::Controls::ContentDialog dialog;
+        dialog.XamlRoot(this->XamlRoot());
+        dialog.Title(winrt::box_value(L"Permissions for " + vm.Name()));
+        dialog.Content(winrt::box_value(permsStr));
+        dialog.CloseButtonText(L"Close");
+        dialog.ShowAsync();
+    }
+
+    void LibraryPage::AppTile_Uninstall(winrt::Windows::Foundation::IInspectable const& sender, winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e)
+    {
+        auto item = sender.as<winrt::Microsoft::UI::Xaml::Controls::MenuFlyoutItem>();
+        auto vm = item.Tag().as<SetuShell::AppTileViewModel>();
+        if (!vm) return;
+
+        std::wstring pkgName = vm.PackageName().c_str();
+        std::wstring appName = vm.Name().c_str();
+        std::wstring installPath = vm.InstallPath().c_str();
+        std::wstring parentPath = installPath.substr(0, installPath.find_last_of(L"\\"));
+
+        winrt::Microsoft::UI::Xaml::Controls::ContentDialog dialog;
+        dialog.XamlRoot(this->XamlRoot());
+        dialog.Title(winrt::box_value(L"Uninstall " + appName + L"?"));
+        dialog.Content(winrt::box_value(L"This will remove all app data permanently."));
+        dialog.PrimaryButtonText(L"Uninstall");
+        dialog.CloseButtonText(L"Cancel");
+
+        dialog.PrimaryButtonClick([this, pkgName, parentPath](auto&&, auto&&) -> winrt::fire_and_forget {
+            // 1. Force Stop
+            ProcessManager::Get().ForceStop(pkgName);
+
+            // 2. Remove from UI immediately
+            for (auto it = m_allApps.begin(); it != m_allApps.end(); ++it) {
+                if (it->PackageName() == pkgName) {
+                    m_allApps.erase(it);
+                    break;
+                }
+            }
+
+            for (uint32_t i = 0; i < m_apps.Size(); ++i) {
+                if (m_apps.GetAt(i).PackageName() == pkgName) {
+                    m_apps.RemoveAt(i);
+                    break;
+                }
+            }
+
+            // 3. Switch to background thread to avoid freezing UI while waiting for process termination
+            co_await winrt::resume_background();
+
+            // 4. Try to delete the folder, retrying if files are still locked by the terminating process
+            int retries = 20; // 2 seconds total max
+            while (retries-- > 0) {
+                if (!std::filesystem::exists(parentPath)) break;
+                try {
+                    std::filesystem::remove_all(parentPath);
+                    break; // Success
+                } catch (...) {
+                    Sleep(100);
+                }
+            }
+        });
+
+        dialog.ShowAsync();
     }
 }

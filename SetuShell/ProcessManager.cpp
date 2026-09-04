@@ -47,7 +47,7 @@ namespace winrt::SetuShell::implementation
         }
     }
 
-    void ProcessManager::LaunchApp(const std::wstring& package, const std::wstring& appPath) {
+    void ProcessManager::LaunchApp(const std::wstring& package, const std::wstring& appPath, const std::wstring& iconPath) {
         std::lock_guard<std::mutex> lock(m_mutex);
 
         if (m_processes.find(package) != m_processes.end()) {
@@ -76,9 +76,17 @@ namespace winrt::SetuShell::implementation
         if (!safeAppPath.empty() && safeAppPath.back() == L'\\') {
             safeAppPath.pop_back();
         }
+        
+        std::wstring safeIconPath = iconPath;
+        if (!safeIconPath.empty() && safeIconPath.back() == L'\\') {
+            safeIconPath.pop_back();
+        }
 
         // Convert paths for CLI
         std::wstring cmdLine = L"\"" + exePath + L"\" --app-path=\"" + safeAppPath + L"\" --package=\"" + package + L"\"";
+        if (!safeIconPath.empty()) {
+            cmdLine += L" --icon-path=\"" + safeIconPath + L"\"";
+        }
 
         STARTUPINFOW si;
         PROCESS_INFORMATION pi;
@@ -97,6 +105,17 @@ namespace winrt::SetuShell::implementation
             info.intentionallyTerminated = false;
             m_processes[package] = info;
             CloseHandle(pi.hThread);
+            
+            std::vector<ProcessLaunchedHandler> handlers;
+            {
+                std::lock_guard<std::mutex> handlerLock(m_handlersMutex);
+                for (auto const& h : m_processLaunchedHandlers) {
+                    handlers.push_back(h.second);
+                }
+            }
+            for (auto const& handler : handlers) {
+                handler(package);
+            }
 
             // Update manifest last_run_at
             PWSTR path = NULL;
@@ -151,6 +170,18 @@ namespace winrt::SetuShell::implementation
     std::map<std::wstring, ProcessInfo> ProcessManager::GetRunningApps() {
         std::lock_guard<std::mutex> lock(m_mutex);
         return m_processes;
+    }
+
+    int ProcessManager::AddProcessLaunchedHandler(ProcessLaunchedHandler handler) {
+        std::lock_guard<std::mutex> lock(m_handlersMutex);
+        int token = m_nextHandlerToken++;
+        m_processLaunchedHandlers[token] = handler;
+        return token;
+    }
+
+    void ProcessManager::RemoveProcessLaunchedHandler(int token) {
+        std::lock_guard<std::mutex> lock(m_handlersMutex);
+        m_processLaunchedHandlers.erase(token);
     }
 
     int ProcessManager::AddProcessExitedHandler(ProcessExitedHandler handler) {

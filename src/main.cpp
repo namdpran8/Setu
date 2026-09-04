@@ -189,12 +189,15 @@ int main(int argc, char* argv[]) {
     LaunchArgs launchArgs;
     std::string apkPath;
     std::string appPath;
+    std::string iconPath;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg.find("--package=") == 0) {
             launchArgs.package = arg.substr(10);
         } else if (arg.find("--app-path=") == 0) {
             appPath = arg.substr(11);
+        } else if (arg.find("--icon-path=") == 0) {
+            iconPath = arg.substr(12);
         } else if (arg.find("--log-level=") == 0) {
             launchArgs.logLevel = arg.substr(12);
         } else if (arg.find("--framework=") == 0) {
@@ -322,6 +325,10 @@ int main(int argc, char* argv[]) {
         crashExit(3, launchArgs.package, "Window/Render initialization failed");
     }
 
+    if (!iconPath.empty()) {
+        WindowManager::setWindowIcon(iconPath);
+    }
+
     // --- Phase 5: Resource Management ---
     std::string frameworkApkPath = launchArgs.frameworkApk;
     
@@ -408,6 +415,8 @@ int main(int argc, char* argv[]) {
 
     // Block on Win32 Message Loop
     WindowManager::runMessageLoop();
+    
+    WindowManager::cleanupIcon();
 
     return 0;
 }

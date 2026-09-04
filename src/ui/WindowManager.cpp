@@ -18,6 +18,96 @@
 #include "../view/KeyEvent.h"
 #include "../view/Choreographer.h"
 #include "../graphics/Direct2DCanvas.h"
+#include "../graphics/BitmapFactory.h"
+#include <fstream>
+#include <vector>
+
+// TODO: The icon correctly decodes and is sent via WM_SETICON (with CopyImage downscaling),
+// but the Windows 10/11 taskbar still groups the window under the generic setu_runtime.exe 
+// executable icon instead of displaying the custom app icon.
+// Possible fix: Explicitly set the AppUserModelID (AUMID) for the window using 
+// SHGetPropertyStoreForWindow or SetCurrentProcessExplicitAppUserModelID, to prevent
+// taskbar grouping from overriding the window's HICON.
+void WindowManager::setWindowIcon(const std::string& iconPath) {
+    std::ifstream file(iconPath, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        Logger::w("WindowManager", "Failed to open icon file: " + iconPath);
+        return;
+    }
+    
+    std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    
+    std::vector<uint8_t> buffer(size);
+    if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+        Logger::w("WindowManager", "Failed to read icon file: " + iconPath);
+        return;
+    }
+    
+    auto bitmap = setu::graphics::BitmapFactory::decodeByteArray(buffer.data(), buffer.size());
+    if (!bitmap) {
+        Logger::w("WindowManager", "Failed to decode icon file: " + iconPath);
+        return;
+    }
+    
+    BITMAPINFO bmi = {0};
+    bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bmi.bmiHeader.biWidth = bitmap->getWidth();
+    bmi.bmiHeader.biHeight = -bitmap->getHeight();
+    bmi.bmiHeader.biPlanes = 1;
+    bmi.bmiHeader.biBitCount = 32;
+    bmi.bmiHeader.biCompression = BI_RGB;
+
+    void* bits = nullptr;
+    HBITMAP hbmColor = CreateDIBSection(NULL, &bmi, DIB_RGB_COLORS, &bits, NULL, 0);
+    if (hbmColor && bits) {
+        memcpy(bits, bitmap->getPixels(), bitmap->getWidth() * bitmap->getHeight() * 4);
+    }
+    
+    int maskRowBytes = ((bitmap->getWidth() + 15) / 16) * 2;
+    std::vector<uint8_t> maskBits(maskRowBytes * bitmap->getHeight(), 0);
+    HBITMAP hbmMask = CreateBitmap(bitmap->getWidth(), bitmap->getHeight(), 1, 1, maskBits.data());
+    
+    ICONINFO ii = {0};
+    ii.fIcon = TRUE;
+    ii.hbmColor = hbmColor;
+    ii.hbmMask = hbmMask;
+    
+    HICON rawIcon = CreateIconIndirect(&ii);
+    
+    DeleteObject(hbmColor);
+    DeleteObject(hbmMask);
+    
+    if (rawIcon) {
+        s_customIconSmall = (HICON)CopyImage(rawIcon, IMAGE_ICON, GetSystemMetrics(SM_CXSMICON), GetSystemMetrics(SM_CYSMICON), LR_COPYRETURNORG);
+        s_customIconBig = (HICON)CopyImage(rawIcon, IMAGE_ICON, GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON), LR_COPYRETURNORG);
+        
+        DestroyIcon(rawIcon); // The resized ones are copies! (unless sizes exactly match)
+
+        if (s_mainWindow) {
+            SendMessage(s_mainWindow, WM_SETICON, ICON_BIG, (LPARAM)s_customIconBig);
+            SendMessage(s_mainWindow, WM_SETICON, ICON_SMALL, (LPARAM)s_customIconSmall);
+        }
+        if (s_skiaWindow) {
+            SendMessage(s_skiaWindow, WM_SETICON, ICON_BIG, (LPARAM)s_customIconBig);
+            SendMessage(s_skiaWindow, WM_SETICON, ICON_SMALL, (LPARAM)s_customIconSmall);
+        }
+    } else {
+        Logger::w("WindowManager", "CreateIconIndirect failed.");
+    }
+}
+
+void WindowManager::cleanupIcon() {
+    if (s_customIconSmall) {
+        DestroyIcon(s_customIconSmall);
+        s_customIconSmall = nullptr;
+    }
+    if (s_customIconBig) {
+        DestroyIcon(s_customIconBig);
+        s_customIconBig = nullptr;
+    }
+}
+
 #include "../graphics/SkiaCanvas.h"
 #include "../graphics/FontManager.h"
 
@@ -41,6 +131,8 @@ static bool s_animationTimerRunning = false;
 
 HWND WindowManager::s_mainWindow = nullptr;
 HWND WindowManager::s_skiaWindow = nullptr;
+HICON WindowManager::s_customIconSmall = nullptr;
+HICON WindowManager::s_customIconBig = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
 std::function<bool(int)> WindowManager::s_longClickCallback = nullptr;
 std::shared_ptr<setu::view::View> WindowManager::s_rootView = nullptr;

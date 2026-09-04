@@ -16,7 +16,7 @@
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             
-            <AutoSuggestBox PlaceholderText="Search apps" Width="240" HorizontalAlignment="Left" QueryIcon="Find" VerticalAlignment="Center" />
+            <AutoSuggestBox x:Name="SearchBox" TextChanged="SearchBox_TextChanged" PlaceholderText="Search apps" Width="240" HorizontalAlignment="Left" QueryIcon="Find" VerticalAlignment="Center" />
             
             <Button Grid.Column="1" VerticalAlignment="Center" Click="InstallApk_Click">
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -37,6 +37,16 @@
                               ToolTipService.ToolTip="{x:Bind Name}" 
                               Tag="{x:Bind}" 
                               Tapped="AppTile_Tapped">
+                            <Grid.ContextFlyout>
+                                <MenuFlyout Opening="AppTileMenu_Opening">
+                                    <MenuFlyoutItem Text="Launch" Click="AppTile_Launch" />
+                                    <MenuFlyoutItem Text="Force Stop" Click="AppTile_ForceStop" />
+                                    <MenuFlyoutItem Text="Show in Explorer" Click="AppTile_ShowExplorer" />
+                                    <MenuFlyoutItem Text="View Permissions" Click="AppTile_ViewPermissions" />
+                                    <MenuFlyoutSeparator />
+                                    <MenuFlyoutItem Text="Uninstall" Click="AppTile_Uninstall" Foreground="Red" />
+                                </MenuFlyout>
+                            </Grid.ContextFlyout>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
@@ -45,8 +55,12 @@
                             <Border Width="48" Height="48" CornerRadius="12" Background="{ThemeResource SystemControlBackgroundAccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Image Source="{x:Bind IconPath}" Stretch="Uniform" Width="48" Height="48" />
                             </Border>
+
+                            <Ellipse Width="10" Height="10" Fill="{ThemeResource SystemFillColorSuccessBrush}"
+                                     HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,-4,-4"
+                                     Visibility="{x:Bind BoolToVis(IsRunning), Mode=OneWay}" />
                             
-                            <TextBlock Grid.Row="1" Text="{x:Bind Name}" HorizontalAlignment="Center" Margin="0,8,0,0" FontSize="12" />
+                            <TextBlock Grid.Row="1" Text="{x:Bind Name}" HorizontalAlignment="Center" Margin="0,8,0,0" FontSize="12" TextTrimming="CharacterEllipsis" MaxLines="2" />
                         </Grid>
                     </DataTemplate>
                 </ItemsRepeater.ItemTemplate>

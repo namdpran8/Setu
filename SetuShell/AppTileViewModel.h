@@ -9,11 +9,22 @@ namespace winrt::SetuShell::implementation
         hstring Name() { return m_name; }
         hstring IconPath() { return m_iconPath; }
         hstring InstallPath() { return m_installPath; }
+
+        bool IsRunning() { return m_isRunning; }
+        void IsRunning(bool value);
+        
+        winrt::Microsoft::UI::Xaml::Visibility BoolToVis(bool value);
+
+        winrt::event_token PropertyChanged(winrt::Microsoft::UI::Xaml::Data::PropertyChangedEventHandler const& handler);
+        void PropertyChanged(winrt::event_token const& token) noexcept;
+
     private:
         hstring m_packageName;
         hstring m_name;
         hstring m_iconPath;
         hstring m_installPath;
+        bool m_isRunning = false;
+        winrt::event<winrt::Microsoft::UI::Xaml::Data::PropertyChangedEventHandler> m_propertyChanged;
     };
 }
 
