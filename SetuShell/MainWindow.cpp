@@ -24,13 +24,13 @@ namespace winrt::SetuShell::implementation
         
 
         this->Title(L"Setu");
-        // this->ExtendsContentIntoTitleBar(true);
+        this->ExtendsContentIntoTitleBar(true);
 
         auto windowNative = this->try_as<IWindowNative>();
         HWND hwnd = nullptr;
         if (windowNative) {
             windowNative->get_WindowHandle(&hwnd);
-            SetWindowPos(hwnd, nullptr, 0, 0, 1200, 800, SWP_NOMOVE | SWP_NOZORDER);
+            SetWindowPos(hwnd, nullptr, 0, 0, 1000, 600, SWP_NOMOVE | SWP_NOZORDER);
         }
 
         winrt::Microsoft::UI::Xaml::Media::MicaBackdrop backdrop;
