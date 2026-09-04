@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "../Rect.h"
+#include "../ColorFilter.h"
 
 namespace setu {
 namespace graphics {
@@ -91,6 +92,18 @@ public:
     virtual void setAlpha(int alpha) {}
     virtual int getAlpha() const { return 255; }
 
+    virtual void setColorFilter(ColorFilterPtr colorFilter) { mColorFilter = colorFilter; }
+    virtual void setTint(uint32_t tintColor) { mTint = tintColor; mHasTint = true; }
+    virtual void setTintMode(BlendMode tintMode) { mTintMode = tintMode; mHasTintMode = true; }
+
+    ColorFilterPtr getActiveColorFilter() const {
+        if (mColorFilter) return mColorFilter;
+        if (mHasTint) {
+            return std::make_shared<PorterDuffColorFilter>(mTint, mHasTintMode ? mTintMode : BlendMode::SRC_IN);
+        }
+        return nullptr;
+    }
+
     // True if the drawable's appearance depends on the owner's state (pressed,
     // enabled, ...). Owners only bother pushing state into stateful drawables.
     virtual bool isStateful() const { return false; }
@@ -146,6 +159,12 @@ protected:
     // Return true if the new state changes the drawable's appearance.
     virtual bool onStateChange(const std::vector<int>& stateSet) { return false; }
     virtual bool onLevelChange(int level) { return false; }
+
+    ColorFilterPtr mColorFilter;
+    uint32_t mTint = 0;
+    bool mHasTint = false;
+    BlendMode mTintMode = BlendMode::SRC_IN;
+    bool mHasTintMode = false;
 
 private:
     Rect mBounds;

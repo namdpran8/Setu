@@ -45,16 +45,20 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalOptions>%(AdditionalOptions) /Zc:templateScope-</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions) /Zc:templateScope- /utf-8</AdditionalOptions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>
-      <PreprocessorDefinitions>WIN32;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;_CRT_SECURE_NO_WARNINGS;_CRT_NONSTDC_NO_DEPRECATE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\src;$(ProjectDir)..\thirdparty;$(ProjectDir)..\thirdparty\androidfw;$(ProjectDir)..\thirdparty\androidfw\incfs_support\include;$(ProjectDir)..\thirdparty\include_compat;$(ProjectDir)..\thirdparty\libbase\include;$(ProjectDir)..\thirdparty\libziparchive\include;$(ProjectDir)..\thirdparty\miniz;$(ProjectDir)..\build\thirdparty\miniz;$(ProjectDir)..\thirdparty\androidfw_compat.h;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <ForcedIncludeFiles>$(ProjectDir)..\thirdparty\androidfw_compat.h</ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>shell32.lib;$(ProjectDir)..\build\thirdparty\androidfw\Debug\setu_androidfw.lib;$(ProjectDir)..\build\thirdparty\libbase\Debug\setu_libbase.lib;$(ProjectDir)..\build\thirdparty\zlib\Debug\setu_zlib.lib;$(ProjectDir)..\build\thirdparty\libziparchive\Debug\setu_libziparchive.lib;$(ProjectDir)..\build\thirdparty\miniz\Debug\miniz.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -99,6 +103,12 @@
       <DependentUpon>SettingsPage.xaml</DependentUpon>
     </ClCompile>
     <ClCompile Include="AppTileViewModel.cpp" />
+    <ClCompile Include="..\src\apk_extractor\ApkExtractor.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\src\utils\Logger.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
 
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
@@ -145,3 +155,4 @@
     </Page>
   </ItemGroup>
 </Project>
+<!-- Test -->

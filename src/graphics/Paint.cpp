@@ -17,10 +17,12 @@ namespace graphics {
 
 Paint::Paint()
     : mColor(0xFF000000), // Black, opaque
+      mAlpha(1.0f),
       mStyle(Style::FILL),
       mStrokeWidth(1.0f),
       mTextSize(12.0f),
-      mAntiAlias(true) {
+      mAntiAlias(true),
+      mColorFilter(nullptr) {
 }
 
 void Paint::setColor(uint32_t color) {
@@ -69,6 +71,22 @@ void Paint::setShader(ShaderPtr shader) {
 
 ShaderPtr Paint::getShader() const {
     return mShader;
+}
+
+void Paint::setAlpha(float alpha) {
+    mAlpha = alpha < 0.0f ? 0.0f : (alpha > 1.0f ? 1.0f : alpha);
+}
+
+float Paint::getAlpha() const {
+    return mAlpha;
+}
+
+void Paint::setColorFilter(ColorFilterPtr filter) {
+    mColorFilter = filter;
+}
+
+ColorFilterPtr Paint::getColorFilter() const {
+    return mColorFilter;
 }
 
 } // namespace graphics

@@ -17,6 +17,7 @@
 #include "include/core/SkPaint.h"
 #include "include/core/SkPathMeasure.h"
 #include "include/core/SkMatrix.h"
+#include "include/core/SkColorFilter.h"
 
 namespace setu {
 namespace graphics {
@@ -103,6 +104,20 @@ void VectorDrawable::drawPath(SkCanvas* canvas, const VPath& vpath) {
         float b = (vpath.fillColor & 0xFF) / 255.0f;
         paint.setColor4f({r, g, b, a});
         
+        if (auto cf = getActiveColorFilter()) {
+            if (cf->getType() == ColorFilterType::PORTER_DUFF) {
+                auto pdcf = std::static_pointer_cast<PorterDuffColorFilter>(cf);
+                SkBlendMode skBlendMode = SkBlendMode::kSrcIn;
+                switch(pdcf->getMode()) {
+                    case BlendMode::SRC_IN: skBlendMode = SkBlendMode::kSrcIn; break;
+                    case BlendMode::SRC_ATOP: skBlendMode = SkBlendMode::kSrcATop; break;
+                    case BlendMode::SRC_OVER: skBlendMode = SkBlendMode::kSrcOver; break;
+                    case BlendMode::MULTIPLY: skBlendMode = SkBlendMode::kMultiply; break;
+                }
+                paint.setColorFilter(SkColorFilters::Blend(pdcf->getColor(), skBlendMode));
+            }
+        }
+        
         canvas->drawPath(pathToDraw, paint);
     }
 
@@ -129,6 +144,20 @@ void VectorDrawable::drawPath(SkCanvas* canvas, const VPath& vpath) {
         float g = ((vpath.strokeColor >> 8) & 0xFF) / 255.0f;
         float b = (vpath.strokeColor & 0xFF) / 255.0f;
         paint.setColor4f({r, g, b, a});
+
+        if (auto cf = getActiveColorFilter()) {
+            if (cf->getType() == ColorFilterType::PORTER_DUFF) {
+                auto pdcf = std::static_pointer_cast<PorterDuffColorFilter>(cf);
+                SkBlendMode skBlendMode = SkBlendMode::kSrcIn;
+                switch(pdcf->getMode()) {
+                    case BlendMode::SRC_IN: skBlendMode = SkBlendMode::kSrcIn; break;
+                    case BlendMode::SRC_ATOP: skBlendMode = SkBlendMode::kSrcATop; break;
+                    case BlendMode::SRC_OVER: skBlendMode = SkBlendMode::kSrcOver; break;
+                    case BlendMode::MULTIPLY: skBlendMode = SkBlendMode::kMultiply; break;
+                }
+                paint.setColorFilter(SkColorFilters::Blend(pdcf->getColor(), skBlendMode));
+            }
+        }
 
         canvas->drawPath(pathToDraw, paint);
     }

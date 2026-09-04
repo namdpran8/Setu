@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include "Shader.h"
+#include "ColorFilter.h"
 
 namespace setu {
 namespace graphics {
@@ -32,6 +33,9 @@ public:
     void setColor(uint32_t color); // ARGB
     uint32_t getColor() const;
 
+    void setAlpha(float alpha);
+    float getAlpha() const;
+
     void setStyle(Style style);
     Style getStyle() const;
 
@@ -47,13 +51,18 @@ public:
     void setShader(ShaderPtr shader);
     ShaderPtr getShader() const;
 
+    void setColorFilter(ColorFilterPtr filter);
+    ColorFilterPtr getColorFilter() const;
+
 private:
     uint32_t mColor; // ARGB
+    float mAlpha;    // 0.0 to 1.0
     Style mStyle;
     float mStrokeWidth;
     float mTextSize;
     bool mAntiAlias;
     ShaderPtr mShader;
+    ColorFilterPtr mColorFilter;
 };
 
 } // namespace graphics

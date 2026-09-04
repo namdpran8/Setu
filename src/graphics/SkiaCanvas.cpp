@@ -20,6 +20,7 @@
 #include "include/core/SkPaint.h"
 #include "include/core/SkPath.h"
 #include "include/core/SkColor.h"
+#include "include/core/SkColorFilter.h"
 #include "include/core/SkRect.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkFont.h"
@@ -53,6 +54,7 @@ SkiaCanvas::~SkiaCanvas() {
 
 void SkiaCanvas::setupSkPaint(const Paint& paint, SkPaint* skPaint) {
     skPaint->setColor(paint.getColor());
+    skPaint->setAlphaf(paint.getAlpha());
     skPaint->setAntiAlias(paint.isAntiAlias());
     
     if (paint.getStyle() == Style::STROKE) {
@@ -64,6 +66,20 @@ void SkiaCanvas::setupSkPaint(const Paint& paint, SkPaint* skPaint) {
     }
     
     skPaint->setStrokeWidth(paint.getStrokeWidth());
+
+    if (auto cf = paint.getColorFilter()) {
+        if (cf->getType() == ColorFilterType::PORTER_DUFF) {
+            auto pdcf = std::static_pointer_cast<PorterDuffColorFilter>(cf);
+            SkBlendMode skBlendMode = SkBlendMode::kSrcIn;
+            switch(pdcf->getMode()) {
+                case BlendMode::SRC_IN: skBlendMode = SkBlendMode::kSrcIn; break;
+                case BlendMode::SRC_ATOP: skBlendMode = SkBlendMode::kSrcATop; break;
+                case BlendMode::SRC_OVER: skBlendMode = SkBlendMode::kSrcOver; break;
+                case BlendMode::MULTIPLY: skBlendMode = SkBlendMode::kMultiply; break;
+            }
+            skPaint->setColorFilter(SkColorFilters::Blend(pdcf->getColor(), skBlendMode));
+        }
+    }
 
     if (auto shader = paint.getShader()) {
         auto toSkTileMode = [](TileMode mode) {

@@ -271,6 +271,7 @@ void BitmapDrawable::draw(Canvas& canvas) {
     Paint paint;
     paint.setColor(((uint32_t)mAlpha << 24) | 0x00FFFFFFu);
     paint.setAntiAlias(mAntiAlias);
+    paint.setColorFilter(getActiveColorFilter());
 
     if (isTiled()) {
         drawTiled(canvas, paint);

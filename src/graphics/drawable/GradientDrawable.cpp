@@ -350,20 +350,17 @@ void GradientDrawable::draw(Canvas& canvas) {
     Paint fillPaint;
     fillPaint.setStyle(Style::FILL);
     if (mHasGradient) {
-        // When drawing a gradient, solid color acts as fallback/tint if we were doing tinting,
-        // but generally gradient overrides. We need to pass alpha down.
-        // Wait, applyAlpha on mShader's colors is hard since Shader holds colors, so we just
-        // rely on Canvas/Paint applying alpha? Direct2D doesn't automatically alpha the brush unless set.
-        // Since we don't have Paint alpha yet, we'll just ignore drawable alpha for gradients for now.
         fillPaint.setShader(mShader);
     } else {
         fillPaint.setColor(fillColor);
     }
+    fillPaint.setColorFilter(getActiveColorFilter());
 
     Paint strokePaint;
     strokePaint.setStyle(Style::STROKE);
     strokePaint.setColor(applyAlpha(mStrokeColor));
     strokePaint.setStrokeWidth(mStrokeWidth);
+    strokePaint.setColorFilter(getActiveColorFilter());
 
     switch (mShape) {
         case Shape::RECTANGLE: {

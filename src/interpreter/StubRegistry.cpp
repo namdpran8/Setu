@@ -794,6 +794,55 @@ void StubRegistry::registerViewStubs() {
             return false;
         };
         
+    stubs["Landroid/widget/ImageView;->setColorFilter(I)V"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+                InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+                auto* view = dynamic_cast<setu::widget::ImageView*>((setu::view::View*)viewObj->nativeHandle);
+                if (view && view->getDrawable()) {
+                    view->getDrawable()->setTint(args[1].i);
+                    view->getDrawable()->setTintMode(setu::graphics::BlendMode::SRC_ATOP);
+                }
+            }
+            return false;
+        };
+
+    stubs["Landroid/widget/ImageView;->setColorFilter(ILandroid/graphics/PorterDuff$Mode;)V"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 3 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+                InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+                auto* view = dynamic_cast<setu::widget::ImageView*>((setu::view::View*)viewObj->nativeHandle);
+                if (view && view->getDrawable()) {
+                    view->getDrawable()->setTint(args[1].i);
+                    view->getDrawable()->setTintMode(setu::graphics::BlendMode::SRC_ATOP);
+                }
+            }
+            return false;
+        };
+
+    stubs["Landroid/graphics/drawable/Drawable;->setTint(I)V"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+                InterpreterObject* drawableObj = (InterpreterObject*)args[0].obj;
+                auto* drawable = (setu::graphics::Drawable*)drawableObj->nativeHandle;
+                if (drawable) {
+                    drawable->setTint(args[1].i);
+                }
+            }
+            return false;
+        };
+
+    stubs["Landroid/graphics/drawable/Drawable;->setTintList(Landroid/content/res/ColorStateList;)V"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            return false;
+        };
+
+    stubs["Landroid/graphics/drawable/Drawable;->setTintMode(Landroid/graphics/PorterDuff$Mode;)V"] = 
+        [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+            // mode ignored for now in interpreter, could map it like in DrawableInflater
+            return false;
+        };
+
     stubs["Landroid/widget/TextView;->getText()Ljava/lang/CharSequence;"] = 
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
             if (args.size() >= 1 && args[0].type == ValueType::OBJECT && args[0].obj) {

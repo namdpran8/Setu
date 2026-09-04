@@ -332,6 +332,7 @@ void NinePatchDrawable::draw(Canvas& canvas) {
     // Only the alpha reaches the backend, per the contract on Canvas::drawBitmap.
     Paint paint;
     paint.setColor(((uint32_t)mAlpha << 24) | 0x00FFFFFFu);
+    paint.setColorFilter(getActiveColorFilter());
 
     const size_t numCols = mCols.size();
     const bool useColors = !mCellColors.empty() && mCellColors.size() == numCols * mRows.size();

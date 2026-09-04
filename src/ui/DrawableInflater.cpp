@@ -307,6 +307,17 @@ const char* phaseFor(const std::string& tag) {
     }
     return "not yet supported";
 }
+
+graphics::BlendMode parseTintMode(int value) {
+    switch (value) {
+        case 3: return graphics::BlendMode::SRC_OVER;
+        case 5: return graphics::BlendMode::SRC_IN;
+        case 9: return graphics::BlendMode::SRC_ATOP;
+        case 14: return graphics::BlendMode::MULTIPLY;
+        default: return graphics::BlendMode::SRC_IN;
+    }
+}
+
 } // namespace
 graphics::DrawablePtr DrawableInflater::inflate(ResourceManager* resManager, Theme* theme,
                                                uint32_t resId) {
@@ -793,6 +804,18 @@ graphics::DrawablePtr DrawableInflater::inflateVector(android::ResXMLParser* par
     
     inflateVectorGroup(parser, resManager, theme, vectorDrawable->getRootGroup().get());
     
+    if (attrs.has("tint")) {
+        uint32_t tint = 0;
+        if (readColor(attrs, "tint", tint)) {
+            vectorDrawable->setTint(tint);
+        } else if (auto csl = attrs.getColorStateList("tint")) {
+            vectorDrawable->setTint(csl->getColorForState({}, csl->getDefaultColor()));
+        }
+    }
+    if (attrs.has("tintMode")) {
+        vectorDrawable->setTintMode(parseTintMode(attrs.getInt("tintMode", 5)));
+    }
+
     return vectorDrawable;
 }
 
@@ -858,7 +881,16 @@ graphics::DrawablePtr DrawableInflater::inflateBitmap(android::ResXMLParser* par
     // android:dither is not mentioned: it means nothing at 32bpp, so silence is
     // honest. These three are different - each would change the pixels.
     if (hasTint) {
-        Logger::d(TAG, "<bitmap> android:tint ignored until a ColorFilter exists");
+        uint32_t tint = 0;
+        if (readColor(attrs, "tint", tint)) {
+            drawable->setTint(tint);
+        } else if (auto csl = attrs.getColorStateList("tint")) {
+            // Note: ColorStateList not fully wired for tint yet.
+            drawable->setTint(csl->getColorForState({}, csl->getDefaultColor()));
+        }
+        if (attrs.has("tintMode")) {
+            drawable->setTintMode(parseTintMode(attrs.getInt("tintMode", 5)));
+        }
     }
     if (hasMipMap) {
         Logger::d(TAG, "<bitmap> android:mipMap ignored; D2D picks its own sampling");
@@ -893,7 +925,15 @@ graphics::DrawablePtr DrawableInflater::inflateNinePatch(android::ResXMLParser* 
     }
     // android:dither omitted for the same reason as in <bitmap>.
     if (hasTint) {
-        Logger::d(TAG, "<nine-patch> android:tint ignored until a ColorFilter exists");
+        uint32_t tint = 0;
+        if (readColor(attrs, "tint", tint)) {
+            drawable->setTint(tint);
+        } else if (auto csl = attrs.getColorStateList("tint")) {
+            drawable->setTint(csl->getColorForState({}, csl->getDefaultColor()));
+        }
+        if (attrs.has("tintMode")) {
+            drawable->setTintMode(parseTintMode(attrs.getInt("tintMode", 5)));
+        }
     }
     if (hasAutoMirrored) {
         Logger::d(TAG, "<nine-patch> android:autoMirrored ignored; this runtime is LTR-only");
@@ -933,9 +973,21 @@ graphics::DrawablePtr DrawableInflater::inflateShape(android::ResXMLParser* pars
                 thickness == -1 ? attrs.getFloat("thicknessRatio", G::DEFAULT_THICKNESS_RATIO)
                                 : G::DEFAULT_THICKNESS_RATIO);
         }
-        // Still unread here: android:tint, and android:useLevel - which would make
+        // Still unread here: android:useLevel - which would make
         // a ring a partial arc driven by setLevel(). Without it a ring is always the
         // full annulus, which is what an unlevelled one draws anyway.
+        
+        if (attrs.has("tint")) {
+            uint32_t tint = 0;
+            if (readColor(attrs, "tint", tint)) {
+                shape->setTint(tint);
+            } else if (auto csl = attrs.getColorStateList("tint")) {
+                shape->setTint(csl->getColorForState({}, csl->getDefaultColor()));
+            }
+        }
+        if (attrs.has("tintMode")) {
+            shape->setTintMode(parseTintMode(attrs.getInt("tintMode", 5)));
+        }
     }
     // A <gradient> outranks a <solid> in AOSP regardless of which came first, so
     // its stand-in colour is held back and applied once the element is fully read.

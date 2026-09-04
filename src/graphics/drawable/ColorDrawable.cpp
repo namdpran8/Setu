@@ -49,6 +49,7 @@ void ColorDrawable::draw(Canvas& canvas) {
     Paint paint;
     paint.setColor(color);
     paint.setStyle(Style::FILL);
+    paint.setColorFilter(getActiveColorFilter());
     canvas.drawRect((float)b.left, (float)b.top, (float)b.right, (float)b.bottom, paint);
 }
 
