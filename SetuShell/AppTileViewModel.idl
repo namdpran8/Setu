@@ -3,9 +3,10 @@ namespace SetuShell
     [default_interface]
     runtimeclass AppTileViewModel
     {
-        AppTileViewModel(String packageName, String name, String iconPath);
+        AppTileViewModel(String packageName, String name, String iconPath, String installPath);
         String PackageName { get; };
         String Name { get; };
         String IconPath { get; };
+        String InstallPath { get; };
     }
 }

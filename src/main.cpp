@@ -188,10 +188,13 @@ int main(int argc, char* argv[]) {
 
     LaunchArgs launchArgs;
     std::string apkPath;
+    std::string appPath;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg.find("--package=") == 0) {
             launchArgs.package = arg.substr(10);
+        } else if (arg.find("--app-path=") == 0) {
+            appPath = arg.substr(11);
         } else if (arg.find("--log-level=") == 0) {
             launchArgs.logLevel = arg.substr(12);
         } else if (arg.find("--framework=") == 0) {
@@ -202,7 +205,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    if (apkPath.empty()) {
+    if (apkPath.empty() && appPath.empty()) {
         if (launchArgs.package.empty()) {
             OPENFILENAMEA ofn;
             char szFile[MAX_PATH] = { 0 };
@@ -242,17 +245,26 @@ int main(int argc, char* argv[]) {
         crashExit(99, launchArgs.package, "HAL9000 error");
     }
 
-    ApkExtractor extractor;
-    if (!extractor.OpenApk(apkPath)) {
-        Logger::e("Main", "Failed to open APK: " + apkPath);
-        crashExit(2, launchArgs.package, "Failed to open APK");
+    bool isDirectory = !appPath.empty();
+    std::string loadPath = isDirectory ? appPath : apkPath;
+    
+    setu::ResourceManager resManager;
+    if (!resManager.init(loadPath, isDirectory)) {
+        Logger::e("Main", "Failed to initialize ResourceManager for: " + loadPath);
+        crashExit(2, launchArgs.package, "Failed to initialize ResourceManager");
     }
-
-    Logger::i("Main", "Successfully opened APK.");
+    
+    Logger::i("Main", "Successfully initialized ResourceManager.");
     
     std::vector<uint8_t> axmlBuffer;
     std::string mainActivityClass = "";
-    if (extractor.ExtractEntryToMemory("AndroidManifest.xml", axmlBuffer)) {
+    
+    auto manifestAsset = resManager.getAssetManager()->OpenNonAsset("AndroidManifest.xml", android::Asset::ACCESS_BUFFER);
+    if (manifestAsset) {
+        axmlBuffer.assign(
+            (const uint8_t*)manifestAsset->getBuffer(true),
+            (const uint8_t*)manifestAsset->getBuffer(true) + manifestAsset->getLength());
+            
         android::ResXMLTree tree;
         if (tree.setTo(axmlBuffer.data(), axmlBuffer.size(), true) == android::NO_ERROR) {
             android::ResXMLParser parser(tree);
@@ -267,7 +279,7 @@ int main(int argc, char* argv[]) {
             Logger::e("Main", "Failed to parse AndroidManifest.xml");
         }
     } else {
-        Logger::e("Main", "Could not find AndroidManifest.xml in the APK!");
+        Logger::e("Main", "Could not find AndroidManifest.xml in the APK/Directory!");
     }
     
     if (mainActivityClass.empty()) {
@@ -281,11 +293,16 @@ int main(int argc, char* argv[]) {
     int dexIndex = 1;
     while (true) {
         std::string dexName = (dexIndex == 1) ? "classes.dex" : "classes" + std::to_string(dexIndex) + ".dex";
-        std::vector<uint8_t> dexBuffer;
         
-        if (!extractor.ExtractEntryToMemory(dexName, dexBuffer)) {
+        auto dexAsset = resManager.getAssetManager()->OpenNonAsset(dexName, android::Asset::ACCESS_BUFFER);
+        if (!dexAsset) {
             break; // No more DEX files
         }
+        
+        std::vector<uint8_t> dexBuffer;
+        dexBuffer.assign(
+            (const uint8_t*)dexAsset->getBuffer(true),
+            (const uint8_t*)dexAsset->getBuffer(true) + dexAsset->getLength());
         
         Logger::i("Main", "Loaded " + dexName);
         if (!multiDexManager.addDex(std::move(dexBuffer))) {
@@ -296,8 +313,8 @@ int main(int argc, char* argv[]) {
     }
     
     if (dexIndex == 1) {
-        Logger::e("Main", "No classes.dex found in the APK!");
-        crashExit(2, launchArgs.package, "No classes.dex found in the APK");
+        Logger::e("Main", "No classes.dex found in the APK/Directory!");
+        crashExit(2, launchArgs.package, "No classes.dex found in the APK/Directory");
     }
 
     // --- Phase 4: Window Manager Init ---
@@ -306,12 +323,6 @@ int main(int argc, char* argv[]) {
     }
 
     // --- Phase 5: Resource Management ---
-    setu::ResourceManager resManager(&extractor);
-    if (!resManager.init(apkPath)) {
-        Logger::e("Main", "Failed to initialize ResourceManager!");
-        // We'll let this pass, maybe just missing resources
-    }
-    
     std::string frameworkApkPath = launchArgs.frameworkApk;
     
     if (frameworkApkPath.empty()) {

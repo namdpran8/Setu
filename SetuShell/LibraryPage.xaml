@@ -34,7 +34,9 @@
                 <ItemsRepeater.ItemTemplate>
                     <DataTemplate x:DataType="local:AppTileViewModel">
                         <Grid Padding="12" CornerRadius="8" Background="Transparent" 
-                              ToolTipService.ToolTip="{x:Bind Name}">
+                              ToolTipService.ToolTip="{x:Bind Name}" 
+                              Tag="{x:Bind}" 
+                              Tapped="AppTile_Tapped">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />

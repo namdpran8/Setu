@@ -11,6 +11,7 @@ namespace winrt::SetuShell::implementation
         LibraryPage();
         winrt::Windows::Foundation::Collections::IObservableVector<SetuShell::AppTileViewModel> Apps();
         winrt::Windows::Foundation::IAsyncAction InstallApk_Click(winrt::Windows::Foundation::IInspectable const& sender, winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e);
+        void AppTile_Tapped(winrt::Windows::Foundation::IInspectable const& sender, winrt::Microsoft::UI::Xaml::Input::TappedRoutedEventArgs const& e);
     private:
         winrt::Windows::Foundation::Collections::IObservableVector<SetuShell::AppTileViewModel> m_apps;
         void LoadApps();

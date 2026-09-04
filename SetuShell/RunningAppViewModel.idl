@@ -1,0 +1,12 @@
+namespace SetuShell
+{
+    [default_interface]
+    runtimeclass RunningAppViewModel
+    {
+        RunningAppViewModel(String packageName, String name, String pidStr, String uptimeStr);
+        String PackageName { get; };
+        String Name { get; };
+        String PidStr { get; };
+        String UptimeStr { get; };
+    }
+}

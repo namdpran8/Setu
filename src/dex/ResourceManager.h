@@ -24,10 +24,10 @@ namespace setu {
 
 class ResourceManager {
 public:
-    ResourceManager(ApkExtractor* extractor);
+    ResourceManager();
     ~ResourceManager();
 
-    bool init(const std::string& apkPath);
+    bool init(const std::string& path, bool isDirectory = false);
     bool loadFrameworkApk(const std::string& path);
 
     android::AssetManager2* getAssetManager() { return m_assetManager.get(); }
@@ -60,7 +60,6 @@ public:
     bool resolveValue(android::AssetManager2::SelectedValue& in_out_value, class Theme* theme = nullptr);
 
 private:
-    ApkExtractor* m_extractor; // Main app extractor
     std::vector<android::AssetManager2::ApkAssetsPtr> m_apkAssets;
     std::unique_ptr<android::AssetManager2> m_assetManager;
 };

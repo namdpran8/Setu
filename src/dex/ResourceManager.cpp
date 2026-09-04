@@ -18,10 +18,11 @@
 #include "../ui/Theme.h"
 #include "../ui/XmlAttrs.h"
 
+#include "androidfw/AssetsProvider.h"
+
 namespace setu {
 
-ResourceManager::ResourceManager(ApkExtractor* extractor) 
-    : m_extractor(extractor) {
+ResourceManager::ResourceManager() {
 }
 
 ResourceManager::~ResourceManager() {
@@ -39,10 +40,18 @@ bool ResourceManager::resolveValue(android::AssetManager2::SelectedValue& in_out
     }
 }
 
-bool ResourceManager::init(const std::string& apkPath) {
-    auto apkAssets = android::ApkAssets::Load(apkPath);
+bool ResourceManager::init(const std::string& path, bool isDirectory) {
+    android::AssetManager2::ApkAssetsPtr apkAssets;
+    
+    if (isDirectory) {
+        auto provider = android::DirectoryAssetsProvider::Create(path);
+        apkAssets = android::ApkAssets::Load(std::move(provider));
+    } else {
+        apkAssets = android::ApkAssets::Load(path);
+    }
+    
     if (!apkAssets) {
-        Logger::e("ResourceManager", "Failed to load ApkAssets for: " + apkPath);
+        Logger::e("ResourceManager", "Failed to load ApkAssets for: " + path);
         return false;
     }
     

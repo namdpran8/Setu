@@ -7,6 +7,7 @@
 #include <winrt/Windows.Storage.Pickers.h>
 #include <winrt/Windows.Storage.h>
 #include <winrt/Windows.Data.Json.h>
+#include "ProcessManager.h"
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Microsoft.UI.Interop.h>
 #include <shobjidl_core.h> // IInitializeWithWindow
@@ -60,9 +61,12 @@ namespace winrt::SetuShell::implementation
                         hstring displayName = json.GetNamedString(L"display_name");
                         hstring iconPath = json.GetNamedString(L"icon_path");
                         
-                        std::wstring absoluteIconPath = entry.path().wstring() + L"\\" + iconPath.c_str();
+                        hstring installPath = json.GetNamedString(L"install_path");
                         
-                        m_apps.Append(winrt::make<AppTileViewModel>(pkgName, displayName, winrt::hstring(absoluteIconPath.c_str())));
+                        std::wstring absoluteIconPath = entry.path().wstring() + L"\\" + iconPath.c_str();
+                        std::wstring absoluteInstallPath = entry.path().wstring() + L"\\" + installPath.c_str();
+                        
+                        m_apps.Append(winrt::make<AppTileViewModel>(pkgName, displayName, winrt::hstring(absoluteIconPath.c_str()), winrt::hstring(absoluteInstallPath.c_str())));
                     } catch (...) {
                         // ignore broken manifests
                     }
@@ -88,6 +92,8 @@ namespace winrt::SetuShell::implementation
         winrt::Windows::Foundation::IInspectable const& sender, 
         winrt::Microsoft::UI::Xaml::RoutedEventArgs const& e)
     {
+        winrt::apartment_context ui_thread; // Capture the UI thread context
+
         auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker();
         picker.ViewMode(winrt::Windows::Storage::Pickers::PickerViewMode::Thumbnail);
         picker.SuggestedStartLocation(winrt::Windows::Storage::Pickers::PickerLocationId::ComputerFolder);
@@ -104,6 +110,9 @@ namespace winrt::SetuShell::implementation
         }
 
         std::string apkPath = winrt::to_string(file.Path());
+
+        // Move off the UI thread for heavy processing
+        co_await winrt::resume_background();
 
         // Prepare local app data folder
         std::wstring appsDirPath;
@@ -306,15 +315,14 @@ namespace winrt::SetuShell::implementation
                 Logger::i("InstallPipeline", "Icon decode failed or absent, using placeholder.");
                 // Create a 1x1 transparent PNG as a placeholder
                 std::vector<uint8_t> placeholder = {
-                    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, // Signature
-                    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, // IHDR header
-                    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, // 1x1
-                    0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, // 8-bit RGBA
-                    0x00, 0x00, 0x00, 0x0B, 0x49, 0x44, 0x41, 0x54, // IDAT header
-                    0x08, 0xD7, 0x63, 0x60, 0x00, 0x02, 0x00, 0x00, // IDAT chunk
-                    0x05, 0x00, 0x01, 0xE2, 0x26, 0x05, 0x9B, 0x00, // IDAT chunk
-                    0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, // IEND header
-                    0x42, 0x60, 0x82                                // IEND chunk
+                    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+                    0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+                    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+                    0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89,
+                    0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54,
+                    0x78, 0xDA, 0x63, 0x64, 0x60, 0x60, 0x60, 0x00, 0x00, 0x00, 0x05, 0x00, 0x01,
+                    0x25, 0x14, 0x01, 0xA2,
+                    0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82
                 };
                 std::ofstream ofs(iconDest, std::ios::binary);
                 ofs.write(reinterpret_cast<const char*>(placeholder.data()), placeholder.size());
@@ -378,6 +386,8 @@ namespace winrt::SetuShell::implementation
             }
 
             Logger::i("InstallPipeline", "Successfully installed " + packageName);
+            
+            co_await ui_thread;
             LoadApps();
 
         } catch (const std::exception& ex) {
@@ -388,5 +398,17 @@ namespace winrt::SetuShell::implementation
         }
 
         co_return;
+    }
+
+    void LibraryPage::AppTile_Tapped(
+        winrt::Windows::Foundation::IInspectable const& sender, 
+        winrt::Microsoft::UI::Xaml::Input::TappedRoutedEventArgs const& e)
+    {
+        auto grid = sender.as<winrt::Microsoft::UI::Xaml::Controls::Grid>();
+        auto viewModel = grid.Tag().as<SetuShell::AppTileViewModel>();
+        
+        if (viewModel) {
+            ProcessManager::Get().LaunchApp(viewModel.PackageName().c_str(), viewModel.InstallPath().c_str());
+        }
     }
 }
