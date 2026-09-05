@@ -78,6 +78,26 @@ void crashExit(int code, const std::string& package, const std::string& message)
     exit(code);
 }
 
+std::string getApkResourcesBasePath(const std::string& executablePathStr) {
+    if (!executablePathStr.empty()) {
+        std::filesystem::path exePath(executablePathStr);
+        std::filesystem::path dir1 = exePath.parent_path() / "apkresources";
+        if (std::filesystem::exists(dir1)) return dir1.string();
+        
+        std::filesystem::path dir2 = exePath.parent_path().parent_path() / "apkresources";
+        if (std::filesystem::exists(dir2)) return dir2.string();
+        
+        std::filesystem::path dir3 = exePath.parent_path().parent_path().parent_path() / "apkresources";
+        if (std::filesystem::exists(dir3)) return dir3.string();
+    }
+    
+    // Fallbacks relative to CWD
+    if (std::filesystem::exists("apkresources")) return "apkresources";
+    if (std::filesystem::exists("..\\apkresources")) return "..\\apkresources";
+    
+    return "apkresources"; // Last resort fallback
+}
+
 std::string resolveMainActivity(android::ResXMLParser* parser) {
     if (!parser) return "";
     
@@ -253,7 +273,14 @@ int main(int argc, char* argv[]) {
     
     // --- Phase 0: Framework DEX Loading ---
     MultiDexManager multiDexManager;
-    size_t frameworkClassesLoaded = multiDexManager.loadDexFilesFromDirectory("apkresources/framework_stub/", true);
+    std::string exePathStr(executablePath, executablePathLength);
+    std::string resourcesBase = getApkResourcesBasePath(exePathStr);
+    std::filesystem::path frameworkStubPath = std::filesystem::path(resourcesBase) / "framework_stub";
+    
+    size_t frameworkClassesLoaded = multiDexManager.loadDexFilesFromDirectory(frameworkStubPath.string(), true);
+    if (frameworkClassesLoaded == 0) {
+        crashExit(1, launchArgs.package, "FATAL: Framework stub DEX directory missing or empty: " + frameworkStubPath.string());
+    }
     Logger::i("Main", "Loaded " + std::to_string(frameworkClassesLoaded) + " framework classes from framework_stub_dex");
     
     setu::ResourceManager resManager;
@@ -337,27 +364,15 @@ int main(int argc, char* argv[]) {
     std::string frameworkApkPath = launchArgs.frameworkApk;
     
     if (frameworkApkPath.empty()) {
-        std::vector<std::string> searchPaths = {
-            "apkresources\\framework-res.apk",
-            "framework-res.apk",
-            "..\\apkresources\\framework-res.apk"
-        };
+        std::filesystem::path resourceBase = getApkResourcesBasePath(exePathStr);
+        frameworkApkPath = (resourceBase / "framework-res.apk").string();
         
-        if (executablePathLength > 0 && executablePathLength < MAX_PATH) {
-            std::filesystem::path exePath(std::string(executablePath, executablePathLength));
-            searchPaths.insert(searchPaths.begin(), (exePath.parent_path() / "framework-res.apk").string());
-            searchPaths.insert(searchPaths.begin(), (exePath.parent_path() / "apkresources" / "framework-res.apk").string());
-        }
-
-        for (const auto& path : searchPaths) {
-            if (std::filesystem::exists(path)) {
-                frameworkApkPath = path;
-                break;
+        if (!std::filesystem::exists(frameworkApkPath)) {
+            // Check adjacent fallback in case they put it next to the executable
+            std::filesystem::path adjacentExe = std::filesystem::path(exePathStr).parent_path() / "framework-res.apk";
+            if (std::filesystem::exists(adjacentExe)) {
+                frameworkApkPath = adjacentExe.string();
             }
-        }
-        
-        if (frameworkApkPath.empty()) {
-            frameworkApkPath = "apkresources\\framework-res.apk"; // Fallback
         }
     }
 
