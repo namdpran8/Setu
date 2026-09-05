@@ -1103,19 +1103,9 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                             executedBytecode = true;
                             break;
                         }
-                        
-                        // If not stubbed, check bytecode
+                        // If not stubbed, check bytecode if it's NOT a framework class
                         auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(currentSig);
-                        if (!bcResult.bytecode.empty() && bcDex) {
-                            if (bcDex->isFramework()) {
-                                // Skip executing throw-stubs from framework-origin DEX files.
-                                // We silently return null for un-stubbed framework methods instead of crashing.
-                                Logger::d("Interpreter", "Skipping framework throw-stub bytecode for: " + currentSig);
-                                executedBytecode = true;
-                                state.methodReturnVal = Value::MakeNull();
-                                break;
-                            }
-                            
+                        if (!bcResult.bytecode.empty() && bcDex && !bcDex->isFramework()) {
                             static thread_local int callDepth = 0;
                             if (callDepth > 16) {
                                 Logger::e("Interpreter", "FATAL: Stack overflow! Looping method: " + currentSig);
@@ -1200,14 +1190,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                         }
                         
                         auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(currentSig);
-                        if (!bcResult.bytecode.empty() && bcDex) {
-                            if (bcDex->isFramework()) {
-                                Logger::d("Interpreter", "Skipping framework throw-stub bytecode for: " + currentSig);
-                                executedBytecode = true;
-                                state.methodReturnVal = Value::MakeNull();
-                                break;
-                            }
-                            
+                        if (!bcResult.bytecode.empty() && bcDex && !bcDex->isFramework()) {
                             static thread_local int callDepth = 0;
                             if (callDepth > 16) {
                                 state.methodReturnVal = Value::MakeNull();
