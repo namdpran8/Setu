@@ -148,6 +148,8 @@ public:
     // The next getD2DBitmap re-uploads instead of handing back a stale texture.
     void notifyPixelsChanged() { ++mGeneration; }
 
+    uint32_t getGeneration() const { return mGeneration; }
+
     // The cached device bitmap for this render target, created on first use and
     // re-uploaded when the pixels have changed since the last upload. Keyed per
     // target because an ID2D1Bitmap belongs to the target that created it and

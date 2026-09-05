@@ -15,6 +15,9 @@
 #include "Bitmap.h"
 #include "../utils/Logger.h"
 
+#include <map>
+#include <memory>
+
 #include "include/core/SkCanvas.h"
 #include "include/core/SkSurface.h"
 #include "include/core/SkPaint.h"
@@ -269,11 +272,37 @@ void SkiaCanvas::drawPath(const Path& path, const Paint& paint) {
 
 void SkiaCanvas::drawBitmap(const Bitmap& bitmap, const RectF& src, const RectF& dst, const Paint& paint) {
     if (!mCanvas) return;
+    static std::map<std::weak_ptr<Bitmap>, std::pair<uint32_t, sk_sp<SkImage>>, std::owner_less<std::weak_ptr<Bitmap>>> s_imageCache;
     
-    // Convert setu::graphics::Bitmap to SkImage
-    SkImageInfo info = SkImageInfo::MakeN32Premul(bitmap.getWidth(), bitmap.getHeight());
-    SkPixmap pixmap(info, bitmap.getPixels(), bitmap.getRowBytes());
-    sk_sp<SkImage> image = SkImages::RasterFromPixmapCopy(pixmap);
+    // Purge dead weak_ptrs occasionally to prevent memory leaks in the map
+    static int s_drawCount = 0;
+    if (++s_drawCount > 100) {
+        s_drawCount = 0;
+        for (auto it = s_imageCache.begin(); it != s_imageCache.end(); ) {
+            if (it->first.expired()) {
+                it = s_imageCache.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    std::shared_ptr<Bitmap> sharedBmp = const_cast<Bitmap&>(bitmap).shared_from_this();
+    std::weak_ptr<Bitmap> weakBmp = sharedBmp;
+    uint32_t currentGen = bitmap.getGeneration();
+    
+    sk_sp<SkImage> image;
+    auto it = s_imageCache.find(weakBmp);
+    if (it != s_imageCache.end() && it->second.first == currentGen) {
+        image = it->second.second;
+    } else {
+        SkImageInfo info = SkImageInfo::MakeN32Premul(bitmap.getWidth(), bitmap.getHeight());
+        SkPixmap pixmap(info, bitmap.getPixels(), bitmap.getRowBytes());
+        image = SkImages::RasterFromPixmapCopy(pixmap);
+        if (image) {
+            s_imageCache[weakBmp] = std::make_pair(currentGen, image);
+        }
+    }
     
     if (!image) return;
 
@@ -307,26 +336,43 @@ void SkiaCanvas::blitToD2D(ID2D1DeviceContext* d2dContext) {
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED)
         );
 
-        Microsoft::WRL::ComPtr<ID2D1Bitmap> d2dBitmap;
-        HRESULT hr = d2dContext->CreateBitmap(
-            D2D1::SizeU(pixmap.width(), pixmap.height()),
-            pixmap.addr(),
-            pixmap.rowBytes(),
-            properties,
-            &d2dBitmap
-        );
+        static Microsoft::WRL::ComPtr<ID2D1Bitmap> s_blitBitmap;
+        static D2D1_SIZE_U s_blitSize = {0, 0};
+        static ID2D1DeviceContext* s_lastContext = nullptr;
 
-        if (SUCCEEDED(hr)) {
-            d2dContext->DrawBitmap(
-                d2dBitmap.Get(),
-                D2D1::RectF(0, 0, (float)mWidth, (float)mHeight),
-                1.0f,
-                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                nullptr
+        D2D1_SIZE_U currentSize = D2D1::SizeU(pixmap.width(), pixmap.height());
+        
+        if (s_lastContext != d2dContext || s_blitSize.width != currentSize.width || s_blitSize.height != currentSize.height || !s_blitBitmap) {
+            HRESULT hr = d2dContext->CreateBitmap(
+                currentSize,
+                pixmap.addr(),
+                pixmap.rowBytes(),
+                properties,
+                &s_blitBitmap
             );
+            if (SUCCEEDED(hr)) {
+                s_blitSize = currentSize;
+                s_lastContext = d2dContext;
+            } else {
+                Logger::e("SkiaCanvas", "Failed to create D2D bitmap for blit");
+                return;
+            }
         } else {
-            Logger::e("SkiaCanvas", "Failed to create D2D bitmap for blit");
+            D2D1_RECT_U destRect = D2D1::RectU(0, 0, currentSize.width, currentSize.height);
+            HRESULT hr = s_blitBitmap->CopyFromMemory(&destRect, pixmap.addr(), pixmap.rowBytes());
+            if (FAILED(hr)) {
+                Logger::e("SkiaCanvas", "Failed to update D2D bitmap for blit");
+                return;
+            }
         }
+
+        d2dContext->DrawBitmap(
+            s_blitBitmap.Get(),
+            D2D1::RectF(0, 0, (float)mWidth, (float)mHeight),
+            1.0f,
+            D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
+            nullptr
+        );
     }
 }
 
