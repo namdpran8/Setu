@@ -113,6 +113,10 @@ public:
 
     bool parse(const std::vector<uint8_t>& dexBuffer);
 
+    void setFramework(bool isFramework) { m_isFramework = isFramework; }
+    bool isFramework() const { return m_isFramework; }
+    uint32_t getClassCount() const { return m_classDefsSize; }
+
     // Look up a method's full signature by its ID (e.g. "com.pranshu.test1.MainActivity -> setContentView")
     std::string getMethodSignature(uint32_t methodIdx) const;
     
@@ -164,4 +168,6 @@ private:
     // Helper to read Android's custom variable-length integers
     uint32_t readUnsignedLeb128(const uint8_t** pStream) const;
     Value readEncodedValue(const uint8_t** pStream) const;
+    
+    bool m_isFramework = false;
 };

@@ -13,6 +13,8 @@
 #include "androidfw/Util.h"
 #include "LayoutInflater.h"
 #include "../utils/Logger.h"
+#include "../interpreter/Interpreter.h"
+#include "../interpreter/Value.h"
 #include "../widget/Button.h"
 #include "../widget/ImageView.h"
 #include "../widget/ImageButton.h"
@@ -26,6 +28,7 @@
 #include "../view/GridLayout.h"
 #include "androidfw/ResourceUtils.h"
 #include "WindowManager.h"
+#include "../dex/MultiDexManager.h"
 #include <string>
 #include <cwchar>
 #include "TypedArray.h"
@@ -43,24 +46,19 @@ static std::wstring utf8_to_utf16(const std::string& utf8) {
     return wstrTo;
 }
 
-std::shared_ptr<setu::view::View> LayoutInflater::inflate(android::ResXMLParser* parser, ResourceManager* resManager, Theme* theme) {
+std::shared_ptr<setu::view::View> LayoutInflater::inflate(android::ResXMLParser* parser, ResourceManager* resManager, MultiDexManager* dexManager, Theme* theme) {
     if (!parser) return nullptr;
 
     android::ResXMLParser::event_code_t event;
     while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT && event != android::ResXMLParser::END_DOCUMENT) {
         if (event == android::ResXMLParser::START_TAG) {
-            return inflateRecursive(parser, nullptr, resManager, theme);
+            return inflateRecursive(parser, nullptr, resManager, dexManager, theme);
         }
     }
     return nullptr;
 }
 
-std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResXMLParser* parser, std::shared_ptr<setu::view::ViewGroup> parent, ResourceManager* resManager, Theme* theme) {
-    size_t tagLen;
-    const char16_t* tag16 = parser->getElementName(&tagLen);
-    if (!tag16) return nullptr;
-    
-    std::string tag = android::util::Utf16ToUtf8(android::StringPiece16(tag16, tagLen));
+std::shared_ptr<setu::view::View> LayoutInflater::createViewByTag(const std::string& tag, android::ResXMLParser* parser, ResourceManager* resManager, Theme* theme) {
     std::shared_ptr<setu::view::View> view = nullptr;
 
     if (tag == "ConstraintLayout" || tag == "androidx.constraintlayout.widget.ConstraintLayout") {
@@ -150,7 +148,19 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         view = ll;
     } else if (tag == "com.sothree.slidinguppanel.SlidingUpPanelLayout" || tag == "SlidingUpPanelLayout") {
         view = std::make_shared<setu::view::OverlayPanelLayout>();
-    } else if (tag == "include") {
+    }
+    return view;
+}
+
+std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResXMLParser* parser, std::shared_ptr<setu::view::ViewGroup> parent, ResourceManager* resManager, MultiDexManager* dexManager, Theme* theme) {
+    size_t tagLen;
+    const char16_t* tag16 = parser->getElementName(&tagLen);
+    if (!tag16) return nullptr;
+    
+    std::string tag = android::util::Utf16ToUtf8(android::StringPiece16(tag16, tagLen));
+    std::shared_ptr<setu::view::View> view = nullptr;
+
+    if (tag == "include") {
         uint32_t layoutResId = 0;
         for (size_t i = 0; i < parser->getAttributeCount(); i++) {
             size_t nameLen;
@@ -167,7 +177,7 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
             auto includedParser = resManager->openXml(layoutResId);
             if (includedParser) {
                 // Inflate returns the root view of the included layout
-                view = inflate(includedParser.get(), resManager, theme);
+                view = inflate(includedParser.get(), resManager, dexManager, theme);
             } else {
                 Logger::w("LayoutInflater", "include tag failed to open layout resource.");
             }
@@ -175,8 +185,84 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
             Logger::w("LayoutInflater", "include tag missing 'layout' attribute or resManager is null.");
         }
     } else {
-        Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", using FrameLayout fallback");
-        view = std::make_shared<setu::view::FrameLayout>();
+        view = createViewByTag(tag, parser, resManager, theme);
+        
+        if (!view) {
+            if (dexManager) {
+                std::string currentClass = tag;
+                if (currentClass.find('.') != std::string::npos) {
+                    for (char& c : currentClass) {
+                        if (c == '.') c = '/';
+                    }
+                    currentClass = "L" + currentClass + ";";
+                } else {
+                    currentClass = "Landroid/widget/" + currentClass + ";";
+                }
+                
+                std::string originalClass = currentClass;
+                
+                int iterations = 0;
+                while (iterations < 50) {
+                    iterations++;
+                    std::string superDescriptor = dexManager->getSuperClass(currentClass);
+                    if (superDescriptor.empty()) {
+                        break;
+                    }
+                    
+                    std::string superTag = superDescriptor;
+                    if (superTag.length() > 2 && superTag.front() == 'L' && superTag.back() == ';') {
+                        superTag = superTag.substr(1, superTag.length() - 2);
+                        for (char& c : superTag) {
+                            if (c == '/') c = '.';
+                        }
+                    }
+                    
+                    view = createViewByTag(superTag, parser, resManager, theme);
+                    if (view) {
+                        Logger::i("LayoutInflater", "Resolved custom view " + tag + " to known ancestor " + superTag);
+                        
+                        std::string initSig2 = originalClass + "-><init>(Landroid/content/Context;Landroid/util/AttributeSet;)V";
+                        auto [initBc, initDex] = dexManager->getMethodBytecode(initSig2);
+                        
+                        if (initBc.bytecode.empty()) {
+                            std::string initSig3 = originalClass + "-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V";
+                            auto res3 = dexManager->getMethodBytecode(initSig3);
+                            initBc = res3.first;
+                            initDex = res3.second;
+                        }
+                        
+                        if (!initBc.bytecode.empty() && initDex) {
+                            Logger::i("LayoutInflater", "Executing custom view constructor for " + originalClass);
+                            InterpreterObject* viewObj = new InterpreterObject();
+                            viewObj->className = originalClass;
+                            viewObj->nativeHandle = view.get();
+                            
+                            std::vector<Value> initArgs;
+                            initArgs.push_back(Value::MakeObject(viewObj));
+                            for (size_t i = 1; i < initBc.ins_size; i++) {
+                                if (i == 3) {
+                                    initArgs.push_back(Value::MakeInt(0));
+                                } else {
+                                    initArgs.push_back(Value::MakeNull());
+                                }
+                            }
+                            
+                            Interpreter vm;
+                            vm.executeMethod(initBc.bytecode, initDex, dexManager, initArgs, initBc.registers_size, initBc.ins_size);
+                        }
+                        
+                        break;
+                    }
+                    
+                    currentClass = superDescriptor;
+                }
+            }
+            
+            if (!view) {
+                Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", completely unresolved. Using FrameLayout fallback.");
+                view = std::make_shared<setu::view::FrameLayout>();
+            }
+        }
     }
     
     if (view && !tag.empty() && tag != "include") {
@@ -207,7 +293,7 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
     android::ResXMLParser::event_code_t event;
     while ((event = parser->next()) != android::ResXMLParser::BAD_DOCUMENT && event != android::ResXMLParser::END_DOCUMENT) {
         if (event == android::ResXMLParser::START_TAG) {
-            auto childView = inflateRecursive(parser, viewGroup, resManager, theme);
+            auto childView = inflateRecursive(parser, viewGroup, resManager, dexManager, theme);
             if (childView && viewGroup) {
                 viewGroup->addView(childView);
             }

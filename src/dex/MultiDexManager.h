@@ -24,7 +24,10 @@ public:
     ~MultiDexManager();
 
     // Extract, store, and parse a DEX file buffer
-    bool addDex(std::vector<uint8_t> dexBuffer);
+    bool addDex(std::vector<uint8_t> dexBuffer, bool isFramework = false);
+
+    // Load all .dex files from a given directory
+    size_t loadDexFilesFromDirectory(const std::string& directoryPath, bool isFramework = false);
 
     // Global lookup for a static field by name
     Value getStaticFieldValue(const std::string& className, const std::string& fieldName) const;

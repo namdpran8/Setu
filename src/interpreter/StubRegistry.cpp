@@ -159,6 +159,18 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
     if (it != stubs.end()) {
         return it->second(state, args, outReturn);
     } else {
+        // android.graphics.Color
+        if (methodSignature == "Landroid/graphics/Color;->rgb(III)I") {
+            if (args.size() >= 3 && args[0].type == ValueType::INT && args[1].type == ValueType::INT && args[2].type == ValueType::INT) {
+                int r = args[0].i;
+                int g = args[1].i;
+                int b = args[2].i;
+                int argb = 0xFF000000 | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
+                if (outReturn) *outReturn = Value::MakeInt(argb);
+            }
+            return false;
+        }
+
         // Intent and Context methods
         if (methodSignature == "Landroid/content/Intent;-><init>(Landroid/content/Context;Ljava/lang/Class;)V") {
             Logger::i("StubRegistry", "Executed: Intent.<init>(Context, Class)");
@@ -272,7 +284,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                         GetClientRect(WindowManager::getMainWindow(), &rect);
                         int pW = rect.right > 0 ? rect.right : 400;
                         int pH = rect.bottom > 0 ? rect.bottom : 800;
-                        auto rootView = setu::LayoutInflater::inflate(&parser, m_resManager);
+                        auto rootView = setu::LayoutInflater::inflate(&parser, m_resManager, m_multiDexManager);
                         WindowManager::setRootView(rootView);
                     }
                 }
@@ -896,7 +908,7 @@ void StubRegistry::registerViewStubs() {
                         GetClientRect(WindowManager::getMainWindow(), &rect);
                         int pW = rect.right > 0 ? rect.right : 400;
                         int pH = rect.bottom > 0 ? rect.bottom : 800;
-                        auto rootView = setu::LayoutInflater::inflate(&parser, m_resManager);
+                        auto rootView = setu::LayoutInflater::inflate(&parser, m_resManager, m_multiDexManager);
                         WindowManager::setRootView(rootView);
                         
                         InterpreterObject* viewObj = new InterpreterObject();
@@ -967,6 +979,17 @@ void StubRegistry::registerViewStubs() {
     stubs["Landroid/view/View;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V"] = setOnLongClickListenerStub;
     stubs["Landroid/widget/Button;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V"] = setOnLongClickListenerStub;
     stubs["Landroid/widget/TextView;->setOnLongClickListener(Landroid/view/View$OnLongClickListener;)V"] = setOnLongClickListenerStub;
+
+    stubs["Landroid/view/View;->setBackgroundColor(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+            setu::view::View* view = (setu::view::View*)((InterpreterObject*)args[0].obj)->nativeHandle;
+            if (view) {
+                view->setBackgroundColor(args[1].i);
+                Logger::d("StubRegistry", "[STUB] Executed: View.setBackgroundColor(" + std::to_string(args[1].i) + ")");
+            }
+        }
+        return false;
+    };
 
     auto emptyStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         Logger::e("StubRegistry", "FATAL: Unimplemented empty stub called!");

@@ -1069,41 +1069,76 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
 
                 std::string methodSig = currentDex ? currentDex->getMethodSignature(methodIdx) : std::to_string(methodIdx);
                 
-                // 1. Try to find the bytecode in the DEX file
+                // 1. Try to find the method in the hierarchy
                 size_t arrowPos = methodSig.find("->");
                 size_t parenPos = methodSig.find('(');
                 bool executedBytecode = false;
                 
                 if (arrowPos != std::string::npos && parenPos != std::string::npos && multiDexManager != nullptr) {
-                    if (StubRegistry::isStubbed(methodSig)) {
-                        bool exceptionThrown = StubRegistry::invoke(methodSig, &state, args, &state.methodReturnVal);
-                        if (exceptionThrown) {
-                            Logger::e("Interpreter", "Exception thrown in native stub!");
-                            return Value::MakeNull(); // Halt
+                    std::string methodNameAndProto = methodSig.substr(arrowPos + 2);
+                    std::string currentClass = methodSig.substr(0, arrowPos);
+                    
+                    // For virtual and interface calls, start from the receiver object's actual class if available
+                    bool isVirtual = (opcode == 0x6E || opcode == 0x72 || opcode == 0x74 || opcode == 0x78);
+                    if (isVirtual && args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                        std::string objClass = static_cast<InterpreterObject*>(args[0].obj)->className;
+                        if (!objClass.empty()) {
+                            currentClass = objClass;
                         }
-                        executedBytecode = true;
-                    } else {
-                        auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(methodSig);
+                    }
+                    
+                    int iterations = 0;
+                    while (!currentClass.empty() && iterations < 50) {
+                        Logger::d("Interpreter", "Hierarchy walk visiting: " + currentClass);
+                        iterations++;
+                        std::string currentSig = currentClass + "->" + methodNameAndProto;
+                        
+                        // Check StubRegistry::isStubbed FIRST at every level of the walk
+                        if (StubRegistry::isStubbed(currentSig)) {
+                            bool exceptionThrown = StubRegistry::invoke(currentSig, &state, args, &state.methodReturnVal);
+                            if (exceptionThrown) {
+                                Logger::e("Interpreter", "Exception thrown in native stub!");
+                                return Value::MakeNull(); // Halt
+                            }
+                            executedBytecode = true;
+                            break;
+                        }
+                        
+                        // If not stubbed, check bytecode
+                        auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(currentSig);
                         if (!bcResult.bytecode.empty() && bcDex) {
+                            if (bcDex->isFramework()) {
+                                // Skip executing throw-stubs from framework-origin DEX files.
+                                // We silently return null for un-stubbed framework methods instead of crashing.
+                                Logger::d("Interpreter", "Skipping framework throw-stub bytecode for: " + currentSig);
+                                executedBytecode = true;
+                                state.methodReturnVal = Value::MakeNull();
+                                break;
+                            }
+                            
                             static thread_local int callDepth = 0;
                             if (callDepth > 16) {
-                                Logger::e("Interpreter", "FATAL: Stack overflow! Looping method: " + methodSig);
+                                Logger::e("Interpreter", "FATAL: Stack overflow! Looping method: " + currentSig);
                                 state.methodReturnVal = Value::MakeNull();
                             } else {
-                                Logger::d("Interpreter", "Executing DEX bytecode for: " + methodSig);
+                                Logger::d("Interpreter", "Executing DEX bytecode for: " + currentSig);
                                 callDepth++;
                                 Interpreter nestedVm;
                                 state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, bcDex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
                                 callDepth--;
                             }
                             executedBytecode = true;
+                            break;
                         }
+                        
+                        // Move up the hierarchy
+                        currentClass = multiDexManager->getSuperClass(currentClass);
                     }
                 }
                 
-                // 2. If not found in DEX, dispatch to native stub
+                // 2. If not found in DEX or stubbed hierarchy, dispatch to original methodSig as fallback
                 if (!executedBytecode) {
-                    Logger::d("Interpreter", "Dispatching to stub: " + methodSig);
+                    Logger::d("Interpreter", "Dispatching to stub (fallback): " + methodSig);
                     bool exceptionThrown = StubRegistry::invoke(methodSig, &state, args, &state.methodReturnVal);
                     if (exceptionThrown) {
                         Logger::e("Interpreter", "Exception thrown in native stub!");
@@ -1141,13 +1176,38 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 bool executedBytecode = false;
                 
                 if (arrowPos != std::string::npos && parenPos != std::string::npos && multiDexManager != nullptr) {
-                    if (StubRegistry::isStubbed(methodSig)) {
-                        bool exceptionThrown = StubRegistry::invoke(methodSig, &state, args, &state.methodReturnVal);
-                        if (exceptionThrown) return Value::MakeNull();
-                        executedBytecode = true;
-                    } else {
-                        auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(methodSig);
+                    std::string methodNameAndProto = methodSig.substr(arrowPos + 2);
+                    std::string currentClass = methodSig.substr(0, arrowPos);
+                    
+                    if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                        std::string objClass = static_cast<InterpreterObject*>(args[0].obj)->className;
+                        if (!objClass.empty()) {
+                            currentClass = objClass;
+                        }
+                    }
+                    
+                    int iterations = 0;
+                    while (!currentClass.empty() && iterations < 50) {
+                        Logger::d("Interpreter", "Hierarchy walk visiting: " + currentClass);
+                        iterations++;
+                        std::string currentSig = currentClass + "->" + methodNameAndProto;
+                        
+                        if (StubRegistry::isStubbed(currentSig)) {
+                            bool exceptionThrown = StubRegistry::invoke(currentSig, &state, args, &state.methodReturnVal);
+                            if (exceptionThrown) return Value::MakeNull();
+                            executedBytecode = true;
+                            break;
+                        }
+                        
+                        auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(currentSig);
                         if (!bcResult.bytecode.empty() && bcDex) {
+                            if (bcDex->isFramework()) {
+                                Logger::d("Interpreter", "Skipping framework throw-stub bytecode for: " + currentSig);
+                                executedBytecode = true;
+                                state.methodReturnVal = Value::MakeNull();
+                                break;
+                            }
+                            
                             static thread_local int callDepth = 0;
                             if (callDepth > 16) {
                                 state.methodReturnVal = Value::MakeNull();
@@ -1158,9 +1218,13 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                                 callDepth--;
                             }
                             executedBytecode = true;
+                            break;
                         }
+                        
+                        currentClass = multiDexManager->getSuperClass(currentClass);
                     }
                 }
+                
                 if (!executedBytecode) {
                     StubRegistry::invoke(methodSig, &state, args, &state.methodReturnVal);
                 }

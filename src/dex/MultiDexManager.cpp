@@ -19,16 +19,51 @@ MultiDexManager::MultiDexManager() {
 MultiDexManager::~MultiDexManager() {
 }
 
-bool MultiDexManager::addDex(std::vector<uint8_t> dexBuffer) {
+#include <filesystem>
+#include <fstream>
+
+bool MultiDexManager::addDex(std::vector<uint8_t> dexBuffer, bool isFramework) {
     auto bufferPtr = std::make_unique<std::vector<uint8_t>>(std::move(dexBuffer));
     auto parser = std::make_unique<DexParser>();
     
     if (parser->parse(*bufferPtr)) {
+        parser->setFramework(isFramework);
         m_dexFiles.push_back(std::move(parser));
         m_buffers.push_back(std::move(bufferPtr));
         return true;
     }
     return false;
+}
+
+size_t MultiDexManager::loadDexFilesFromDirectory(const std::string& directoryPath, bool isFramework) {
+    size_t classesLoaded = 0;
+    std::error_code ec;
+    if (!std::filesystem::exists(directoryPath, ec) || !std::filesystem::is_directory(directoryPath, ec)) {
+        Logger::w("MultiDexManager", "Directory not found or not a directory: " + directoryPath);
+        return 0;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(directoryPath, ec)) {
+        if (entry.is_regular_file(ec) && entry.path().extension() == ".dex") {
+            std::ifstream file(entry.path(), std::ios::binary | std::ios::ate);
+            if (!file.is_open()) {
+                Logger::e("MultiDexManager", "Failed to open dex file: " + entry.path().string());
+                continue;
+            }
+            std::streamsize size = file.tellg();
+            file.seekg(0, std::ios::beg);
+            std::vector<uint8_t> buffer(size);
+            if (file.read(reinterpret_cast<char*>(buffer.data()), size)) {
+                if (addDex(std::move(buffer), isFramework)) {
+                    classesLoaded += m_dexFiles.back()->getClassCount();
+                    Logger::i("MultiDexManager", "Loaded framework DEX: " + entry.path().filename().string());
+                } else {
+                    Logger::e("MultiDexManager", "Failed to parse DEX: " + entry.path().filename().string());
+                }
+            }
+        }
+    }
+    return classesLoaded;
 }
 
 Value MultiDexManager::getStaticFieldValue(const std::string& className, const std::string& fieldName) const {
@@ -104,44 +139,10 @@ std::string MultiDexManager::getSuperClass(const std::string& className) const {
 }
 
 bool MultiDexManager::isInstanceOf(const std::string& actualClass, const std::string& expectedClass) const {
-    if (actualClass == expectedClass) return true;
-    if (expectedClass == "Ljava/lang/Object;") return true;
-
-    // Hardcoded overrides for stubbed framework (similar to what was in check-cast)
-    if (actualClass.find("Activity") != std::string::npos && expectedClass.find("Context") != std::string::npos) return true;
-    if (expectedClass == "Ljava/lang/CharSequence;" && actualClass == "java.lang.String") return true;
-
-    // Walk the merged hierarchy
     std::string currentClass = actualClass;
     while (!currentClass.empty()) {
         if (currentClass == expectedClass) return true;
-        
-        // Custom framework short-circuits (fallback if missing from DEX)
-        if (currentClass.find("Activity") != std::string::npos && expectedClass.find("Context") != std::string::npos) return true;
-        if (currentClass.find("TextView") != std::string::npos && expectedClass.find("View") != std::string::npos) return true;
-        if (currentClass.find("EditText") != std::string::npos && expectedClass.find("TextView") != std::string::npos) return true;
-        if (currentClass.find("Button") != std::string::npos && expectedClass.find("View") != std::string::npos) return true;
-
         currentClass = getSuperClass(currentClass);
     }
-    
-    // Reverse check for UI stubs: if actualClass is a stubbed generic view, and expectedClass is a custom view in DEX that inherits from it
-    if (actualClass == "Landroid/view/ViewGroup;" || actualClass == "Landroid/view/View;" || actualClass == "Landroid/widget/FrameLayout;") {
-        currentClass = expectedClass;
-        while (!currentClass.empty()) {
-            if (currentClass == actualClass || currentClass == "Landroid/view/View;") return true;
-            currentClass = getSuperClass(currentClass);
-        }
-    }
-    
-    // Also, if the expected class is a generic View and actual is a ViewGroup variant not explicitly checked
-    if (expectedClass.find("android/view/") != std::string::npos || 
-        expectedClass.find("android/widget/") != std::string::npos ||
-        expectedClass.find("androidx/") != std::string::npos ||
-        expectedClass.find("com/google/android/material/") != std::string::npos) {
-        // Fallback for our UI stubbing, if the above walk didn't catch it
-        return true; 
-    }
-    
     return false;
 }

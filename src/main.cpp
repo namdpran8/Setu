@@ -251,6 +251,11 @@ int main(int argc, char* argv[]) {
     bool isDirectory = !appPath.empty();
     std::string loadPath = isDirectory ? appPath : apkPath;
     
+    // --- Phase 0: Framework DEX Loading ---
+    MultiDexManager multiDexManager;
+    size_t frameworkClassesLoaded = multiDexManager.loadDexFilesFromDirectory("apkresources/framework_stub/", true);
+    Logger::i("Main", "Loaded " + std::to_string(frameworkClassesLoaded) + " framework classes from framework_stub_dex");
+    
     setu::ResourceManager resManager;
     if (!resManager.init(loadPath, isDirectory)) {
         Logger::e("Main", "Failed to initialize ResourceManager for: " + loadPath);
@@ -290,8 +295,7 @@ int main(int argc, char* argv[]) {
         mainActivityClass = "Lcom/pranshu/test1/MainActivity;";
     }
 
-    // --- Phase 4: Multi-DEX Extraction ---
-    MultiDexManager multiDexManager;
+    // --- Phase 4: App Multi-DEX Extraction ---
     
     int dexIndex = 1;
     while (true) {
