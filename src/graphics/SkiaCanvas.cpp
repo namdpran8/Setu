@@ -34,6 +34,9 @@
 
 #include <windows.h>
 #include <wrl/client.h>
+#include <map>
+#include <tuple>
+#include <string>
 
 namespace setu {
 namespace graphics {
@@ -177,9 +180,31 @@ void SkiaCanvas::drawText(const std::wstring& text, float x, float y, const Pain
     SkPaint skPaint;
     setupSkPaint(paint, &skPaint);
     
-    // Set up a default typeface so text actually renders on Windows
-    sk_sp<SkFontMgr> fontMgr = SkFontMgr_New_DirectWrite();
-    sk_sp<SkTypeface> typeface = fontMgr ? fontMgr->matchFamilyStyle("Segoe UI", SkFontStyle::Normal()) : nullptr;
+    struct FontStyleCompare {
+        bool operator()(const std::pair<std::string, SkFontStyle>& a, const std::pair<std::string, SkFontStyle>& b) const {
+            if (a.first != b.first) return a.first < b.first;
+            if (a.second.weight() != b.second.weight()) return a.second.weight() < b.second.weight();
+            if (a.second.width() != b.second.width()) return a.second.width() < b.second.width();
+            return a.second.slant() < b.second.slant();
+        }
+    };
+    
+    static std::map<std::pair<std::string, SkFontStyle>, sk_sp<SkTypeface>, FontStyleCompare> typefaceCache;
+    static sk_sp<SkFontMgr> fontMgr = SkFontMgr_New_DirectWrite();
+    
+    std::string familyName = "Segoe UI";
+    SkFontStyle fontStyle = SkFontStyle::Normal();
+    auto key = std::make_pair(familyName, fontStyle);
+    
+    sk_sp<SkTypeface> typeface;
+    auto it = typefaceCache.find(key);
+    if (it != typefaceCache.end()) {
+        typeface = it->second;
+    } else {
+        typeface = fontMgr ? fontMgr->matchFamilyStyle(familyName.c_str(), fontStyle) : nullptr;
+        typefaceCache[key] = typeface;
+    }
+    
     SkFont font(typeface, paint.getTextSize());
     
     // Convert wstring to string (UTF-8) for Skia

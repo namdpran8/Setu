@@ -88,10 +88,6 @@ void WindowManager::setWindowIcon(const std::string& iconPath) {
             SendMessage(s_mainWindow, WM_SETICON, ICON_BIG, (LPARAM)s_customIconBig);
             SendMessage(s_mainWindow, WM_SETICON, ICON_SMALL, (LPARAM)s_customIconSmall);
         }
-        if (s_skiaWindow) {
-            SendMessage(s_skiaWindow, WM_SETICON, ICON_BIG, (LPARAM)s_customIconBig);
-            SendMessage(s_skiaWindow, WM_SETICON, ICON_SMALL, (LPARAM)s_customIconSmall);
-        }
     } else {
         Logger::w("WindowManager", "CreateIconIndirect failed.");
     }
@@ -114,7 +110,6 @@ void WindowManager::cleanupIcon() {
 static const int KONAMI_CODE[] = {VK_UP, VK_UP, VK_DOWN, VK_DOWN, VK_LEFT, VK_RIGHT, VK_LEFT, VK_RIGHT, 'B', 'A'};
 static int s_konamiIndex = 0;
 static bool s_showBsod = false;
-static int s_renderMode = 1; // 0 = D2D, 1 = Skia, 2 = Side-by-Side
 
 // Timer IDs. The ten-minute idle "ghost touch" already owned 1, and SetTimer
 // replaces rather than adds when an ID repeats, so the animation clock needs its
@@ -130,7 +125,6 @@ static const UINT TIMER_ANIMATION_INTERVAL_MS = 16;
 static bool s_animationTimerRunning = false;
 
 HWND WindowManager::s_mainWindow = nullptr;
-HWND WindowManager::s_skiaWindow = nullptr;
 HICON WindowManager::s_customIconSmall = nullptr;
 HICON WindowManager::s_customIconBig = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
@@ -159,8 +153,6 @@ Microsoft::WRL::ComPtr<ID3D11Device> WindowManager::s_d3dDevice;
 Microsoft::WRL::ComPtr<ID3D11DeviceContext> WindowManager::s_d3dContext;
 Microsoft::WRL::ComPtr<IDXGISwapChain1> WindowManager::s_swapChain;
 Microsoft::WRL::ComPtr<ID2D1Bitmap1> WindowManager::s_d2dTargetBitmap;
-Microsoft::WRL::ComPtr<IDXGISwapChain1> WindowManager::s_skiaSwapChain;
-Microsoft::WRL::ComPtr<ID2D1Bitmap1> WindowManager::s_skiaTargetBitmap;
 Microsoft::WRL::ComPtr<ID2D1Factory1> WindowManager::s_d2dFactory;
 Microsoft::WRL::ComPtr<ID2D1Device> WindowManager::s_d2dDevice;
 Microsoft::WRL::ComPtr<ID2D1DeviceContext> WindowManager::s_d2dContext;
@@ -278,15 +270,7 @@ bool WindowManager::initDirect2D() {
     );
     if (FAILED(hr)) return false;
 
-    hr = dxgiFactory->CreateSwapChainForHwnd(
-        s_d3dDevice.Get(),
-        s_skiaWindow,
-        &swapChainDesc,
-        nullptr,
-        nullptr,
-        &s_skiaSwapChain
-    );
-    if (FAILED(hr)) return false;
+    // No skia swap chain creation
 
     // 4. Create Direct2D Factory & Device Context
     D2D1_FACTORY_OPTIONS options;
@@ -313,12 +297,6 @@ bool WindowManager::initDirect2D() {
     hr = s_d2dContext->CreateBitmapFromDxgiSurface(dxgiBackBuffer1.Get(), &bitmapProperties, &s_d2dTargetBitmap);
     if (FAILED(hr)) return false;
 
-    Microsoft::WRL::ComPtr<IDXGISurface> dxgiBackBuffer2;
-    hr = s_skiaSwapChain->GetBuffer(0, IID_PPV_ARGS(&dxgiBackBuffer2));
-    if (FAILED(hr)) return false;
-    hr = s_d2dContext->CreateBitmapFromDxgiSurface(dxgiBackBuffer2.Get(), &bitmapProperties, &s_skiaTargetBitmap);
-    if (FAILED(hr)) return false;
-
     // 6. Create DirectWrite Factory
     hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), (IUnknown**)&s_dWriteFactory);
     if (FAILED(hr)) return false;
@@ -335,9 +313,6 @@ bool WindowManager::initDirect2D() {
     setu::view::View::setInvalidateHandler([]() {
         if (s_mainWindow) {
             InvalidateRect(s_mainWindow, nullptr, FALSE);
-        }
-        if (s_skiaWindow) {
-            InvalidateRect(s_skiaWindow, nullptr, FALSE);
         }
     });
 
@@ -452,15 +427,6 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                 } else if (wParam == VK_F9) {
                     MessageBoxA(hwnd, "You found the hidden Setu Easter Egg!\n\nDalvik says hello from the grave... \xE2\x98\xA0\xEF\xB8\x8F", "Secret Discovered!", MB_OK | MB_ICONINFORMATION);
                     Logger::i("EasterEgg", "User pressed F9! Pshhh...");
-                } else if (wParam == VK_F11) {
-                    s_renderMode = (s_renderMode + 1) % 3;
-                    std::string modeStr;
-                    if (s_renderMode == 0) modeStr = "Direct2D";
-                    else if (s_renderMode == 1) modeStr = "Skia";
-                    else modeStr = "Side-by-Side (D2D | Skia)";
-                    
-                    Logger::i("WindowManager", "Render mode switched to: " + modeStr);
-                    InvalidateRect(hwnd, nullptr, TRUE);
                 }
                 setu::view::KeyEvent event(setu::view::KeyEvent::Action::DOWN, (int)wParam, 0);
                 if (s_rootView->dispatchKeyEvent(event)) {
@@ -485,7 +451,7 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             GetClientRect(hwnd, &rect);
             if (s_showBsod) {
                 if (s_d2dContext) {
-                    s_d2dContext->SetTarget(hwnd == s_mainWindow ? s_d2dTargetBitmap.Get() : s_skiaTargetBitmap.Get());
+                    s_d2dContext->SetTarget(s_d2dTargetBitmap.Get());
                     s_d2dContext->BeginDraw();
                     s_d2dContext->Clear(D2D1::ColorF(0.0f, 0.0f, 0.7f)); // Blue background
                     
@@ -510,21 +476,11 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     }
                     
                     s_d2dContext->EndDraw();
-                    if (hwnd == s_mainWindow) s_swapChain->Present(1, 0);
-                    else s_skiaSwapChain->Present(1, 0);
+                    s_swapChain->Present(1, 0);
                 }
             } else if (s_rootView) {
                 if (hwnd == s_mainWindow) {
                     s_d2dContext->SetTarget(s_d2dTargetBitmap.Get());
-                    s_d2dContext->BeginDraw();
-                    
-                    setu::graphics::Direct2DCanvas canvas(s_d2dContext.Get(), s_dWriteFactory.Get());
-                    setu::view::Choreographer::getInstance().doFrame(s_rootView, canvas, rect.right, rect.bottom);
-                    
-                    s_d2dContext->EndDraw();
-                    s_swapChain->Present(1, 0);
-                } else if (hwnd == s_skiaWindow) {
-                    s_d2dContext->SetTarget(s_skiaTargetBitmap.Get());
                     s_d2dContext->BeginDraw();
                     
                     setu::graphics::SkiaCanvas canvas(rect.right, rect.bottom);
@@ -532,7 +488,7 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     canvas.blitToD2D(s_d2dContext.Get());
                     
                     s_d2dContext->EndDraw();
-                    s_skiaSwapChain->Present(1, 0);
+                    s_swapChain->Present(1, 0);
                 }
             }
             EndPaint(hwnd, &ps);
@@ -588,7 +544,7 @@ bool WindowManager::init() {
     s_mainWindow = CreateWindowEx(
         0,
         "SetuMainWindow",
-        "Setu Runtime - Direct2D",
+        "Setu Runtime",
         WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT,
         540, 1170, // Average modern phone aspect ratio
@@ -598,20 +554,7 @@ bool WindowManager::init() {
         nullptr
     );
     
-    s_skiaWindow = CreateWindowEx(
-        0,
-        "SetuMainWindow",
-        "Setu Runtime - Skia",
-        WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME & ~WS_MAXIMIZEBOX,
-        CW_USEDEFAULT, CW_USEDEFAULT,
-        540, 1170, // Average modern phone aspect ratio
-        nullptr,
-        nullptr,
-        hInstance,
-        nullptr
-    );
-    
-    if (!s_mainWindow || !s_skiaWindow) {
+    if (!s_mainWindow) {
         Logger::e("WindowManager", "Failed to create main window!");
         return false;
     }
@@ -623,25 +566,21 @@ bool WindowManager::init() {
     
     SetTimer(s_mainWindow, TIMER_IDLE_GHOST, 600000, nullptr); // 10 minute idle timer
 
-    // Position them nicely on screen
+    // Position it nicely on screen
     int screenWidth = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
     
     int windowWidth = 540;
     int windowHeight = 1170;
     
-    int startX = (screenWidth - (windowWidth * 2)) / 2;
+    int startX = (screenWidth - windowWidth) / 2;
     int startY = (screenHeight - windowHeight) / 2;
     if (startY < 0) startY = 0;
     
     SetWindowPos(s_mainWindow, nullptr, startX, startY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-    SetWindowPos(s_skiaWindow, nullptr, startX + windowWidth, startY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 
     ShowWindow(s_mainWindow, SW_SHOW);
     UpdateWindow(s_mainWindow);
-    
-    ShowWindow(s_skiaWindow, SW_SHOW);
-    UpdateWindow(s_skiaWindow);
     
     Logger::i("WindowManager", "Initialized main window and Direct2D successfully.");
     return true;
