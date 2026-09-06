@@ -158,17 +158,108 @@ std::string DexParser::getTypeString(uint32_t typeIdx) const {
     return "";
 }
 
-std::string DexParser::getSuperClass(const std::string& className) const {
-    if (!m_classDefs || !m_typeIds) return "";
+const class_def_item* DexParser::findClass(const std::string& className) const {
+    if (!m_classDefs || !m_typeIds) return nullptr;
     for (uint32_t i = 0; i < m_classDefsSize; ++i) {
         const class_def_item& classDef = m_classDefs[i];
         std::string currentClassName = m_strings[m_typeIds[classDef.class_idx].descriptor_idx];
         if (currentClassName == className) {
-            if (classDef.superclass_idx == 0xFFFFFFFF) return ""; // NO_INDEX
-            return m_strings[m_typeIds[classDef.superclass_idx].descriptor_idx];
+            return &classDef;
         }
     }
-    return "";
+    return nullptr;
+}
+
+std::string DexParser::getSuperClass(const std::string& className) const {
+    const class_def_item* classDef = findClass(className);
+    return classDef ? getSuperClass(classDef) : "";
+}
+
+std::string DexParser::getSuperClass(const class_def_item* classDef) const {
+    if (!classDef) return "";
+    if (classDef->superclass_idx == 0xFFFFFFFF) return ""; // NO_INDEX
+    return m_strings[m_typeIds[classDef->superclass_idx].descriptor_idx];
+}
+
+DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const class_def_item* classDef, const std::string& methodSignature) const {
+    if (!classDef || !m_dexBufferStart) return {};
+
+    if (classDef->class_data_off == 0) {
+        // Logger::w("DexParser", "Class has no class_data_item (marker interface?)");
+        return {};
+    }
+
+    const uint8_t* ptr = m_dexBufferStart + classDef->class_data_off;
+    
+    // Read lengths
+    uint32_t staticFieldsSize = readUnsignedLeb128(&ptr);
+    uint32_t instanceFieldsSize = readUnsignedLeb128(&ptr);
+    uint32_t directMethodsSize = readUnsignedLeb128(&ptr);
+    uint32_t virtualMethodsSize = readUnsignedLeb128(&ptr);
+
+    // Skip static fields
+    for (uint32_t f = 0; f < staticFieldsSize; ++f) {
+        readUnsignedLeb128(&ptr); // field_idx_diff
+        readUnsignedLeb128(&ptr); // access_flags
+    }
+
+    // Skip instance fields
+    for (uint32_t f = 0; f < instanceFieldsSize; ++f) {
+        readUnsignedLeb128(&ptr);
+        readUnsignedLeb128(&ptr);
+    }
+
+    // Helper lambda to search a method list
+    auto searchMethodList = [&](uint32_t methodCount) -> DexParser::MethodBytecodeResult {
+        uint32_t methodIdx = 0; // Reset prev_method_idx to 0 for each new list!
+        for (uint32_t m = 0; m < methodCount; ++m) {
+            uint32_t methodIdxDiff = readUnsignedLeb128(&ptr);
+            uint32_t accessFlags = readUnsignedLeb128(&ptr);
+            uint32_t codeOff = readUnsignedLeb128(&ptr);
+
+            methodIdx += methodIdxDiff; // Add diff to running total
+
+            std::string currentMethodSig = getMethodSignature(methodIdx);
+            if (currentMethodSig == methodSignature) {
+                // Found the method!
+                if (codeOff == 0) {
+                    Logger::w("DexParser", "Method " + methodSignature + " has code_off == 0 (abstract or native)");
+                    return {};
+                }
+                
+                const uint8_t* codeItemPtr = m_dexBufferStart + codeOff;
+                const code_item_header* codeHeader = reinterpret_cast<const code_item_header*>(codeItemPtr);
+                
+                // The insns array starts exactly 16 bytes after the start of the code_item
+                const uint16_t* insnsPtr = reinterpret_cast<const uint16_t*>(codeItemPtr + 16);
+                
+                // insns_size is in 16-bit code units, so multiply by 2 for bytes
+                uint32_t bytecodeBytes = codeHeader->insns_size * 2;
+                
+                std::vector<uint8_t> bytecode;
+                bytecode.reserve(bytecodeBytes);
+                const uint8_t* rawInsns = reinterpret_cast<const uint8_t*>(insnsPtr);
+                for (uint32_t b = 0; b < bytecodeBytes; ++b) {
+                    bytecode.push_back(rawInsns[b]);
+                }
+                
+                Logger::i("DexParser", "Dynamically extracted " + std::to_string(bytecodeBytes) + " bytes of bytecode for " + methodSignature);
+                return {bytecode, codeHeader->registers_size, codeHeader->ins_size};
+            }
+        }
+        return {}; // Not found in this list
+    };
+
+    // Search direct methods first
+    DexParser::MethodBytecodeResult result = searchMethodList(directMethodsSize);
+    if (!result.bytecode.empty()) return result;
+
+    // Search virtual methods second
+    result = searchMethodList(virtualMethodsSize);
+    if (!result.bytecode.empty()) return result;
+
+    Logger::w("DexParser", "Method " + methodSignature + " not found in class");
+    return {};
 }
 
 DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& methodSignature) const {
@@ -176,103 +267,12 @@ DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const std::string& 
     if (arrowPos == std::string::npos) return {};
     
     std::string className = methodSignature.substr(0, arrowPos);
-    if (!m_classDefs || !m_dexBufferStart) {
-        return {};
+    const class_def_item* classDef = findClass(className);
+    
+    if (classDef) {
+        return getMethodBytecode(classDef, methodSignature);
     }
 
-    for (uint32_t i = 0; i < m_classDefsSize; ++i) {
-        const class_def_item& classDef = m_classDefs[i];
-        
-        // Match class name
-        uint32_t typeStringIdx = m_typeIds[classDef.class_idx].descriptor_idx;
-        std::string currentClassName = m_strings[typeStringIdx];
-        if (currentClassName != className) {
-            continue;
-        }
-
-        // Found the class!
-        if (classDef.class_data_off == 0) {
-            Logger::w("DexParser", "Class " + className + " has no class_data_item (marker interface?)");
-            return {};
-        }
-
-        const uint8_t* ptr = m_dexBufferStart + classDef.class_data_off;
-        
-        // Read lengths
-        uint32_t staticFieldsSize = readUnsignedLeb128(&ptr);
-        uint32_t instanceFieldsSize = readUnsignedLeb128(&ptr);
-        uint32_t directMethodsSize = readUnsignedLeb128(&ptr);
-        uint32_t virtualMethodsSize = readUnsignedLeb128(&ptr);
-
-        // Skip static fields
-        for (uint32_t f = 0; f < staticFieldsSize; ++f) {
-            readUnsignedLeb128(&ptr); // field_idx_diff
-            readUnsignedLeb128(&ptr); // access_flags
-        }
-
-        // Skip instance fields
-        for (uint32_t f = 0; f < instanceFieldsSize; ++f) {
-            readUnsignedLeb128(&ptr);
-            readUnsignedLeb128(&ptr);
-        }
-
-        // Helper lambda to search a method list
-        auto searchMethodList = [&](uint32_t methodCount) -> DexParser::MethodBytecodeResult {
-            uint32_t methodIdx = 0; // Reset prev_method_idx to 0 for each new list!
-            for (uint32_t m = 0; m < methodCount; ++m) {
-                uint32_t methodIdxDiff = readUnsignedLeb128(&ptr);
-                uint32_t accessFlags = readUnsignedLeb128(&ptr);
-                uint32_t codeOff = readUnsignedLeb128(&ptr);
-
-                methodIdx += methodIdxDiff; // Add diff to running total
-
-                std::string currentMethodSig = getMethodSignature(methodIdx);
-                if (currentMethodSig == methodSignature) {
-                    // Found the method!
-                    if (codeOff == 0) {
-                        Logger::w("DexParser", "Method " + methodSignature + " has code_off == 0 (abstract or native)");
-                        return {};
-                    }
-					// What are you doing here? You are trying to read the code_item structure from the DEX file. The code_item structure starts with a header that contains the number of registers, ins, outs, tries, and the size of the instructions. After the header, there is an array of 16-bit instructions (insns). You need to read the code_item structure and extract the bytecode. Dont know what is written in this comment as it written by AI , not me.
-                    const uint8_t* codeItemPtr = m_dexBufferStart + codeOff;
-                    const code_item_header* codeHeader = reinterpret_cast<const code_item_header*>(codeItemPtr);
-                    
-                    // The insns array starts exactly 16 bytes after the start of the code_item
-                    const uint16_t* insnsPtr = reinterpret_cast<const uint16_t*>(codeItemPtr + 16);
-                    
-                    // insns_size is in 16-bit code units, so multiply by 2 for bytes
-                    uint32_t bytecodeBytes = codeHeader->insns_size * 2;
-                    
-                    std::vector<uint8_t> bytecode;
-                    bytecode.reserve(bytecodeBytes);
-                    const uint8_t* rawInsns = reinterpret_cast<const uint8_t*>(insnsPtr);
-                    for (uint32_t b = 0; b < bytecodeBytes; ++b) {
-                        bytecode.push_back(rawInsns[b]);
-                    }
-                    
-                    Logger::i("DexParser", "Dynamically extracted " + std::to_string(bytecodeBytes) + " bytes of bytecode for " + methodSignature);
-                    return {bytecode, codeHeader->registers_size, codeHeader->ins_size};
-                }
-            }
-            return {}; // Not found in this list
-        };
-
-        // Search direct methods first
-        DexParser::MethodBytecodeResult result = searchMethodList(directMethodsSize);
-        if (!result.bytecode.empty()) return result;
-
-        // Search virtual methods second
-        result = searchMethodList(virtualMethodsSize);
-        if (!result.bytecode.empty()) return result;
-
-        Logger::w("DexParser", "Method " + methodSignature + " not found in class " + className);
-        return {};
-    }
-
-    // Suppress warnings for standard Android and Java classes
-    if (className.find("Ljava/") != 0 && className.find("Landroid/") != 0 && className.find("Ldalvik/") != 0) {
-        Logger::w("DexParser", "Class " + className + " not found in DEX.");
-    }
     return {};
 }
 

@@ -128,12 +128,17 @@ public:
 
     // Dynamically extracts the Dalvik bytecode for a specific method signature
     MethodBytecodeResult getMethodBytecode(const std::string& methodSignature) const;
+    MethodBytecodeResult getMethodBytecode(const class_def_item* classDef, const std::string& methodSignature) const;
+
+    // Find class definition
+    const class_def_item* findClass(const std::string& className) const;
 
     // Get type string by type_idx
     std::string getTypeString(uint32_t typeIdx) const;
     
     // Get superclass of a given class
     std::string getSuperClass(const std::string& className) const;
+    std::string getSuperClass(const class_def_item* classDef) const;
 
     // Get string by string_idx
     std::string getString(uint32_t stringIdx) const {

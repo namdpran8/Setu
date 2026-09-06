@@ -1103,26 +1103,36 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                             executedBytecode = true;
                             break;
                         }
-                        // If not stubbed, check bytecode if it's NOT a framework class
-                        auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(currentSig);
-                        if (!bcResult.bytecode.empty() && bcDex && !bcDex->isFramework()) {
-                            static thread_local int callDepth = 0;
-                            if (callDepth > 16) {
-                                Logger::e("Interpreter", "FATAL: Stack overflow! Looping method: " + currentSig);
-                                state.methodReturnVal = Value::MakeNull();
-                            } else {
-                                Logger::d("Interpreter", "Executing DEX bytecode for: " + currentSig);
-                                callDepth++;
-                                Interpreter nestedVm;
-                                state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, bcDex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
-                                callDepth--;
-                            }
-                            executedBytecode = true;
+                        
+                        // Query MultiDexManager ONCE for the class definition for this iteration
+                        auto classLoc = multiDexManager->findClass(currentClass);
+                        if (!classLoc.classDef || !classLoc.dex) {
+                            // If the class itself isn't found anywhere, no point continuing up the hierarchy
                             break;
                         }
+
+                        // If not stubbed, check bytecode if it's NOT a framework class
+                        if (!classLoc.dex->isFramework()) {
+                            auto bcResult = classLoc.dex->getMethodBytecode(classLoc.classDef, currentSig);
+                            if (!bcResult.bytecode.empty()) {
+                                static thread_local int callDepth = 0;
+                                if (callDepth > 16) {
+                                    Logger::e("Interpreter", "FATAL: Stack overflow! Looping method: " + currentSig);
+                                    state.methodReturnVal = Value::MakeNull();
+                                } else {
+                                    Logger::d("Interpreter", "Executing DEX bytecode for: " + currentSig);
+                                    callDepth++;
+                                    Interpreter nestedVm;
+                                    state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, classLoc.dex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                                    callDepth--;
+                                }
+                                executedBytecode = true;
+                                break;
+                            }
+                        }
                         
-                        // Move up the hierarchy
-                        currentClass = multiDexManager->getSuperClass(currentClass);
+                        // Move up the hierarchy using the already-found class location
+                        currentClass = classLoc.dex->getSuperClass(classLoc.classDef);
                     }
                 }
                 
@@ -1189,22 +1199,27 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                             break;
                         }
                         
-                        auto [bcResult, bcDex] = multiDexManager->getMethodBytecode(currentSig);
-                        if (!bcResult.bytecode.empty() && bcDex && !bcDex->isFramework()) {
-                            static thread_local int callDepth = 0;
-                            if (callDepth > 16) {
-                                state.methodReturnVal = Value::MakeNull();
-                            } else {
-                                callDepth++;
-                                Interpreter nestedVm;
-                                state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, bcDex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
-                                callDepth--;
+                        auto classLoc = multiDexManager->findClass(currentClass);
+                        if (!classLoc.classDef || !classLoc.dex) break;
+
+                        if (!classLoc.dex->isFramework()) {
+                            auto bcResult = classLoc.dex->getMethodBytecode(classLoc.classDef, currentSig);
+                            if (!bcResult.bytecode.empty()) {
+                                static thread_local int callDepth = 0;
+                                if (callDepth > 16) {
+                                    state.methodReturnVal = Value::MakeNull();
+                                } else {
+                                    callDepth++;
+                                    Interpreter nestedVm;
+                                    state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, classLoc.dex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                                    callDepth--;
+                                }
+                                executedBytecode = true;
+                                break;
                             }
-                            executedBytecode = true;
-                            break;
                         }
                         
-                        currentClass = multiDexManager->getSuperClass(currentClass);
+                        currentClass = classLoc.dex->getSuperClass(classLoc.classDef);
                     }
                 }
                 

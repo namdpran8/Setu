@@ -43,6 +43,12 @@ public:
     std::string getSuperClass(const std::string& className) const;
     bool isInstanceOf(const std::string& actualClass, const std::string& expectedClass) const;
 
+    struct ClassLocation {
+        const class_def_item* classDef = nullptr;
+        const DexParser* dex = nullptr;
+    };
+    ClassLocation findClass(const std::string& className) const;
+
 private:
     std::vector<std::unique_ptr<std::vector<uint8_t>>> m_buffers;
     std::vector<std::unique_ptr<DexParser>> m_dexFiles;

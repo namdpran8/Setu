@@ -138,6 +138,20 @@ std::string MultiDexManager::getSuperClass(const std::string& className) const {
     return "";
 }
 
+MultiDexManager::ClassLocation MultiDexManager::findClass(const std::string& className) const {
+    for (const auto& dex : m_dexFiles) {
+        const class_def_item* classDef = dex->findClass(className);
+        if (classDef) {
+            return {classDef, dex.get()};
+        }
+    }
+    // Suppress warnings for standard Android and Java classes
+    if (className.find("Ljava/") != 0 && className.find("Landroid/") != 0 && className.find("Ldalvik/") != 0) {
+        Logger::w("MultiDexManager", "Class " + className + " not found in ANY loaded DEX file.");
+    }
+    return {nullptr, nullptr};
+}
+
 bool MultiDexManager::isInstanceOf(const std::string& actualClass, const std::string& expectedClass) const {
     std::string currentClass = actualClass;
     while (!currentClass.empty()) {
