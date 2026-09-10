@@ -146,6 +146,8 @@ void ViewGroup::onDraw(graphics::Canvas& canvas) {
 }
 
 void ViewGroup::dispatchDraw(graphics::Canvas& canvas) {
+    canvas.save();
+    canvas.translate(-(float)mScrollX, -(float)mScrollY);
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::VISIBLE) {
             child->updateRenderNode();
@@ -156,37 +158,80 @@ void ViewGroup::dispatchDraw(graphics::Canvas& canvas) {
         child->updateRenderNode();
         canvas.drawRenderNode(child->getRenderNode());
     }
+    canvas.restore();
 }
 
 bool ViewGroup::dispatchTouchEvent(MotionEvent& event) {
-    float x = event.getX();
-    float y = event.getY();
+    if (event.getAction() == MotionEvent::Action::DOWN) {
+        mMotionTarget = nullptr;
+    }
 
-    // Iterate backwards for Z-ordering (top views first)
-    for (auto it = mChildren.rbegin(); it != mChildren.rend(); ++it) {
-        auto& child = *it;
-        if (x >= child->getLeft() && x <= child->getRight() &&
-            y >= child->getTop() && y <= child->getBottom()) {
-            
-            // Transform coordinates to child's local space
-            float offsetX = -(float)child->getLeft();
-            float offsetY = -(float)child->getTop();
-            
-            event.offsetLocation(offsetX, offsetY);
-            
-            if (child->dispatchTouchEvent(event)) {
-                // Event handled by child
-                event.offsetLocation(-offsetX, -offsetY); // Restore
-                return true;
+    bool intercepted = onInterceptTouchEvent(event);
+    bool handled = false;
+
+    if (!intercepted) {
+        if (event.getAction() == MotionEvent::Action::DOWN) {
+            float x = event.getX();
+            float y = event.getY();
+
+            // Iterate backwards for Z-ordering (top views first)
+            for (auto it = mChildren.rbegin(); it != mChildren.rend(); ++it) {
+                auto& child = *it;
+                if (x >= child->getLeft() - mScrollX && x <= child->getRight() - mScrollX &&
+                    y >= child->getTop() - mScrollY && y <= child->getBottom() - mScrollY) {
+                    
+                    float offsetX = -(float)child->getLeft() + mScrollX;
+                    float offsetY = -(float)child->getTop() + mScrollY;
+                    
+                    event.offsetLocation(offsetX, offsetY);
+                    
+                    if (child->dispatchTouchEvent(event)) {
+                        mMotionTarget = child;
+                        handled = true;
+                        event.offsetLocation(-offsetX, -offsetY); // Restore
+                        break;
+                    }
+                    
+                    event.offsetLocation(-offsetX, -offsetY);
+                }
             }
+        }
+    }
+
+    if (mMotionTarget) {
+        if (intercepted) {
+            // Send CANCEL to child
+            event.setAction(MotionEvent::Action::CANCEL);
+            float offsetX = -(float)mMotionTarget->getLeft() + mScrollX;
+            float offsetY = -(float)mMotionTarget->getTop() + mScrollY;
+            event.offsetLocation(offsetX, offsetY);
+            mMotionTarget->dispatchTouchEvent(event);
+            event.offsetLocation(-offsetX, -offsetY);
             
-            // Restore coordinates if not handled
+            mMotionTarget = nullptr;
+            
+            // Restore action for self
+            event.setAction(MotionEvent::Action::MOVE);
+            handled = View::dispatchTouchEvent(event);
+        } else {
+            // Route to child
+            float offsetX = -(float)mMotionTarget->getLeft() + mScrollX;
+            float offsetY = -(float)mMotionTarget->getTop() + mScrollY;
+            event.offsetLocation(offsetX, offsetY);
+            handled = mMotionTarget->dispatchTouchEvent(event);
             event.offsetLocation(-offsetX, -offsetY);
         }
     }
 
-    // If no child handled it, try handling it ourselves
-    return View::dispatchTouchEvent(event);
+    if (!handled) {
+        handled = View::dispatchTouchEvent(event);
+    }
+
+    if (event.getAction() == MotionEvent::Action::UP || event.getAction() == MotionEvent::Action::CANCEL) {
+        mMotionTarget = nullptr;
+    }
+
+    return handled;
 }
 
 bool ViewGroup::dispatchKeyEvent(const KeyEvent& event) {

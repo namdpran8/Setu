@@ -61,6 +61,7 @@ public:
 
     // Hit testing and event routing
     bool dispatchTouchEvent(MotionEvent& event) override;
+    virtual bool onInterceptTouchEvent(MotionEvent& event) { return false; }
     bool dispatchKeyEvent(const KeyEvent& event) override;
 
     virtual std::shared_ptr<View::LayoutParams> generateLayoutParams(android::ResXMLParser* parser);
@@ -74,6 +75,7 @@ protected:
     static int getChildMeasureSpec(int spec, int padding, int childDimension);
     
     std::vector<std::shared_ptr<View>> mChildren;
+    std::shared_ptr<View> mMotionTarget;
     std::vector<std::shared_ptr<View>> mDisappearingChildren;
     std::shared_ptr<animation::LayoutTransition> mLayoutTransition;
 

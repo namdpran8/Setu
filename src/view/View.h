@@ -255,6 +255,19 @@ public:
     void setMinimumWidth(int minWidth) { mMinWidth = minWidth; requestLayout(); }
     void setMinimumHeight(int minHeight) { mMinHeight = minHeight; requestLayout(); }
 
+    int getScrollX() const { return mScrollX; }
+    int getScrollY() const { return mScrollY; }
+    virtual void scrollTo(int x, int y) {
+        if (mScrollX != x || mScrollY != y) {
+            mScrollX = x;
+            mScrollY = y;
+            invalidate();
+        }
+    }
+    virtual void scrollBy(int x, int y) {
+        scrollTo(mScrollX + x, mScrollY + y);
+    }
+
     void invalidate();
     virtual void dispatchAttachedToWindow();
     virtual void dispatchDetachedFromWindow();
@@ -345,6 +358,8 @@ protected:
 
     int mMinWidth = 0;
     int mMinHeight = 0;
+    int mScrollX = 0;
+    int mScrollY = 0;
 
     ViewGroup* mParent = nullptr;
 

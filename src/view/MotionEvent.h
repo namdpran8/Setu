@@ -27,6 +27,7 @@ public:
     MotionEvent(Action action, float x, float y) : mAction(action), mX(x), mY(y) {}
 
     Action getAction() const { return mAction; }
+    void setAction(Action action) { mAction = action; }
     float getX() const { return mX; }
     float getY() const { return mY; }
 

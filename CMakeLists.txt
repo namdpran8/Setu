@@ -80,6 +80,8 @@ add_executable(setu_runtime
     "src/view/Choreographer.cpp"
     "src/view/LinearLayout.cpp"
     "src/view/FrameLayout.cpp"
+    "src/view/ScrollView.cpp"
+    "src/view/HorizontalScrollView.cpp"
     "src/view/OverlayPanelLayout.cpp"
     "src/view/RelativeLayout.cpp"
     "src/view/ConstraintLayout.cpp"
