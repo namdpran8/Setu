@@ -459,14 +459,24 @@ void LayoutInflater::parseViewAttributes(android::ResXMLParser* parser, std::sha
                     }
                 }
             }
-        } else if (attrName == "clickable" || resId == 0x0101006e) {
+        } else if (attrName == "clickable" || resId == 0x010100e5) {
             int type = parser->getAttributeDataType(i);
-            if (type == android::Res_value::TYPE_INT_BOOLEAN) {
+            if (type >= android::Res_value::TYPE_FIRST_INT && type <= android::Res_value::TYPE_LAST_INT) {
                 view->setClickable(parser->getAttributeData(i) != 0);
             }
-        } else if (attrName == "focusable" || resId == 0x0101006f) {
+        } else if (attrName == "longClickable" || resId == 0x010100e6) {
             int type = parser->getAttributeDataType(i);
-            if (type == android::Res_value::TYPE_INT_BOOLEAN) {
+            if (type >= android::Res_value::TYPE_FIRST_INT && type <= android::Res_value::TYPE_LAST_INT) {
+                view->setLongClickable(parser->getAttributeData(i) != 0);
+            }
+        } else if (attrName == "contextClickable" || resId == 0x010104e7) {
+            int type = parser->getAttributeDataType(i);
+            if (type >= android::Res_value::TYPE_FIRST_INT && type <= android::Res_value::TYPE_LAST_INT) {
+                view->setContextClickable(parser->getAttributeData(i) != 0);
+            }
+        } else if (attrName == "focusable" || resId == 0x010100da) {
+            int type = parser->getAttributeDataType(i);
+            if (type >= android::Res_value::TYPE_FIRST_INT && type <= android::Res_value::TYPE_LAST_INT) {
                 view->setFocusable(parser->getAttributeData(i) != 0);
             }
         } else if (attrName == "enabled" || resId == 0x0101000e) {

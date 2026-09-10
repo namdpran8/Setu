@@ -163,6 +163,12 @@ public:
     bool isClickable() const { return mClickable; }
     virtual void setClickable(bool clickable) { mClickable = clickable; }
 
+    bool isLongClickable() const { return mLongClickable; }
+    virtual void setLongClickable(bool longClickable) { mLongClickable = longClickable; }
+
+    bool isContextClickable() const { return mContextClickable; }
+    virtual void setContextClickable(bool contextClickable) { mContextClickable = contextClickable; }
+
     bool isFocusable() const { return mFocusable; }
     virtual void setFocusable(bool focusable) { mFocusable = focusable; }
 
@@ -186,8 +192,14 @@ public:
                           long long whenMs) override;
     void unscheduleDrawable(graphics::Drawable* who) override;
 
-    void setOnClickListener(std::function<void()> listener) { mOnClickListener = listener; }
-    void setOnLongClickListener(std::function<bool()> listener) { mOnLongClickListener = listener; }
+    void setOnClickListener(std::function<void()> listener) {
+        if (!isClickable()) setClickable(true);
+        mOnClickListener = listener; 
+    }
+    void setOnLongClickListener(std::function<bool()> listener) {
+        if (!isLongClickable()) setLongClickable(true);
+        mOnLongClickListener = listener;
+    }
     void performLongClick();
     virtual void performClick() { if (mOnClickListener) mOnClickListener(); }
 
@@ -356,6 +368,8 @@ protected:
     std::vector<int> mDrawableState;
     bool mDrawableStateDirty = true;
     bool mClickable = false;
+    bool mLongClickable = false;
+    bool mContextClickable = false;
     bool mFocusable = false;
     int mGravity = 0x33; // Default TOP | LEFT
     std::shared_ptr<graphics::Drawable> mBackground;

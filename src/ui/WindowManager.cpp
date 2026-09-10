@@ -131,6 +131,8 @@ std::function<void(int)> WindowManager::s_clickCallback = nullptr;
 std::function<bool(int)> WindowManager::s_longClickCallback = nullptr;
 std::shared_ptr<setu::view::View> WindowManager::s_rootView = nullptr;
 bool WindowManager::s_rootViewDumpPending = false;
+std::vector<std::pair<int, OverlayLayer>> WindowManager::s_overlays;
+int WindowManager::s_nextOverlayId = 1;
 
 // Density lives on setu::view::View; see the declarations in WindowManager.h.
 float WindowManager::getDensity() {
@@ -198,6 +200,34 @@ void WindowManager::setRootView(std::shared_ptr<setu::view::View> rootView) {
 
 std::shared_ptr<setu::view::View> WindowManager::getRootView() {
     return s_rootView;
+}
+
+int WindowManager::addOverlay(std::shared_ptr<setu::view::View> rootView, bool acceptsInput, int zOrder) {
+    int id = s_nextOverlayId++;
+    OverlayLayer layer;
+    layer.rootView = rootView;
+    layer.acceptsInput = acceptsInput;
+    layer.zOrder = zOrder;
+    s_overlays.push_back({id, layer});
+    
+    std::stable_sort(s_overlays.begin(), s_overlays.end(), [](const auto& a, const auto& b) {
+        return a.second.zOrder < b.second.zOrder;
+    });
+    
+    if (s_mainWindow) {
+        InvalidateRect(s_mainWindow, nullptr, FALSE);
+    }
+    return id;
+}
+
+void WindowManager::removeOverlay(int overlayId) {
+    s_overlays.erase(std::remove_if(s_overlays.begin(), s_overlays.end(), 
+        [overlayId](const auto& pair) { return pair.first == overlayId; }), 
+        s_overlays.end());
+        
+    if (s_mainWindow) {
+        InvalidateRect(s_mainWindow, nullptr, FALSE);
+    }
 }
 
 void WindowManager::dumpRootViewAfterLayout() {
@@ -386,23 +416,41 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         }
         case WM_LBUTTONDOWN: {
             SetTimer(hwnd, TIMER_IDLE_GHOST, 600000, nullptr); // Reset 10 min idle timer
-            if (s_rootView) {
-                float x = (float)LOWORD(lParam);
-                float y = (float)HIWORD(lParam);
-                setu::view::MotionEvent event(setu::view::MotionEvent::Action::DOWN, x, y);
-                s_rootView->dispatchTouchEvent(event);
-                InvalidateRect(hwnd, nullptr, FALSE);
+            float x = (float)LOWORD(lParam);
+            float y = (float)HIWORD(lParam);
+            setu::view::MotionEvent event(setu::view::MotionEvent::Action::DOWN, x, y);
+
+            bool routed = false;
+            for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
+                if (it->second.acceptsInput && it->second.rootView) {
+                    it->second.rootView->dispatchTouchEvent(event);
+                    routed = true;
+                    break;
+                }
             }
+            if (!routed && s_rootView) {
+                s_rootView->dispatchTouchEvent(event);
+            }
+            InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
         }
         case WM_LBUTTONUP: {
-            if (s_rootView) {
-                float x = (float)LOWORD(lParam);
-                float y = (float)HIWORD(lParam);
-                setu::view::MotionEvent event(setu::view::MotionEvent::Action::UP, x, y);
-                s_rootView->dispatchTouchEvent(event);
-                InvalidateRect(hwnd, nullptr, FALSE);
+            float x = (float)LOWORD(lParam);
+            float y = (float)HIWORD(lParam);
+            setu::view::MotionEvent event(setu::view::MotionEvent::Action::UP, x, y);
+
+            bool routed = false;
+            for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
+                if (it->second.acceptsInput && it->second.rootView) {
+                    it->second.rootView->dispatchTouchEvent(event);
+                    routed = true;
+                    break;
+                }
             }
+            if (!routed && s_rootView) {
+                s_rootView->dispatchTouchEvent(event);
+            }
+            InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
         }
         case WM_KEYDOWN: {
@@ -419,28 +467,48 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                 s_showBsod = true;
                 InvalidateRect(hwnd, nullptr, TRUE);
             }
-            if (s_rootView) {
-                if (wParam == VK_F8) {
-                    Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP START ---");
-                    s_rootView->dump(0);
-                    Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP END ---");
-                } else if (wParam == VK_F9) {
-                    MessageBoxA(hwnd, "You found the hidden Setu Easter Egg!\n\nDalvik says hello from the grave... \xE2\x98\xA0\xEF\xB8\x8F", "Secret Discovered!", MB_OK | MB_ICONINFORMATION);
-                    Logger::i("EasterEgg", "User pressed F9! Pshhh...");
+            
+            if (wParam == VK_F8) {
+                Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP START ---");
+                if (s_rootView) s_rootView->dump(0);
+                for (const auto& pair : s_overlays) {
+                    Logger::i("WindowManager", "Overlay " + std::to_string(pair.first) + ":");
+                    if (pair.second.rootView) pair.second.rootView->dump(0);
                 }
-                setu::view::KeyEvent event(setu::view::KeyEvent::Action::DOWN, (int)wParam, 0);
-                if (s_rootView->dispatchKeyEvent(event)) {
-                    // Handled
+                Logger::i("WindowManager", "--- VIEW HIERARCHY DUMP END ---");
+            } else if (wParam == VK_F9) {
+                MessageBoxA(hwnd, "You found the hidden Setu Easter Egg!\n\nDalvik says hello from the grave... \xE2\x98\xA0\xEF\xB8\x8F", "Secret Discovered!", MB_OK | MB_ICONINFORMATION);
+                Logger::i("EasterEgg", "User pressed F9! Pshhh...");
+            }
+            
+            setu::view::KeyEvent event(setu::view::KeyEvent::Action::DOWN, (int)wParam, 0);
+            
+            bool routed = false;
+            for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
+                if (it->second.acceptsInput && it->second.rootView) {
+                    it->second.rootView->dispatchKeyEvent(event);
+                    routed = true;
+                    break;
                 }
+            }
+            if (!routed && s_rootView) {
+                s_rootView->dispatchKeyEvent(event);
             }
             return 0;
         }
         case WM_CHAR: {
-            if (s_rootView) {
-                setu::view::KeyEvent event(setu::view::KeyEvent::Action::DOWN, 0, (wchar_t)wParam);
-                if (s_rootView->dispatchKeyEvent(event)) {
-                    // Handled
+            setu::view::KeyEvent event(setu::view::KeyEvent::Action::DOWN, 0, (wchar_t)wParam);
+            
+            bool routed = false;
+            for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
+                if (it->second.acceptsInput && it->second.rootView) {
+                    it->second.rootView->dispatchKeyEvent(event);
+                    routed = true;
+                    break;
                 }
+            }
+            if (!routed && s_rootView) {
+                s_rootView->dispatchKeyEvent(event);
             }
             return 0;
         }
@@ -485,6 +553,14 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     
                     setu::graphics::SkiaCanvas canvas(rect.right, rect.bottom);
                     setu::view::Choreographer::getInstance().doFrame(s_rootView, canvas, rect.right, rect.bottom);
+                    
+                    for (const auto& pair : s_overlays) {
+                        if (pair.second.rootView) {
+                            pair.second.rootView->updateRenderNode();
+                            canvas.drawRenderNode(pair.second.rootView->getRenderNode());
+                        }
+                    }
+                    
                     canvas.blitToD2D(s_d2dContext.Get());
                     
                     s_d2dContext->EndDraw();
@@ -495,6 +571,7 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             return 0;
         }
         case WM_DESTROY:
+            s_overlays.clear();
             PostQuitMessage(0);
             return 0;
         default:

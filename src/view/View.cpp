@@ -435,35 +435,37 @@ bool View::dispatchTouchEvent(MotionEvent& event) {
 }
 
 bool View::onTouchEvent(MotionEvent& event) {
-    if (event.getAction() == MotionEvent::Action::DOWN) {
-        setPressed(true);
-        if (mOnLongClickListener) {
-            std::weak_ptr<View> weakSelf = weak_from_this();
-            mPendingCheckForLongPress = getMainHandler().postDelayed([weakSelf]() {
-                if (auto self = weakSelf.lock()) {
-                    self->performLongClick();
-                }
-            }, 500);
-        }
-        return true; // Handle touch
-    } else if (event.getAction() == MotionEvent::Action::UP) {
-        if (mPendingCheckForLongPress) {
-            getMainHandler().removeCallbacksByToken(mPendingCheckForLongPress);
-            mPendingCheckForLongPress = 0;
-        }
-        if (isPressed()) {
-            if (mOnClickListener) performClick();
-            setPressed(false);
-        }
-        return true;
-    } else if (event.getAction() == MotionEvent::Action::CANCEL || event.getAction() == MotionEvent::Action::MOVE) {
-        // Simple bounds check omitted for brevity in MOVE, just cancel on CANCEL
-        if (event.getAction() == MotionEvent::Action::CANCEL) {
+    const bool clickable = mClickable || mLongClickable || mContextClickable;
+
+    if (clickable) {
+        if (event.getAction() == MotionEvent::Action::DOWN) {
+            setPressed(true);
+            if (mOnLongClickListener) {
+                std::weak_ptr<View> weakSelf = weak_from_this();
+                mPendingCheckForLongPress = getMainHandler().postDelayed([weakSelf]() {
+                    if (auto self = weakSelf.lock()) {
+                        self->performLongClick();
+                    }
+                }, 500);
+            }
+        } else if (event.getAction() == MotionEvent::Action::UP) {
             if (mPendingCheckForLongPress) {
                 getMainHandler().removeCallbacksByToken(mPendingCheckForLongPress);
                 mPendingCheckForLongPress = 0;
             }
-            setPressed(false);
+            if (isPressed()) {
+                if (mOnClickListener) performClick();
+                setPressed(false);
+            }
+        } else if (event.getAction() == MotionEvent::Action::CANCEL || event.getAction() == MotionEvent::Action::MOVE) {
+            // Simple bounds check omitted for brevity in MOVE, just cancel on CANCEL
+            if (event.getAction() == MotionEvent::Action::CANCEL) {
+                if (mPendingCheckForLongPress) {
+                    getMainHandler().removeCallbacksByToken(mPendingCheckForLongPress);
+                    mPendingCheckForLongPress = 0;
+                }
+                setPressed(false);
+            }
         }
         return true;
     }
