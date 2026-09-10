@@ -31,6 +31,13 @@ namespace view {
 }
 }
 
+struct OverlayLayer {
+    // Intended to be reused by future Dialog/PopupWindow work, not Toast-specific.
+    std::shared_ptr<setu::view::View> rootView;
+    bool acceptsInput = false;
+    int zOrder = 0;
+};
+
 class WindowManager {
 public:
     static bool init();
@@ -40,6 +47,9 @@ public:
     static void pumpLooper();
 
     static HWND getMainWindow();
+
+    static int addOverlay(std::shared_ptr<setu::view::View> rootView, bool acceptsInput = false, int zOrder = 0);
+    static void removeOverlay(int overlayId);
 
     // D2D getters
     static ID2D1DeviceContext* getD2DContext();
@@ -75,6 +85,9 @@ public:
     static void setScaledDensity(float scaledDensity);
 
 private:
+    static std::vector<std::pair<int, OverlayLayer>> s_overlays;
+    static int s_nextOverlayId;
+
     static std::shared_ptr<setu::view::View> s_rootView;
     static bool s_rootViewDumpPending;
     static std::function<void(int)> s_clickCallback;
