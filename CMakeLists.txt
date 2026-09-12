@@ -21,7 +21,7 @@ add_subdirectory(src/cassowary)
 add_library(skia STATIC IMPORTED GLOBAL)
 set_target_properties(skia PROPERTIES
     IMPORTED_LOCATION_DEBUG "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia.lib"
-    IMPORTED_LOCATION_RELEASE "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia_release.lib"
+    IMPORTED_LOCATION_RELEASE "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia.lib"
     IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia/out/Static/skia.lib" # Default fallback
     INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/thirdparty/skia_build/skia"
 )
@@ -93,7 +93,10 @@ add_executable(setu_runtime
     "src/widget/Button.cpp"
     "src/widget/EditText.cpp"
     "src/widget/ImageView.cpp"
-    "src/widget/ImageButton.cpp")
+    "src/widget/ImageButton.cpp"
+    "src/view/VelocityTracker.cpp"
+    "src/widget/OverScroller.cpp"
+    "src/widget/RecyclerView.cpp")
 
 target_include_directories(setu_runtime PRIVATE include)
 # windowscodecs: WIC, for BitmapFactory's decoders. ole32: CoInitializeEx and
@@ -135,6 +138,7 @@ if(WIN32)
     set(CPACK_GENERATOR "ZIP")
 endif()
 
+include(CPack)
 include(CPack)
 
 

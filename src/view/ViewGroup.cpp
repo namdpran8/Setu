@@ -147,6 +147,7 @@ void ViewGroup::onDraw(graphics::Canvas& canvas) {
 
 void ViewGroup::dispatchDraw(graphics::Canvas& canvas) {
     canvas.save();
+    canvas.clipRect(0.0f, 0.0f, (float)getWidth(), (float)getHeight());
     canvas.translate(-(float)mScrollX, -(float)mScrollY);
     for (auto& child : mChildren) {
         if (child->getVisibility() == View::VISIBLE) {
@@ -168,6 +169,7 @@ bool ViewGroup::dispatchTouchEvent(MotionEvent& event) {
 
     bool intercepted = onInterceptTouchEvent(event);
     bool handled = false;
+    bool alreadyDispatchedToNewTarget = false;
 
     if (!intercepted) {
         if (event.getAction() == MotionEvent::Action::DOWN) {
@@ -188,6 +190,7 @@ bool ViewGroup::dispatchTouchEvent(MotionEvent& event) {
                     if (child->dispatchTouchEvent(event)) {
                         mMotionTarget = child;
                         handled = true;
+                        alreadyDispatchedToNewTarget = true;
                         event.offsetLocation(-offsetX, -offsetY); // Restore
                         break;
                     }
@@ -214,12 +217,16 @@ bool ViewGroup::dispatchTouchEvent(MotionEvent& event) {
             event.setAction(MotionEvent::Action::MOVE);
             handled = View::dispatchTouchEvent(event);
         } else {
-            // Route to child
-            float offsetX = -(float)mMotionTarget->getLeft() + mScrollX;
-            float offsetY = -(float)mMotionTarget->getTop() + mScrollY;
-            event.offsetLocation(offsetX, offsetY);
-            handled = mMotionTarget->dispatchTouchEvent(event);
-            event.offsetLocation(-offsetX, -offsetY);
+            if (alreadyDispatchedToNewTarget) {
+                handled = true;
+            } else {
+                // Route to child
+                float offsetX = -(float)mMotionTarget->getLeft() + mScrollX;
+                float offsetY = -(float)mMotionTarget->getTop() + mScrollY;
+                event.offsetLocation(offsetX, offsetY);
+                handled = mMotionTarget->dispatchTouchEvent(event);
+                event.offsetLocation(-offsetX, -offsetY);
+            }
         }
     }
 

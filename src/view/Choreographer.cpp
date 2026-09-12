@@ -14,6 +14,7 @@
 #include "../animation/ValueAnimator.h"
 #include "../utils/SystemClock.h"
 #include "../ui/WindowManager.h"
+#include "../widget/OverScroller.h"
 
 namespace setu {
 namespace view {
@@ -21,6 +22,7 @@ namespace view {
 void Choreographer::doFrame(std::shared_ptr<View> decorView, graphics::Canvas& canvas, int windowWidth, int windowHeight) {
     long long frameTimeNanos = setu::uptimeMillis() * 1000000LL;
     setu::animation::ValueAnimator::doFrame(frameTimeNanos);
+    setu::widget::OverScroller::doFrame(frameTimeNanos);
 
     if (!decorView) return;
 

@@ -419,17 +419,22 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             float x = (float)LOWORD(lParam);
             float y = (float)HIWORD(lParam);
             setu::view::MotionEvent event(setu::view::MotionEvent::Action::DOWN, x, y);
+            
+            Logger::d("WindowManager", "WM_LBUTTONDOWN at " + std::to_string(x) + ", " + std::to_string(y));
 
             bool routed = false;
             for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
                 if (it->second.acceptsInput && it->second.rootView) {
-                    it->second.rootView->dispatchTouchEvent(event);
-                    routed = true;
-                    break;
+                    if (it->second.rootView->dispatchTouchEvent(event)) {
+                        Logger::d("WindowManager", "Event absorbed by overlay!");
+                        routed = true;
+                        break;
+                    }
                 }
             }
             if (!routed && s_rootView) {
-                s_rootView->dispatchTouchEvent(event);
+                bool handled = s_rootView->dispatchTouchEvent(event);
+                Logger::d("WindowManager", "Event routed to s_rootView, handled=" + std::to_string(handled));
             }
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
@@ -442,15 +447,38 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             bool routed = false;
             for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
                 if (it->second.acceptsInput && it->second.rootView) {
-                    it->second.rootView->dispatchTouchEvent(event);
-                    routed = true;
-                    break;
+                    if (it->second.rootView->dispatchTouchEvent(event)) {
+                        routed = true;
+                        break;
+                    }
                 }
             }
             if (!routed && s_rootView) {
                 s_rootView->dispatchTouchEvent(event);
             }
             InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+        }
+        case WM_MOUSEMOVE: {
+            if (wParam & MK_LBUTTON) {
+                float x = (float)LOWORD(lParam);
+                float y = (float)HIWORD(lParam);
+                setu::view::MotionEvent event(setu::view::MotionEvent::Action::MOVE, x, y);
+
+                bool routed = false;
+                for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
+                    if (it->second.acceptsInput && it->second.rootView) {
+                        if (it->second.rootView->dispatchTouchEvent(event)) {
+                            routed = true;
+                            break;
+                        }
+                    }
+                }
+                if (!routed && s_rootView) {
+                    s_rootView->dispatchTouchEvent(event);
+                }
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
             return 0;
         }
         case WM_KEYDOWN: {
@@ -486,9 +514,10 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             bool routed = false;
             for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
                 if (it->second.acceptsInput && it->second.rootView) {
-                    it->second.rootView->dispatchKeyEvent(event);
-                    routed = true;
-                    break;
+                    if (it->second.rootView->dispatchKeyEvent(event)) {
+                        routed = true;
+                        break;
+                    }
                 }
             }
             if (!routed && s_rootView) {
@@ -502,9 +531,10 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             bool routed = false;
             for (auto it = s_overlays.rbegin(); it != s_overlays.rend(); ++it) {
                 if (it->second.acceptsInput && it->second.rootView) {
-                    it->second.rootView->dispatchKeyEvent(event);
-                    routed = true;
-                    break;
+                    if (it->second.rootView->dispatchKeyEvent(event)) {
+                        routed = true;
+                        break;
+                    }
                 }
             }
             if (!routed && s_rootView) {

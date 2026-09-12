@@ -23,6 +23,7 @@
 #include "../view/LinearLayout.h"
 #include "../view/FrameLayout.h"
 #include "../view/ScrollView.h"
+#include "../widget/RecyclerView.h"
 #include "../view/HorizontalScrollView.h"
 #include "../view/OverlayPanelLayout.h"
 #include "../view/RelativeLayout.h"
@@ -142,8 +143,10 @@ std::shared_ptr<setu::view::View> LayoutInflater::createViewByTag(const std::str
         view = std::make_shared<setu::view::View>(resManager, theme, parser, 0, 0);
     } else if (tag == "HorizontalScrollView" || tag == "android.widget.HorizontalScrollView") {
         view = std::make_shared<setu::view::HorizontalScrollView>();
-    } else if (tag == "ScrollView" || tag == "android.widget.ScrollView" || tag == "androidx.recyclerview.widget.RecyclerView") {
+    } else if (tag == "ScrollView" || tag == "android.widget.ScrollView") {
         view = std::make_shared<setu::view::ScrollView>();
+    } else if (tag == "androidx.recyclerview.widget.RecyclerView") {
+        view = std::make_shared<setu::widget::RecyclerView>();
     } else if (tag == "com.sothree.slidinguppanel.SlidingUpPanelLayout" || tag == "SlidingUpPanelLayout") {
         view = std::make_shared<setu::view::OverlayPanelLayout>();
     }
