@@ -397,11 +397,12 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             }
             if (wParam == TIMER_IDLE_GHOST) {
                 Logger::i("IdleGhost", "Are you still there? (Ghost Touch)");
-                if (s_rootView) {
+                auto root = s_rootView;
+                if (root) {
                     setu::view::MotionEvent eventDown(setu::view::MotionEvent::Action::DOWN, 100, 100);
-                    s_rootView->dispatchTouchEvent(eventDown);
+                    root->dispatchTouchEvent(eventDown);
                     setu::view::MotionEvent eventUp(setu::view::MotionEvent::Action::UP, 100, 100);
-                    s_rootView->dispatchTouchEvent(eventUp);
+                    root->dispatchTouchEvent(eventUp);
                     InvalidateRect(hwnd, nullptr, FALSE);
                 }
             }
@@ -432,9 +433,12 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     }
                 }
             }
-            if (!routed && s_rootView) {
-                bool handled = s_rootView->dispatchTouchEvent(event);
-                Logger::d("WindowManager", "Event routed to s_rootView, handled=" + std::to_string(handled));
+            if (!routed) {
+                auto root = s_rootView;
+                if (root) {
+                    bool handled = root->dispatchTouchEvent(event);
+                    Logger::d("WindowManager", "Event routed to s_rootView, handled=" + std::to_string(handled));
+                }
             }
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
@@ -453,8 +457,11 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     }
                 }
             }
-            if (!routed && s_rootView) {
-                s_rootView->dispatchTouchEvent(event);
+            if (!routed) {
+                auto root = s_rootView;
+                if (root) {
+                    root->dispatchTouchEvent(event);
+                }
             }
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
@@ -474,8 +481,11 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                         }
                     }
                 }
-                if (!routed && s_rootView) {
-                    s_rootView->dispatchTouchEvent(event);
+                if (!routed) {
+                    auto root = s_rootView;
+                    if (root) {
+                        root->dispatchTouchEvent(event);
+                    }
                 }
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
@@ -520,8 +530,11 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     }
                 }
             }
-            if (!routed && s_rootView) {
-                s_rootView->dispatchKeyEvent(event);
+            if (!routed) {
+                auto root = s_rootView;
+                if (root) {
+                    root->dispatchKeyEvent(event);
+                }
             }
             return 0;
         }
@@ -537,8 +550,11 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
                     }
                 }
             }
-            if (!routed && s_rootView) {
-                s_rootView->dispatchKeyEvent(event);
+            if (!routed) {
+                auto root = s_rootView;
+                if (root) {
+                    root->dispatchKeyEvent(event);
+                }
             }
             return 0;
         }
