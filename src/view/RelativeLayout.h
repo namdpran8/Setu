@@ -34,6 +34,9 @@ public:
         static const std::string ALIGN_PARENT_TOP;
         static const std::string ALIGN_PARENT_RIGHT;
         static const std::string ALIGN_PARENT_BOTTOM;
+        static const std::string CENTER_IN_PARENT;
+        static const std::string CENTER_HORIZONTAL;
+        static const std::string CENTER_VERTICAL;
 
         LayoutParams(int w, int h) : View::LayoutParams(w, h) {}
     };

@@ -23,6 +23,29 @@ void ScrollView::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     }
 }
 
+void ScrollView::onLayout(bool changed, int l, int t, int r, int b) {
+    FrameLayout::onLayout(changed, l, t, r, b);
+    scrollTo(mScrollX, mScrollY);
+}
+
+int ScrollView::getScrollRange() const {
+    if (mChildren.empty() || !mChildren[0]) return 0;
+
+    auto child = mChildren[0];
+    auto lp = child->getLayoutParams();
+    int childHeight = child->getHeight();
+    if (lp) {
+        childHeight += lp->topMargin + lp->bottomMargin;
+    }
+
+    int parentSpace = getHeight() - mPaddingTop - mPaddingBottom;
+    return std::max(0, childHeight - parentSpace);
+}
+
+void ScrollView::scrollTo(int, int y) {
+    View::scrollTo(0, std::clamp(y, 0, getScrollRange()));
+}
+
 ScrollView::ScrollView() {
     mScroller = std::make_shared<widget::OverScroller>();
 }
@@ -85,10 +108,8 @@ bool ScrollView::onTouchEvent(MotionEvent& event) {
             int deltaY = (int)(mLastMotionY - y);
             mLastMotionY = y;
             
-            int childHeight = (!mChildren.empty() && mChildren[0]) ? mChildren.back()->getBottom() : 0;
-            int maxScrollY = std::max(0, childHeight - (getBottom() - getTop()));
-            int newScrollY = std::clamp(mScrollY + deltaY, 0, maxScrollY);
-            scrollTo(mScrollX, newScrollY);
+            int newScrollY = std::clamp(mScrollY + deltaY, 0, getScrollRange());
+            scrollTo(0, newScrollY);
             return true;
         }
     } else if (event.getAction() == MotionEvent::Action::UP || event.getAction() == MotionEvent::Action::CANCEL) {
@@ -96,9 +117,7 @@ bool ScrollView::onTouchEvent(MotionEvent& event) {
             mVelocityTracker->computeCurrentVelocity(1000, 8000.0f);
             int initialVelocity = (int)mVelocityTracker->getYVelocity();
             if (std::abs(initialVelocity) > 50) {
-                int childHeight = (!mChildren.empty() && mChildren[0]) ? mChildren.back()->getBottom() : 0;
-                int maxScrollY = std::max(0, childHeight - (getBottom() - getTop()));
-                mScroller->fling(mScrollX, mScrollY, 0, -initialVelocity, 0, 0, 0, maxScrollY);
+                mScroller->fling(mScrollX, mScrollY, 0, -initialVelocity, 0, 0, 0, getScrollRange());
                 invalidate();
             }
         }

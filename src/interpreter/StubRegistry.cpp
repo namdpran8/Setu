@@ -1414,6 +1414,38 @@ void StubRegistry::registerViewStubs() {
         }
         return false;
     };
+    stubs["Landroid/view/View;->scrollTo(II)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 3 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            auto view = static_cast<setu::view::View*>(((InterpreterObject*)args[0].obj)->nativeHandle);
+            if (view) view->scrollTo(args[1].i, args[2].i);
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->scrollBy(II)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 3 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            auto view = static_cast<setu::view::View*>(((InterpreterObject*)args[0].obj)->nativeHandle);
+            if (view) view->scrollBy(args[1].i, args[2].i);
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->getScrollX()I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        int scrollX = 0;
+        if (!args.empty() && args[0].type == ValueType::OBJECT && args[0].obj) {
+            auto view = static_cast<setu::view::View*>(((InterpreterObject*)args[0].obj)->nativeHandle);
+            if (view) scrollX = view->getScrollX();
+        }
+        if (outReturn) *outReturn = Value::MakeInt(scrollX);
+        return false;
+    };
+    stubs["Landroid/view/View;->getScrollY()I"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        int scrollY = 0;
+        if (!args.empty() && args[0].type == ValueType::OBJECT && args[0].obj) {
+            auto view = static_cast<setu::view::View*>(((InterpreterObject*)args[0].obj)->nativeHandle);
+            if (view) scrollY = view->getScrollY();
+        }
+        if (outReturn) *outReturn = Value::MakeInt(scrollY);
+        return false;
+    };
     stubs["Landroid/view/View;->setAccessibilityDelegate(Landroid/view/View$AccessibilityDelegate;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         Logger::d("StubRegistry", "[STUB-NOOP] View.setAccessibilityDelegate is intentionalNoOp, accessibility service hook.");
         return false;

@@ -16,9 +16,11 @@
 #include "../utils/Logger.h"
 #include "androidfw/ResourceTypes.h"
 #include "../cassowary/Guideline.h"
-
+ 
+ //Public Static Void Main (String[] args) {
 namespace setu {
 namespace view {
+
 
 ConstraintLayout::ConstraintLayout() {
     mLayoutWidget.setCompanionWidget(this);
@@ -216,6 +218,7 @@ std::shared_ptr<View::LayoutParams> ConstraintLayout::generateLayoutParams(andro
     auto parseConstraintTarget = [&](uint8_t type, uint32_t data, const std::string& rawValue) {
         if (type == android::Res_value::TYPE_STRING) {
             if (rawValue == "parent") return 0;
+			// system.out.println ("Warning: ConstraintLayout: Unrecognized string value for constraint target: " + rawValue);
         }
         if (data == 0) return 0;
         return (int)data;

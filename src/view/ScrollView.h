@@ -21,10 +21,13 @@ public:
     bool onTouchEvent(MotionEvent& event) override;
 
     void onMeasure(int widthMeasureSpec, int heightMeasureSpec) override;
+    void onLayout(bool changed, int l, int t, int r, int b) override;
+    void scrollTo(int x, int y) override;
     void computeScroll();
     void draw(graphics::Canvas& canvas) override;
 
 private:
+    int getScrollRange() const;
     float mLastMotionY = 0;
     bool mIsBeingDragged = false;
     VelocityTracker* mVelocityTracker = nullptr;

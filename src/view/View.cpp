@@ -430,6 +430,24 @@ void View::invalidate() {
     requestHostRedraw();
 }
 
+void View::scrollTo(int x, int y) {
+    if (mScrollX == x && mScrollY == y) return;
+
+    int oldX = mScrollX;
+    int oldY = mScrollY;
+    mScrollX = x;
+    mScrollY = y;
+    onScrollChanged(mScrollX, mScrollY, oldX, oldY);
+    invalidate();
+}
+
+void View::scrollBy(int dx, int dy) {
+    scrollTo(mScrollX + dx, mScrollY + dy);
+}
+
+void View::onScrollChanged(int, int, int, int) {
+}
+
 bool View::dispatchTouchEvent(MotionEvent& event) {
     return onTouchEvent(event);
 }
@@ -508,12 +526,13 @@ void View::updateRenderNode() {
 void View::dump(int depth) {
     std::string indent(depth * 2, ' ');
     char buffer[256];
-    snprintf(buffer, sizeof(buffer), "%s[%s id=%d] bounds=(%d,%d)-(%d,%d) w=%d h=%d",
+    snprintf(buffer, sizeof(buffer), "%s[%s id=%d] bounds=(%d,%d)-(%d,%d) w=%d h=%d scrollX=%d scrollY=%d",
              indent.c_str(),
              getClassName().c_str(),
              mId,
              mLeft, mTop, mRight, mBottom,
-             mRight - mLeft, mBottom - mTop);
+             mRight - mLeft, mBottom - mTop,
+             mScrollX, mScrollY);
     Logger::i("ViewDump", std::string(buffer));
 }
 

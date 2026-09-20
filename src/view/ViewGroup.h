@@ -68,6 +68,17 @@ public:
     static void parseBaseLayoutParams(std::shared_ptr<View::LayoutParams> lp, android::ResXMLParser* parser);
 
 protected:
+    struct ContentBounds {
+        int left;
+        int top;
+        int right;
+        int bottom;
+
+        int getWidth() const { return right - left; }
+        int getHeight() const { return bottom - top; }
+    };
+
+    ContentBounds getContentBounds(int width, int height) const;
     void measureChild(std::shared_ptr<View> child, int parentWidthMeasureSpec, int parentHeightMeasureSpec);
     void measureChildWithMargins(std::shared_ptr<View> child, 
         int parentWidthMeasureSpec, int widthUsed,

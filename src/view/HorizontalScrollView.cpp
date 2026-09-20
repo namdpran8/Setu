@@ -8,6 +8,29 @@
 namespace setu {
 namespace view {
 
+void HorizontalScrollView::onLayout(bool changed, int l, int t, int r, int b) {
+    FrameLayout::onLayout(changed, l, t, r, b);
+    scrollTo(mScrollX, mScrollY);
+}
+
+int HorizontalScrollView::getScrollRange() const {
+    if (mChildren.empty() || !mChildren[0]) return 0;
+
+    auto child = mChildren[0];
+    auto lp = child->getLayoutParams();
+    int childWidth = child->getWidth();
+    if (lp) {
+        childWidth += lp->leftMargin + lp->rightMargin;
+    }
+
+    int parentSpace = getWidth() - mPaddingLeft - mPaddingRight;
+    return std::max(0, childWidth - parentSpace);
+}
+
+void HorizontalScrollView::scrollTo(int x, int) {
+    View::scrollTo(std::clamp(x, 0, getScrollRange()), 0);
+}
+
 bool HorizontalScrollView::onInterceptTouchEvent(MotionEvent& event) {
     if (event.getAction() == MotionEvent::Action::DOWN) {
         mLastMotionX = event.getX();
@@ -44,15 +67,8 @@ bool HorizontalScrollView::onTouchEvent(MotionEvent& event) {
             int deltaX = (int)(mLastMotionX - x);
             mLastMotionX = x;
             
-            // Calculate max scroll
-            int childWidth = 0;
-            if (!mChildren.empty() && mChildren[0]) {
-                childWidth = mChildren[0]->getRight();
-            }
-            int maxScrollX = std::max(0, childWidth - (getRight() - getLeft()));
-            
-            int newScrollX = std::clamp(mScrollX + deltaX, 0, maxScrollX);
-            scrollTo(newScrollX, mScrollY);
+            int newScrollX = std::clamp(mScrollX + deltaX, 0, getScrollRange());
+            scrollTo(newScrollX, 0);
             return true;
         }
     } else if (event.getAction() == MotionEvent::Action::UP || event.getAction() == MotionEvent::Action::CANCEL) {

@@ -139,6 +139,15 @@ void ViewGroup::onLayout(bool changed, int l, int t, int r, int b) {
     // already placed them at specific X,Y coordinates.
 }
 
+ViewGroup::ContentBounds ViewGroup::getContentBounds(int width, int height) const {
+    return {
+        mPaddingLeft,
+        mPaddingTop,
+        std::max(mPaddingLeft, width - mPaddingRight),
+        std::max(mPaddingTop, height - mPaddingBottom)
+    };
+}
+
 void ViewGroup::onDraw(graphics::Canvas& canvas) {
     // ViewGroup draws its own background (handled by View base class)
     // and then dispatches draw to children

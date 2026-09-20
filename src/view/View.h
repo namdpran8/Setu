@@ -257,16 +257,8 @@ public:
 
     int getScrollX() const { return mScrollX; }
     int getScrollY() const { return mScrollY; }
-    virtual void scrollTo(int x, int y) {
-        if (mScrollX != x || mScrollY != y) {
-            mScrollX = x;
-            mScrollY = y;
-            invalidate();
-        }
-    }
-    virtual void scrollBy(int x, int y) {
-        scrollTo(mScrollX + x, mScrollY + y);
-    }
+    virtual void scrollTo(int x, int y);
+    void scrollBy(int dx, int dy);
 
     void invalidate();
     virtual void dispatchAttachedToWindow();
@@ -317,6 +309,8 @@ public:
     static void setDisplayMetrics(float density, float scaledDensity);
 
 protected:
+    virtual void onScrollChanged(int l, int t, int oldl, int oldt);
+
     float mAlpha = 1.0f;
     float mTranslationX = 0.0f;
     float mTranslationY = 0.0f;

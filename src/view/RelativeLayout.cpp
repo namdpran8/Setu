@@ -89,6 +89,9 @@ const std::string RelativeLayout::LayoutParams::ALIGN_PARENT_LEFT = "layout_alig
 const std::string RelativeLayout::LayoutParams::ALIGN_PARENT_TOP = "layout_alignParentTop";
 const std::string RelativeLayout::LayoutParams::ALIGN_PARENT_RIGHT = "layout_alignParentRight";
 const std::string RelativeLayout::LayoutParams::ALIGN_PARENT_BOTTOM = "layout_alignParentBottom";
+const std::string RelativeLayout::LayoutParams::CENTER_IN_PARENT = "layout_centerInParent";
+const std::string RelativeLayout::LayoutParams::CENTER_HORIZONTAL = "layout_centerHorizontal";
+const std::string RelativeLayout::LayoutParams::CENTER_VERTICAL = "layout_centerVertical";
 
 std::shared_ptr<View> RelativeLayout::getViewById(int id) {
     for (auto& child : mChildren) {
@@ -103,10 +106,11 @@ void RelativeLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     int maxWidth = 0;
     int maxHeight = 0;
 
-    int widthMode = getMode(widthMeasureSpec);
     int widthSize = getSize(widthMeasureSpec);
-    int heightMode = getMode(heightMeasureSpec);
     int heightSize = getSize(heightMeasureSpec);
+    auto content = getContentBounds(widthSize, heightSize);
+    int horizontalPadding = widthSize - content.getWidth();
+    int verticalPadding = heightSize - content.getHeight();
 
     // Topological sort pass
     auto sortedChildren = getSortedChildren(mChildren);
@@ -115,23 +119,23 @@ void RelativeLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         auto lp = std::dynamic_pointer_cast<LayoutParams>(child->getLayoutParams());
         if (!lp) lp = std::make_shared<LayoutParams>(View::WRAP_CONTENT, View::WRAP_CONTENT);
 
-        int childWidthSpec = View::makeMeasureSpec(widthSize, (lp->width == View::MATCH_PARENT) ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST);
-        int childHeightSpec = View::makeMeasureSpec(heightSize, (lp->height == View::MATCH_PARENT) ? View::MEASURE_SPEC_EXACTLY : View::MEASURE_SPEC_AT_MOST);
-        if (lp->width > 0) childWidthSpec = View::makeMeasureSpec(lp->width, View::MEASURE_SPEC_EXACTLY);
-        if (lp->height > 0) childHeightSpec = View::makeMeasureSpec(lp->height, View::MEASURE_SPEC_EXACTLY);
+        int childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec,
+            horizontalPadding + lp->leftMargin + lp->rightMargin, lp->width);
+        int childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec,
+            verticalPadding + lp->topMargin + lp->bottomMargin, lp->height);
 
         child->measure(childWidthSpec, childHeightSpec);
+        maxWidth = std::max(maxWidth, child->getMeasuredWidth() + lp->leftMargin + lp->rightMargin);
+        maxHeight = std::max(maxHeight, child->getMeasuredHeight() + lp->topMargin + lp->bottomMargin);
     }
 
-    // Measure self
-    int measuredWidth = (widthMode == MEASURE_SPEC_EXACTLY) ? widthSize : widthSize; // Default to size
-    int measuredHeight = (heightMode == MEASURE_SPEC_EXACTLY) ? heightSize : heightSize;
+    int measuredWidth = resolveSize(maxWidth + mPaddingLeft + mPaddingRight, widthMeasureSpec);
+    int measuredHeight = resolveSize(maxHeight + mPaddingTop + mPaddingBottom, heightMeasureSpec);
     setMeasuredDimension(measuredWidth, measuredHeight);
 }
 
 void RelativeLayout::onLayout(bool changed, int l, int t, int r, int b) {
-    int parentWidth = r - l;
-    int parentHeight = b - t;
+    auto content = getContentBounds(r - l, b - t);
 
     auto sortedChildren = getSortedChildren(mChildren);
 
@@ -143,19 +147,37 @@ void RelativeLayout::onLayout(bool changed, int l, int t, int r, int b) {
         int cw = child->getMeasuredWidth();
         int ch = child->getMeasuredHeight();
         
-        int childLeft = lp->leftMargin;
-        int childTop = lp->topMargin;
+        int childLeft = content.left + lp->leftMargin;
+        int childTop = content.top + lp->topMargin;
         int childRight = childLeft + cw;
         int childBottom = childTop + ch;
 
         // Apply align parent rules
+        if (lp->rules.count(LayoutParams::ALIGN_PARENT_LEFT)) {
+            childLeft = content.left + lp->leftMargin;
+            childRight = childLeft + cw;
+        }
+        if (lp->rules.count(LayoutParams::ALIGN_PARENT_TOP)) {
+            childTop = content.top + lp->topMargin;
+            childBottom = childTop + ch;
+        }
         if (lp->rules.count(LayoutParams::ALIGN_PARENT_RIGHT)) {
-            childRight = parentWidth - lp->rightMargin;
+            childRight = content.right - lp->rightMargin;
             childLeft = childRight - cw;
         }
         if (lp->rules.count(LayoutParams::ALIGN_PARENT_BOTTOM)) {
-            childBottom = parentHeight - lp->bottomMargin;
+            childBottom = content.bottom - lp->bottomMargin;
             childTop = childBottom - ch;
+        }
+        if (lp->rules.count(LayoutParams::CENTER_IN_PARENT) ||
+            lp->rules.count(LayoutParams::CENTER_HORIZONTAL)) {
+            childLeft = content.left + (content.getWidth() - cw - lp->leftMargin - lp->rightMargin) / 2 + lp->leftMargin;
+            childRight = childLeft + cw;
+        }
+        if (lp->rules.count(LayoutParams::CENTER_IN_PARENT) ||
+            lp->rules.count(LayoutParams::CENTER_VERTICAL)) {
+            childTop = content.top + (content.getHeight() - ch - lp->topMargin - lp->bottomMargin) / 2 + lp->topMargin;
+            childBottom = childTop + ch;
         }
 
         // Apply relative positioning rules (very naive implementation without topological sort)
@@ -215,7 +237,10 @@ std::shared_ptr<View::LayoutParams> RelativeLayout::generateLayoutParams(android
             attrName == LayoutParams::ALIGN_PARENT_LEFT ||
             attrName == LayoutParams::ALIGN_PARENT_TOP ||
             attrName == LayoutParams::ALIGN_PARENT_RIGHT ||
-            attrName == LayoutParams::ALIGN_PARENT_BOTTOM) {
+            attrName == LayoutParams::ALIGN_PARENT_BOTTOM ||
+            attrName == LayoutParams::CENTER_IN_PARENT ||
+            attrName == LayoutParams::CENTER_HORIZONTAL ||
+            attrName == LayoutParams::CENTER_VERTICAL) {
             lp->rules[attrName] = data;
         }
     }
