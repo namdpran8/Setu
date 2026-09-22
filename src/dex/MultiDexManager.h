@@ -41,6 +41,7 @@ public:
 
     // Hierarchy resolution
     std::string getSuperClass(const std::string& className) const;
+    std::vector<std::string> getInterfaces(const std::string& className) const;
     bool isInstanceOf(const std::string& actualClass, const std::string& expectedClass) const;
 
     struct ClassLocation {

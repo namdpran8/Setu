@@ -181,6 +181,27 @@ std::string DexParser::getSuperClass(const class_def_item* classDef) const {
     return m_strings[m_typeIds[classDef->superclass_idx].descriptor_idx];
 }
 
+std::vector<std::string> DexParser::getInterfaces(const std::string& className) const {
+    const class_def_item* classDef = findClass(className);
+    return classDef ? getInterfaces(classDef) : std::vector<std::string>();
+}
+
+std::vector<std::string> DexParser::getInterfaces(const class_def_item* classDef) const {
+    std::vector<std::string> interfaces;
+    if (!classDef || classDef->interfaces_off == 0) return interfaces;
+    
+    const uint8_t* p = m_dexBufferStart + classDef->interfaces_off;
+    uint32_t size = *reinterpret_cast<const uint32_t*>(p);
+    p += 4;
+    
+    for (uint32_t i = 0; i < size; ++i) {
+        uint16_t typeIdx = *reinterpret_cast<const uint16_t*>(p);
+        p += 2;
+        interfaces.push_back(m_strings[m_typeIds[typeIdx].descriptor_idx]);
+    }
+    return interfaces;
+}
+
 DexParser::MethodBytecodeResult DexParser::getMethodBytecode(const class_def_item* classDef, const std::string& methodSignature) const {
     if (!classDef || !m_dexBufferStart) return {};
 

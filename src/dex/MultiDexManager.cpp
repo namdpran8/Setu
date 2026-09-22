@@ -12,6 +12,7 @@
 
 #include "MultiDexManager.h"
 #include "../utils/Logger.h"
+#include <unordered_set>
 
 MultiDexManager::MultiDexManager() {
 }
@@ -152,11 +153,44 @@ MultiDexManager::ClassLocation MultiDexManager::findClass(const std::string& cla
     return {nullptr, nullptr};
 }
 
+std::vector<std::string> MultiDexManager::getInterfaces(const std::string& className) const {
+    for (const auto& dex : m_dexFiles) {
+        const class_def_item* classDef = dex->findClass(className);
+        if (classDef) {
+            return dex->getInterfaces(classDef);
+        }
+    }
+    return {};
+}
+
 bool MultiDexManager::isInstanceOf(const std::string& actualClass, const std::string& expectedClass) const {
-    std::string currentClass = actualClass;
-    while (!currentClass.empty()) {
+    if (actualClass == expectedClass) return true;
+    if (expectedClass == "Ljava/lang/Object;") return true;
+
+    std::vector<std::string> queue;
+    std::unordered_set<std::string> visited;
+
+    queue.push_back(actualClass);
+    visited.insert(actualClass);
+
+    size_t idx = 0;
+    while (idx < queue.size()) {
+        std::string currentClass = queue[idx++];
         if (currentClass == expectedClass) return true;
-        currentClass = getSuperClass(currentClass);
+
+        std::string superClass = getSuperClass(currentClass);
+        if (!superClass.empty() && visited.find(superClass) == visited.end()) {
+            visited.insert(superClass);
+            queue.push_back(superClass);
+        }
+
+        std::vector<std::string> interfaces = getInterfaces(currentClass);
+        for (const auto& iface : interfaces) {
+            if (visited.find(iface) == visited.end()) {
+                visited.insert(iface);
+                queue.push_back(iface);
+            }
+        }
     }
     return false;
 }

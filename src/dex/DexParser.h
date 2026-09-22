@@ -136,9 +136,10 @@ public:
     // Get type string by type_idx
     std::string getTypeString(uint32_t typeIdx) const;
     
-    // Get superclass of a given class
     std::string getSuperClass(const std::string& className) const;
     std::string getSuperClass(const class_def_item* classDef) const;
+    std::vector<std::string> getInterfaces(const class_def_item* classDef) const;
+    std::vector<std::string> getInterfaces(const std::string& className) const;
 
     // Get string by string_idx
     std::string getString(uint32_t stringIdx) const {
