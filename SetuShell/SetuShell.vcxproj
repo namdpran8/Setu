@@ -45,7 +45,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <AdditionalOptions>%(AdditionalOptions) /Zc:templateScope- /utf-8</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions) /Zc:templateScope- /utf-8 /Zm200</AdditionalOptions>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <WarningLevel>Level3</WarningLevel>

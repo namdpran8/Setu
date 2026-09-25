@@ -687,6 +687,15 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             return false;
         }
 
+        if (methodSignature == "Landroid/content/res/TypedArray;->getInt(II)I") {
+            if (args.size() > 2) {
+                if (outReturn) *outReturn = args[2];
+            } else {
+                if (outReturn) *outReturn = Value::MakeInt(0);
+            }
+            return false;
+        }
+
         Logger::w("StubRegistry", "Unimplemented stub: " + methodSignature);
         // We do not throw an exception here just because it's a stub missing, 
         // we'll just return false (no exception thrown) and ignore it for now.

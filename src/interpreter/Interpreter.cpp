@@ -554,73 +554,70 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 uint8_t aa = safe8(bytecode, state.pc);
                 int32_t switchValue = state.registers[aa].i;
                 
-                // Format 31t: AA|op BBBB (padding) CCCCCCCC DDDDDDDD
-                // pc points to padding byte after opcode
-                int32_t firstKey = (int32_t)(safe16(bytecode, state.pc + 3) | (safe8(bytecode, state.pc + 5) << 16) | (safe8(bytecode, state.pc + 6) << 24));
-                int32_t targetsSize = (int32_t)(safe16(bytecode, state.pc + 7) | (safe8(bytecode, state.pc + 9) << 16) | (safe8(bytecode, state.pc + 10) << 24));
+                // Format 31t: AA|op BBBBBBBB 
+                // instruction start is pc - 1 (because fetchOpcode consumed the opcode byte)
+                uint32_t instrStart = state.pc - 1; 
                 
-                // Targets start at pc + 12 (aligned to 4 bytes)
-                uint32_t targetsOffset = state.pc + 12;
+                // Read the 32-bit signed offset to the payload (in 16-bit words)
+                int32_t payloadOffsetWords = (int32_t)(safe16(bytecode, instrStart + 2) | (safe16(bytecode, instrStart + 4) << 16));
+                uint32_t payloadOffset = instrStart + (payloadOffsetWords * 2);
+                
+                // Read packed-switch-payload
+                // uint16_t ident = safe16(bytecode, payloadOffset); // should be 0x0100
+                uint16_t size = safe16(bytecode, payloadOffset + 2);
+                int32_t firstKey = (int32_t)(safe16(bytecode, payloadOffset + 4) | (safe16(bytecode, payloadOffset + 6) << 16));
+                
+                uint32_t targetsOffset = payloadOffset + 8;
                 int32_t index = switchValue - firstKey;
                 
-                int32_t targetOffset = 0;
-                if (index >= 0 && index < targetsSize) {
-                    targetOffset = (int32_t)(safe16(bytecode, targetsOffset + index * 4) | 
-                                             (safe8(bytecode, targetsOffset + index * 4 + 2) << 16) | 
-                                             (safe8(bytecode, targetsOffset + index * 4 + 3) << 24));
-                } else {
-                    // Default target (first entry in payload)
-                    targetOffset = (int32_t)(safe16(bytecode, targetsOffset) | 
-                                             (safe8(bytecode, targetsOffset + 2) << 16) | 
-                                             (safe8(bytecode, targetsOffset + 3) << 24));
+                int32_t targetOffsetWords = 0;
+                if (index >= 0 && index < size) {
+                    targetOffsetWords = (int32_t)(safe16(bytecode, targetsOffset + index * 4) | 
+                                                 (safe16(bytecode, targetsOffset + index * 4 + 2) << 16));
                 }
                 
-                Logger::d("Interpreter", "[0x2B] packed-switch v" + std::to_string(aa) + "=" + std::to_string(switchValue) + " -> offset " + std::to_string(targetOffset));
-                state.pc = (state.pc - 1) + (targetOffset * 2);
+                if (targetOffsetWords != 0) {
+                    state.pc = instrStart + (targetOffsetWords * 2);
+                } else {
+                    state.pc = instrStart + 6; // fallthrough to next instruction (31t is 6 bytes long)
+                }
+                
+                Logger::d("Interpreter", "[0x2B] packed-switch resolved to offset " + std::to_string(targetOffsetWords));
                 break;
             }
             case 0x2C: { // sparse-switch
                 uint8_t aa = safe8(bytecode, state.pc);
                 int32_t switchValue = state.registers[aa].i;
                 
-                // Format 31t: AA|op BBBB CCCCCCCC (size)
-                // pc points to AA (register) after fetchOpcode consumed the opcode
-                // Instruction start = state.pc - 1
-                int32_t targetsSize = (int32_t)(safe16(bytecode, state.pc + 3) | (safe8(bytecode, state.pc + 5) << 16) | (safe8(bytecode, state.pc + 6) << 24));
-                
-                // Keys start at instruction_start + 8, aligned to 4 bytes
-                // instruction_start = state.pc - 1
-                // So: (state.pc - 1 + 8) & ~3 = (state.pc + 7) & ~3
                 uint32_t instrStart = state.pc - 1;
-                uint32_t keysOffset = (instrStart + 8 + 3) & ~3u;  // Align to 4 bytes
-                // Targets follow keys (targetsSize * 4 bytes each)
-                uint32_t targetsOffset = keysOffset + targetsSize * 4;
+                int32_t payloadOffsetWords = (int32_t)(safe16(bytecode, instrStart + 2) | (safe16(bytecode, instrStart + 4) << 16));
+                uint32_t payloadOffset = instrStart + (payloadOffsetWords * 2);
                 
-                int32_t targetOffset = 0;
-                bool found = false;
+                // Read sparse-switch-payload
+                // uint16_t ident = safe16(bytecode, payloadOffset); // should be 0x0200
+                uint16_t size = safe16(bytecode, payloadOffset + 2);
                 
-                for (int i = 0; i < targetsSize; ++i) {
+                uint32_t keysOffset = payloadOffset + 4;
+                uint32_t targetsOffset = keysOffset + (size * 4);
+                
+                int32_t targetOffsetWords = 0;
+                for (int i = 0; i < size; ++i) {
                     int32_t key = (int32_t)(safe16(bytecode, keysOffset + i * 4) | 
-                                            (safe8(bytecode, keysOffset + i * 4 + 2) << 16) | 
-                                            (safe8(bytecode, keysOffset + i * 4 + 3) << 24));
+                                           (safe16(bytecode, keysOffset + i * 4 + 2) << 16));
                     if (key == switchValue) {
-                        targetOffset = (int32_t)(safe16(bytecode, targetsOffset + i * 4) | 
-                                                 (safe8(bytecode, targetsOffset + i * 4 + 2) << 16) | 
-                                                 (safe8(bytecode, targetsOffset + i * 4 + 3) << 24));
-                        found = true;
+                        targetOffsetWords = (int32_t)(safe16(bytecode, targetsOffset + i * 4) | 
+                                                     (safe16(bytecode, targetsOffset + i * 4 + 2) << 16));
                         break;
                     }
                 }
                 
-                if (!found) {
-                    // Default target (first target entry)
-                    targetOffset = (int32_t)(safe16(bytecode, targetsOffset) | 
-                                             (safe8(bytecode, targetsOffset + 2) << 16) | 
-                                             (safe8(bytecode, targetsOffset + 3) << 24));
+                if (targetOffsetWords != 0) {
+                    state.pc = instrStart + (targetOffsetWords * 2);
+                } else {
+                    state.pc = instrStart + 6; // fallthrough
                 }
                 
-                Logger::d("Interpreter", "[0x2C] sparse-switch v" + std::to_string(aa) + "=" + std::to_string(switchValue) + " -> offset " + std::to_string(targetOffset));
-                state.pc = (state.pc - 1) + (targetOffset * 2);
+                Logger::d("Interpreter", "[0x2C] sparse-switch resolved to offset " + std::to_string(targetOffsetWords));
                 break;
             }
             case 0x1C: { // const-class vAA, type@BBBB
@@ -1133,6 +1130,60 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                         
                         // Move up the hierarchy using the already-found class location
                         currentClass = classLoc.dex->getSuperClass(classLoc.classDef);
+                    }
+                }
+                
+                // If not found in class hierarchy, check interfaces (especially for invoke-interface/invoke-polymorphic)
+                if (!executedBytecode && (opcode == 0x72 || opcode == 0x78 || opcode == 0xFA)) {
+                    std::vector<std::string> interfacesToCheck;
+                    std::string searchClass = "";
+                    if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                        searchClass = static_cast<InterpreterObject*>(args[0].obj)->className;
+                    }
+                    
+                    while (!searchClass.empty()) {
+                        auto classLoc = multiDexManager->findClass(searchClass);
+                        if (!classLoc.classDef || !classLoc.dex) break;
+                        auto ifaces = classLoc.dex->getInterfaces(classLoc.classDef);
+                        for (const auto& iface : ifaces) {
+                            interfacesToCheck.push_back(iface);
+                        }
+                        searchClass = classLoc.dex->getSuperClass(classLoc.classDef);
+                    }
+                    
+                    // Ambiguity resolution: We process interfaces bottom-up through the class hierarchy,
+                    // and left-to-right as declared in interfaces_off. The first matching stub or bytecode wins.
+                    // KNOWN DEVIATION: This is a heuristic simplification. The JVM/ART spec actually uses
+                    // a "most specific interface" rule when multiple interfaces provide conflicting default methods.
+                    for (const auto& iface : interfacesToCheck) {
+                        std::string currentSig = iface + "->" + methodSig.substr(methodSig.find("->") + 2);
+                        
+                        if (StubRegistry::isStubbed(currentSig)) {
+                            bool exceptionThrown = StubRegistry::invoke(currentSig, &state, args, &state.methodReturnVal);
+                            if (exceptionThrown) return Value::MakeNull();
+                            executedBytecode = true;
+                            break;
+                        }
+                        
+                        auto ifaceLoc = multiDexManager->findClass(iface);
+                        if (ifaceLoc.classDef && ifaceLoc.dex && !ifaceLoc.dex->isFramework()) {
+                            auto bcResult = ifaceLoc.dex->getMethodBytecode(ifaceLoc.classDef, currentSig);
+                            if (!bcResult.bytecode.empty()) {
+                                static thread_local int callDepth = 0;
+                                if (callDepth > 16) {
+                                    Logger::e("Interpreter", "FATAL: Stack overflow! Looping method: " + currentSig);
+                                    state.methodReturnVal = Value::MakeNull();
+                                } else {
+                                    Logger::d("Interpreter", "Executing DEX bytecode for interface method: " + currentSig);
+                                    callDepth++;
+                                    Interpreter nestedVm;
+                                    state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, ifaceLoc.dex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                                    callDepth--;
+                                }
+                                executedBytecode = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 

@@ -402,3 +402,15 @@ dialog_roadmap.mdbuildoutput.txt
 build_output.txt
 docs/gradient_and_dash_design.md
 run_log*.txt
+
+# Scratch files and temporary test scripts
+*.class
+*.dex
+CustomInterfaceTest.*
+test_viewgroup_padding.cpp
+analyze.py
+all_files.txt
+search_results.txt
+test_dex_dir/
+android/
+com/

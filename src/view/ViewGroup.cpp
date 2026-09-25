@@ -309,8 +309,8 @@ void ViewGroup::measureChild(std::shared_ptr<View> child, int parentWidthMeasure
     auto lp = child->getLayoutParams();
     if (!lp) return;
 
-    int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec, 0, lp->width);
-    int childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec, 0, lp->height);
+    int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec, mPaddingLeft + mPaddingRight, lp->width);
+    int childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec, mPaddingTop + mPaddingBottom, lp->height);
 
     child->measure(childWidthMeasureSpec, childHeightMeasureSpec);
 }
@@ -322,9 +322,9 @@ void ViewGroup::measureChildWithMargins(std::shared_ptr<View> child,
     if (!lp) return;
 
     int childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec,
-            widthUsed + lp->leftMargin + lp->rightMargin, lp->width);
+            mPaddingLeft + mPaddingRight + widthUsed + lp->leftMargin + lp->rightMargin, lp->width);
     int childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec,
-            heightUsed + lp->topMargin + lp->bottomMargin, lp->height);
+            mPaddingTop + mPaddingBottom + heightUsed + lp->topMargin + lp->bottomMargin, lp->height);
 
     child->measure(childWidthMeasureSpec, childHeightMeasureSpec);
 }

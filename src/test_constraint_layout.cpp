@@ -87,6 +87,26 @@ int constraint_layout_test_main() {
 
     std::cout << "=== All Phase 1 tests passed! ===" << std::endl;
     
+    std::cout << "\n=== Phase 2: ViewGroup Padding Test ===" << std::endl;
+    auto paddingLayout = std::make_shared<ConstraintLayout>();
+    paddingLayout->setPadding(10, 20, 30, 40);
+    auto pChild = std::make_shared<View>();
+    pChild->setLayoutParams(std::make_shared<ConstraintLayout::LayoutParams>(View::MATCH_PARENT, View::MATCH_PARENT));
+    paddingLayout->addConstrainedChild(pChild);
+    
+    auto pChildWidget = paddingLayout->getWidget(pChild.get());
+    auto pRootWidget = pChildWidget->getParent();
+    pChildWidget->mLeft.connect(pRootWidget->getAnchor(setu::cassowary::ConstraintAnchor::Type::LEFT), 0);
+    pChildWidget->mRight.connect(pRootWidget->getAnchor(setu::cassowary::ConstraintAnchor::Type::RIGHT), 0);
+    pChildWidget->mTop.connect(pRootWidget->getAnchor(setu::cassowary::ConstraintAnchor::Type::TOP), 0);
+    pChildWidget->mBottom.connect(pRootWidget->getAnchor(setu::cassowary::ConstraintAnchor::Type::BOTTOM), 0);
+    
+    paddingLayout->measure(View::makeMeasureSpec(1000, View::MEASURE_SPEC_EXACTLY), View::makeMeasureSpec(2000, View::MEASURE_SPEC_EXACTLY));
+    paddingLayout->layout(0, 0, 1000, 2000);
+    
+    check_eq(pChild->getMeasuredWidth(), 1000 - 10 - 30, "pChild width");
+    check_eq(pChild->getMeasuredHeight(), 2000 - 20 - 40, "pChild height");
+    
     std::cout << "\n=== Phase 3: AnimatedVectorDrawable Test ===" << std::endl;
     // 1. Setup Looper
     if (!setu::os::Looper::myLooper()) {
