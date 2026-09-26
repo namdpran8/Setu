@@ -37,6 +37,8 @@ setu::ResourceManager* StubRegistry::m_resManager = nullptr;
 MultiDexManager* StubRegistry::m_multiDexManager = nullptr;
 std::unordered_map<int, InterpreterObject*> StubRegistry::clickListeners;
 std::unordered_map<int, InterpreterObject*> StubRegistry::longClickListeners;
+std::vector<ActivityRecord> StubRegistry::s_backStack;
+ActivityRecord StubRegistry::s_currentActivity;
 
 static std::wstring utf8_to_utf16(const std::string& utf8) {
     if (utf8.empty()) return std::wstring();
@@ -185,6 +187,7 @@ void StubRegistry::init(setu::ResourceManager* resManager, MultiDexManager* mult
     m_multiDexManager = multiDexManager;
     registerActivityStubs();
     registerViewStubs();
+    WindowManager::setBackNavigationCallback(StubRegistry::performBackNavigation);
 }
 
 bool StubRegistry::isStubbed(const std::string& methodSignature) {
@@ -193,6 +196,7 @@ bool StubRegistry::isStubbed(const std::string& methodSignature) {
     if (methodSignature == "Landroid/content/Intent;-><init>(Ljava/lang/String;Landroid/net/Uri;)V") return true;
     if (methodSignature == "Landroid/net/Uri;->parse(Ljava/lang/String;)Landroid/net/Uri;") return true;
     if (methodSignature.find("->startActivity(Landroid/content/Intent;)V") != std::string::npos) return true;
+    if (methodSignature.find("->finish()V") != std::string::npos) return true;
     if (methodSignature.find("->setContentView(I)V") != std::string::npos) return true;
     if (methodSignature.find("->findViewById(I)Landroid/view/View;") != std::string::npos) return true;
     if (methodSignature.find("Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter") == 0 ||
@@ -307,16 +311,24 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                     if (it != intentObj->fields.end() && it->second.type == ValueType::OBJECT) {
                         InterpreterObject* strObj = (InterpreterObject*)it->second.obj;
                         std::string targetClassName = strObj->className;
-                        Logger::i("StubRegistry", "Starting new activity: " + targetClassName);
+                        Logger::i("StubRegistry", "Starting new activity: " + targetClassName); Logger::i("StubRegistry", "Current activity is: " + s_currentActivity.className + (s_currentActivity.instance ? " (HAS INSTANCE)" : " (NULL)"));
                         
-                        // Clear the old window
-                        WindowManager::clearWindow(); // Restored temporarily until Phase 2 is complete
+                        // 1. Fire onPause on current top-of-stack activity
+                        if (s_currentActivity.instance) {
+                            auto [onPauseBc, onPauseDex] = m_multiDexManager->getMethodBytecode(s_currentActivity.className + "->onPause()V");
+                            if (!onPauseBc.bytecode.empty() && onPauseDex) {
+                                Interpreter vm;
+                                std::vector<Value> pauseArgs = { Value::MakeObject(s_currentActivity.instance) };
+                                vm.executeMethod(onPauseBc.bytecode, onPauseDex, m_multiDexManager, pauseArgs, onPauseBc.registers_size, onPauseBc.ins_size);
+                            }
+                            // 2. Capture view state and push to stack
+                            s_currentActivity.rootView = WindowManager::getRootView();
+                            s_backStack.push_back(s_currentActivity);
+                        }
                         
-                        // Launch the new activity
+                        // 3. Launch the new activity
                         if (m_multiDexManager) {
                             Interpreter vm;
-                            
-                            // Execute <init>
                             auto [initBc, initDex] = m_multiDexManager->getMethodBytecode(targetClassName + "-><init>()V");
                             if (!initBc.bytecode.empty() && initDex) {
                                 InterpreterObject* newActivity = new InterpreterObject();
@@ -324,14 +336,38 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                                 std::vector<Value> initArgs = { Value::MakeObject(newActivity) };
                                 vm.executeMethod(initBc.bytecode, initDex, m_multiDexManager, initArgs, initBc.registers_size, initBc.ins_size);
                                 
-                                // Execute onCreate
+                                ActivityRecord newRecord;
+                                newRecord.instance = newActivity;
+                                newRecord.className = targetClassName;
+                                s_currentActivity = newRecord;
+
                                 auto [onCreateBc, onCreateDex] = m_multiDexManager->getMethodBytecode(targetClassName + "->onCreate(Landroid/os/Bundle;)V");
                                 if (!onCreateBc.bytecode.empty() && onCreateDex) {
-                                    // this, Bundle (null)
                                     std::vector<Value> createArgs = { Value::MakeObject(newActivity), Value::MakeNull() }; 
                                     vm.executeMethod(onCreateBc.bytecode, onCreateDex, m_multiDexManager, createArgs, onCreateBc.registers_size, onCreateBc.ins_size);
-                                } else {
-                                    Logger::w("StubRegistry", "Could not find onCreate for " + targetClassName);
+                                }
+                                
+                                auto [onStartBc, onStartDex] = m_multiDexManager->getMethodBytecode(targetClassName + "->onStart()V");
+                                if (!onStartBc.bytecode.empty() && onStartDex) {
+                                    std::vector<Value> startArgs = { Value::MakeObject(newActivity) };
+                                    vm.executeMethod(onStartBc.bytecode, onStartDex, m_multiDexManager, startArgs, onStartBc.registers_size, onStartBc.ins_size);
+                                }
+                                
+                                auto [onResumeBc, onResumeDex] = m_multiDexManager->getMethodBytecode(targetClassName + "->onResume()V");
+                                if (!onResumeBc.bytecode.empty() && onResumeDex) {
+                                    std::vector<Value> resumeArgs = { Value::MakeObject(newActivity) };
+                                    vm.executeMethod(onResumeBc.bytecode, onResumeDex, m_multiDexManager, resumeArgs, onResumeBc.registers_size, onResumeBc.ins_size);
+                                }
+                                
+                                // 4. Fire onStop on old activity
+                                if (!s_backStack.empty()) {
+                                    ActivityRecord& oldActivity = s_backStack.back();
+                                    auto [onStopBc, onStopDex] = m_multiDexManager->getMethodBytecode(oldActivity.className + "->onStop()V");
+                                    if (!onStopBc.bytecode.empty() && onStopDex) {
+                                        Interpreter vmStop;
+                                        std::vector<Value> stopArgs = { Value::MakeObject(oldActivity.instance) };
+                                        vmStop.executeMethod(onStopBc.bytecode, onStopDex, m_multiDexManager, stopArgs, onStopBc.registers_size, onStopBc.ins_size);
+                                    }
                                 }
                             } else {
                                 Logger::w("StubRegistry", "Could not find <init> for " + targetClassName);
@@ -358,6 +394,12 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
             return false; // Return false means NO exception thrown
         }
         
+        if (methodSignature.find("->finish()V") != std::string::npos) {
+            Logger::i("StubRegistry", "Executed: finish()");
+            performBackNavigation();
+            return false;
+        }
+
         if (methodSignature.find("->setContentView(I)V") != std::string::npos) {
             if (args.size() >= 2 && args[1].type == ValueType::INT) {
                 int layoutId = args[1].i;
@@ -1168,6 +1210,45 @@ void StubRegistry::registerViewStubs() {
         }
         return false;
     };
+    auto obtainStyledAttributesStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            InterpreterObject* typedArrayObj = new InterpreterObject();
+            typedArrayObj->className = "Landroid/content/res/TypedArray;";
+            *outReturn = Value::MakeObject(typedArrayObj);
+        }
+        return false;
+    };
+    stubs["Landroid/content/Context;->obtainStyledAttributes([I)Landroid/content/res/TypedArray;"] = obtainStyledAttributesStub;
+    stubs["Landroid/content/Context;->obtainStyledAttributes(I[I)Landroid/content/res/TypedArray;"] = obtainStyledAttributesStub;
+    stubs["Landroid/content/Context;->obtainStyledAttributes(Landroid/util/AttributeSet;[I)Landroid/content/res/TypedArray;"] = obtainStyledAttributesStub;
+    stubs["Landroid/content/Context;->obtainStyledAttributes(Landroid/util/AttributeSet;[III)Landroid/content/res/TypedArray;"] = obtainStyledAttributesStub;
+
+    auto typedArrayDefaultValStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            if (args.size() > 2) {
+                *outReturn = args[2]; // Return the default value (defValue)
+            } else {
+                *outReturn = Value::MakeInt(0);
+            }
+        }
+        return false;
+    };
+    stubs["Landroid/content/res/TypedArray;->getBoolean(IZ)Z"] = typedArrayDefaultValStub;
+    stubs["Landroid/content/res/TypedArray;->getFloat(IF)F"] = typedArrayDefaultValStub;
+    stubs["Landroid/content/res/TypedArray;->getColor(II)I"] = typedArrayDefaultValStub;
+    stubs["Landroid/content/res/TypedArray;->getDimension(IF)F"] = typedArrayDefaultValStub;
+    stubs["Landroid/content/res/TypedArray;->getDimensionPixelSize(II)I"] = typedArrayDefaultValStub;
+    stubs["Landroid/content/res/TypedArray;->getResourceId(II)I"] = typedArrayDefaultValStub;
+    stubs["Landroid/content/res/TypedArray;->getInteger(II)I"] = typedArrayDefaultValStub;
+    
+    stubs["Landroid/content/res/TypedArray;->getString(I)Ljava/lang/String;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) *outReturn = Value::MakeNull();
+        return false;
+    };
+    stubs["Landroid/content/res/TypedArray;->recycle()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        return false;
+    };
+
     stubs["Landroid/content/Context;->getString(I)Ljava/lang/String;"] = 
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
             if (args.size() >= 2 && args[1].type == ValueType::INT && m_resManager) {
@@ -1799,3 +1880,68 @@ void StubRegistry::registerViewStubs() {
 
 
 
+
+void StubRegistry::performBackNavigation() {
+    if (!s_currentActivity.instance) return;
+    
+    // Fire onPause on finishing Activity
+    auto [onPauseBc, onPauseDex] = m_multiDexManager->getMethodBytecode(s_currentActivity.className + "->onPause()V");
+    if (!onPauseBc.bytecode.empty() && onPauseDex) {
+        Interpreter vm;
+        std::vector<Value> pauseArgs = { Value::MakeObject(s_currentActivity.instance) };
+        vm.executeMethod(onPauseBc.bytecode, onPauseDex, m_multiDexManager, pauseArgs, onPauseBc.registers_size, onPauseBc.ins_size);
+    }
+    
+    ActivityRecord finishingActivity = s_currentActivity;
+    s_currentActivity.instance = nullptr;
+    
+    if (!s_backStack.empty()) {
+        s_currentActivity = s_backStack.back();
+        s_backStack.pop_back();
+        
+        // Restore view
+        WindowManager::setRootView(s_currentActivity.rootView);
+        
+        Interpreter vm;
+        auto [onRestartBc, onRestartDex] = m_multiDexManager->getMethodBytecode(s_currentActivity.className + "->onRestart()V");
+        if (!onRestartBc.bytecode.empty() && onRestartDex) {
+            std::vector<Value> args = { Value::MakeObject(s_currentActivity.instance) };
+            vm.executeMethod(onRestartBc.bytecode, onRestartDex, m_multiDexManager, args, onRestartBc.registers_size, onRestartBc.ins_size);
+        }
+        
+        auto [onStartBc, onStartDex] = m_multiDexManager->getMethodBytecode(s_currentActivity.className + "->onStart()V");
+        if (!onStartBc.bytecode.empty() && onStartDex) {
+            std::vector<Value> args = { Value::MakeObject(s_currentActivity.instance) };
+            vm.executeMethod(onStartBc.bytecode, onStartDex, m_multiDexManager, args, onStartBc.registers_size, onStartBc.ins_size);
+        }
+        
+        auto [onResumeBc, onResumeDex] = m_multiDexManager->getMethodBytecode(s_currentActivity.className + "->onResume()V");
+        if (!onResumeBc.bytecode.empty() && onResumeDex) {
+            std::vector<Value> args = { Value::MakeObject(s_currentActivity.instance) };
+            vm.executeMethod(onResumeBc.bytecode, onResumeDex, m_multiDexManager, args, onResumeBc.registers_size, onResumeBc.ins_size);
+        }
+    } else {
+        // App is exiting
+        WindowManager::setRootView(nullptr);
+    }
+    
+    // Fire onStop and onDestroy on finishing Activity
+    Interpreter vmStop;
+    auto [onStopBc, onStopDex] = m_multiDexManager->getMethodBytecode(finishingActivity.className + "->onStop()V");
+    if (!onStopBc.bytecode.empty() && onStopDex) {
+        std::vector<Value> stopArgs = { Value::MakeObject(finishingActivity.instance) };
+        vmStop.executeMethod(onStopBc.bytecode, onStopDex, m_multiDexManager, stopArgs, onStopBc.registers_size, onStopBc.ins_size);
+    }
+    
+    auto [onDestroyBc, onDestroyDex] = m_multiDexManager->getMethodBytecode(finishingActivity.className + "->onDestroy()V");
+    if (!onDestroyBc.bytecode.empty() && onDestroyDex) {
+        std::vector<Value> destroyArgs = { Value::MakeObject(finishingActivity.instance) };
+        vmStop.executeMethod(onDestroyBc.bytecode, onDestroyDex, m_multiDexManager, destroyArgs, onDestroyBc.registers_size, onDestroyBc.ins_size);
+    }
+
+}
+
+void StubRegistry::setInitialActivity(InterpreterObject* instance, const std::string& className) {
+    s_currentActivity.instance = instance;
+    s_currentActivity.className = className;
+}

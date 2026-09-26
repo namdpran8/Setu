@@ -128,6 +128,7 @@ HWND WindowManager::s_mainWindow = nullptr;
 HICON WindowManager::s_customIconSmall = nullptr;
 HICON WindowManager::s_customIconBig = nullptr;
 std::function<void(int)> WindowManager::s_clickCallback = nullptr;
+std::function<void()> WindowManager::s_backNavigationCallback = nullptr;
 std::function<bool(int)> WindowManager::s_longClickCallback = nullptr;
 std::shared_ptr<setu::view::View> WindowManager::s_rootView = nullptr;
 bool WindowManager::s_rootViewDumpPending = false;
@@ -159,6 +160,10 @@ Microsoft::WRL::ComPtr<ID2D1Factory1> WindowManager::s_d2dFactory;
 Microsoft::WRL::ComPtr<ID2D1Device> WindowManager::s_d2dDevice;
 Microsoft::WRL::ComPtr<ID2D1DeviceContext> WindowManager::s_d2dContext;
 Microsoft::WRL::ComPtr<IDWriteFactory> WindowManager::s_dWriteFactory;
+
+void WindowManager::setBackNavigationCallback(std::function<void()> cb) {
+    s_backNavigationCallback = cb;
+}
 
 void WindowManager::setClickCallback(std::function<void(int)> cb) {
     s_clickCallback = cb;
@@ -533,7 +538,12 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             if (!routed) {
                 auto root = s_rootView;
                 if (root) {
-                    root->dispatchKeyEvent(event);
+                    routed = root->dispatchKeyEvent(event);
+                }
+            }
+            if (!routed && wParam == VK_ESCAPE) {
+                if (s_backNavigationCallback) {
+                    s_backNavigationCallback();
                 }
             }
             return 0;

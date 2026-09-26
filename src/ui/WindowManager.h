@@ -61,6 +61,7 @@ public:
     static void clearWindow();
     static void setWindowIcon(const std::string& iconPath);
     static void cleanupIcon();
+    static void setBackNavigationCallback(std::function<void()> cb);
     static void setClickCallback(std::function<void(int)> cb);
     static void setLongClickCallback(std::function<bool(int)> cb);
     static std::function<bool(int)> s_longClickCallback;
@@ -91,6 +92,7 @@ private:
     static std::shared_ptr<setu::view::View> s_rootView;
     static bool s_rootViewDumpPending;
     static std::function<void(int)> s_clickCallback;
+    static std::function<void()> s_backNavigationCallback;
     static HWND s_mainWindow;
     static HICON s_customIconSmall;
     static HICON s_customIconBig;

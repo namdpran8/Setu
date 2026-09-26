@@ -319,7 +319,7 @@ int main(int argc, char* argv[]) {
     
     if (mainActivityClass.empty()) {
         Logger::w("Main", "Falling back to hardcoded MainActivity...");
-        mainActivityClass = "Lcom/pranshu/test1/MainActivity;";
+        mainActivityClass = "Lcom/test/ActivityA;";
     }
 
     // --- Phase 4: App Multi-DEX Extraction ---
@@ -399,6 +399,7 @@ int main(int argc, char* argv[]) {
     
     if (!realBytecodeResult.bytecode.empty() && currentDex) {
         InterpreterObject* mainActivityObj = new InterpreterObject(mainActivityClass);
+        StubRegistry::setInitialActivity(mainActivityObj, mainActivityClass);
         std::vector<Value> args;
         args.push_back(Value::MakeObject(mainActivityObj));
         args.push_back(Value::MakeNull()); // Bundle (null for now)
@@ -433,6 +434,7 @@ int main(int argc, char* argv[]) {
     });
 
     // Block on Win32 Message Loop
+    
     WindowManager::runMessageLoop();
     
     WindowManager::cleanupIcon();

@@ -20,6 +20,16 @@ class MultiDexManager;
 // StubFunc signature: takes InterpreterState, args array, and an output Value pointer for returns.
 // Returns a boolean indicating if a Java Exception was "thrown" (true = exception).
 using StubFunc = std::function<bool(InterpreterState* state, const std::vector<Value>& args, Value* outReturn)>;
+#include <memory>
+
+namespace setu { namespace view { class View; } }
+
+struct ActivityRecord {
+    InterpreterObject* instance = nullptr;
+    std::string className;
+    std::shared_ptr<setu::view::View> rootView;
+};
+
 class StubRegistry {
 public:
     static void init(setu::ResourceManager* resManager, MultiDexManager* multiDexManager);
@@ -30,12 +40,21 @@ public:
     static void registerClickListener(int viewId, const Value& listenerObj);
     static InterpreterObject* getClickListener(int controlId);
     static InterpreterObject* getLongClickListener(int controlId);
+
+    // Activity Lifecycle
+    static void performBackNavigation();
+    static void setInitialActivity(InterpreterObject* instance, const std::string& className);
+
 private:
     static std::unordered_map<std::string, StubFunc> stubs;
     static setu::ResourceManager* m_resManager;
     static MultiDexManager* m_multiDexManager;
     static std::unordered_map<int, InterpreterObject*> clickListeners;
     static std::unordered_map<int, InterpreterObject*> longClickListeners;
+    
+    static std::vector<ActivityRecord> s_backStack;
+    static ActivityRecord s_currentActivity;
+
     // Register individual stubs
     static void registerActivityStubs();
     static void registerViewStubs();
