@@ -414,3 +414,9 @@ search_results.txt
 test_dex_dir/
 android/
 com/
+compiled_res.zip
+new_test_apk.zip
+report.md
+run_out*.txt
+test_apk_proj/
+test_apk_unzipped/
