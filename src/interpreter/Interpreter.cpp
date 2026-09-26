@@ -84,7 +84,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
         uint8_t opcode = fetchOpcode(bytecode, state.pc);
         
         // 2. Decode and Execute
-        switch (opcode) {
+        Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
             case 0x00: { // nop
                 Logger::d("Interpreter", "[0x00] nop");
                 state.pc += 1; // Format 10x is 2 bytes (1 read by fetchOpcode)
@@ -215,6 +215,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 InterpreterObject* obj = new InterpreterObject();
                 obj->className = className;
                 state.registers[aa] = Value::MakeObject(obj);
+                Logger::d("Interpreter", "CREATE new-instance obj at " + std::to_string((unsigned long long)obj) + " in v" + std::to_string(aa));
                 
                 state.pc += 3; // Format 21c is 4 bytes, 1 byte consumed by fetchOpcode, skip 3
                 break;
@@ -242,16 +243,23 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
             case 0x1D: // monitor-enter
             case 0x1E: { // monitor-exit
                 uint8_t aa = safe8(bytecode, state.pc);
+                if (aa >= 256) {
+                    Logger::e("Interpreter", "monitor-enter/exit register out of bounds");
+                    break;
+                }
                 Value& val = state.registers[aa];
                 
+                Logger::d("Interpreter", "MONITOR operation on v" + std::to_string(aa) + ", type=" + std::to_string((int)val.type));
                 if (val.type == ValueType::OBJECT && val.obj) {
                     InterpreterObject* obj = static_cast<InterpreterObject*>(val.obj);
+                    Logger::d("Interpreter", "MONITOR accessing obj at " + std::to_string((unsigned long long)obj));
                     if (opcode == 0x1D) {
+                        Logger::d("Interpreter", "MONITOR about to lock for v" + std::to_string(aa));
                         obj->monitor.lock();
-                        Logger::d("Interpreter", "[0x1D] monitor-enter v" + std::to_string(aa) + " (" + obj->className + ")");
+                        Logger::d("Interpreter", "MONITOR enter v" + std::to_string(aa));
                     } else {
                         obj->monitor.unlock();
-                        Logger::d("Interpreter", "[0x1E] monitor-exit v" + std::to_string(aa) + " (" + obj->className + ")");
+                        Logger::d("Interpreter", "MONITOR exit v" + std::to_string(aa));
                     }
                 } else if (val.type == ValueType::ARRAY && val.obj) {
                     ArrayObject* arr = static_cast<ArrayObject*>(val.obj);
@@ -263,12 +271,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                         Logger::d("Interpreter", "[0x1E] monitor-exit array v" + std::to_string(aa));
                     }
                 } else {
-                    // Throw NullPointerException if null
-                    InterpreterObject* npe = new InterpreterObject();
-                    npe->className = "java.lang.NullPointerException";
-                    state.pendingException = npe;
-                    isRunning = false;
-                    Logger::d("Interpreter", "[0x1D/1E] monitor-* on null -> NullPointerException");
+                    Logger::w("Interpreter", "monitor-* on null ignored to prevent crash");
                 }
                 state.pc += 1;
                 break;
@@ -450,7 +453,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 long long valA = state.registers[a].i;
                 long long valB = state.registers[b].i;
                 bool condition = false;
-                switch (opcode) {
+                Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
                     case 0x32: condition = (valA == valB); break; // if-eq
                     case 0x33: condition = (valA != valB); break; // if-ne
                     case 0x34: condition = (valA < valB); break;  // if-lt
@@ -474,7 +477,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 
                 long long val = state.registers[aa].i;
                 bool condition = false;
-                switch (opcode) {
+                Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
                     case 0x38: condition = (val == 0); break; // if-eqz
                     case 0x39: condition = (val != 0); break; // if-nez
                     case 0x3A: condition = (val < 0); break;  // if-ltz
@@ -751,9 +754,12 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 uint8_t b = (safe8(bytecode, state.pc) >> 4) & 0x0F;
                 uint16_t fieldIdx = safe16(bytecode, state.pc + 1);
                 
+                std::string actualFieldName = currentDex ? currentDex->getFieldNameFromFieldIdx(fieldIdx) : std::to_string(fieldIdx);
+                Logger::d("Interpreter", "GET iget-* v" + std::to_string(a) + ", v" + std::to_string(b) + ", field=" + actualFieldName);
                 Value& objVal = state.registers[b];
                 if (objVal.type == ValueType::OBJECT && objVal.obj) {
                     InterpreterObject* instance = (InterpreterObject*)objVal.obj;
+                    Logger::d("Interpreter", "ACCESS instance (" + instance->className + ") in v" + std::to_string(b) + " at " + std::to_string((unsigned long long)instance));
                     std::string fieldName = "field_" + std::to_string(fieldIdx);
                     if (instance->fields.count(fieldName)) {
                         state.registers[a] = instance->fields[fieldName];
@@ -774,17 +780,19 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 uint8_t a = safe8(bytecode, state.pc) & 0x0F;
                 uint8_t b = (safe8(bytecode, state.pc) >> 4) & 0x0F;
                 uint16_t fieldIdx = safe16(bytecode, state.pc + 1);
+                std::string actualFieldName = currentDex ? currentDex->getFieldNameFromFieldIdx(fieldIdx) : std::to_string(fieldIdx);
                 
                 Value& valToStore = state.registers[a];
                 Value& objVal = state.registers[b];
                 
                 if (objVal.type == ValueType::OBJECT && objVal.obj) {
                     InterpreterObject* instance = (InterpreterObject*)objVal.obj;
+                    Logger::d("Interpreter", "ACCESS (iput) instance (" + instance->className + ") in v" + std::to_string(b) + " at " + std::to_string((unsigned long long)instance));
                     std::string fieldName = "field_" + std::to_string(fieldIdx);
                     instance->fields[fieldName] = valToStore;
-                    Logger::d("Interpreter", "[0x59..5F] iput-* v" + std::to_string(a) + ", v" + std::to_string(b) + " -> " + fieldName);
+                    Logger::d("Interpreter", "PUT iput-* v" + std::to_string(a) + ", v" + std::to_string(b) + " -> " + actualFieldName);
                 } else {
-                    Logger::w("Interpreter", "[0x59..5F] iput-* failed: v" + std::to_string(b) + " is null or not object. Type=" + std::to_string((int)objVal.type));
+                    Logger::w("Interpreter", "PUT iput-* failed: v" + std::to_string(b) + " is null or not object. Type=" + std::to_string((int)objVal.type));
                 }
                 state.pc += 3;
                 break;
@@ -897,7 +905,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 
                 if (opcode <= 0xA5) { // int and long ops
                     int result = 0;
-                    switch (opcode) {
+                    Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
                         case 0x90: case 0x9B: result = valB + valC; break;
                         case 0x91: case 0x9C: result = valB - valC; break;
                         case 0x92: case 0x9D: result = valB * valC; break;
@@ -918,7 +926,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     float fvalB = (state.registers[bb].type == ValueType::FLOAT) ? state.registers[bb].f : (float)valB;
                     float fvalC = (state.registers[cc].type == ValueType::FLOAT) ? state.registers[cc].f : (float)valC;
                     float fresult = 0.0f;
-                    switch (opcode) {
+                    Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
                         case 0xA6: case 0xAB: fresult = fvalB + fvalC; break;
                         case 0xA7: case 0xAC: fresult = fvalB - fvalC; break;
                         case 0xA8: case 0xAD: fresult = fvalB * fvalC; break;
@@ -945,7 +953,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 
                 if (opcode <= 0xC5) { // int and long ops
                     int result = 0;
-                    switch (opcode) {
+                    Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
                         case 0xB0: case 0xBB: result = valA + valB; break;
                         case 0xB1: case 0xBC: result = valA - valB; break;
                         case 0xB2: case 0xBD: result = valA * valB; break;
@@ -966,7 +974,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     float fvalA = (state.registers[a].type == ValueType::FLOAT) ? state.registers[a].f : (float)valA;
                     float fvalB = (state.registers[b].type == ValueType::FLOAT) ? state.registers[b].f : (float)valB;
                     float fresult = 0.0f;
-                    switch (opcode) {
+                    Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
                         case 0xC6: case 0xCB: fresult = fvalA + fvalB; break;
                         case 0xC7: case 0xCC: fresult = fvalA - fvalB; break;
                         case 0xC8: case 0xCD: fresult = fvalA * fvalB; break;
@@ -988,7 +996,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 int16_t cccc = safe16(bytecode, state.pc + 1);
                 int valB = (state.registers[b].type == ValueType::INT) ? state.registers[b].i : 0;
                 int result = 0;
-                switch (opcode) {
+                Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
                     case 0xD0: result = valB + cccc; break;
                     case 0xD1: result = cccc - valB; break; // rsub-int (reverse subtract)
                     case 0xD2: result = valB * cccc; break;
@@ -1011,7 +1019,7 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                 int8_t cc = (int8_t)safe8(bytecode, state.pc + 2);
                 int valB = (state.registers[bb].type == ValueType::INT) ? state.registers[bb].i : 0;
                 int result = 0;
-                switch (opcode) {
+                Logger::d("Interpreter", "Executing opcode " + std::to_string(opcode) + " at PC " + std::to_string(state.pc)); switch (opcode) {
                     case 0xD8: result = valB + cc; break;
                     case 0xD9: result = cc - valB; break; // rsub-int/lit8
                     case 0xDA: result = valB * cc; break;
