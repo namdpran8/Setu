@@ -240,9 +240,22 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
                             
                             std::vector<Value> initArgs;
                             initArgs.push_back(Value::MakeObject(viewObj));
+                            
+                            InterpreterObject* ctxObj = new InterpreterObject();
+                            ctxObj->className = "Landroid/content/Context;";
+                            
+                            InterpreterObject* attrsObj = new InterpreterObject();
+                            attrsObj->className = "Landroid/util/AttributeSet;";
+                            
                             for (size_t i = 1; i < initBc.ins_size; i++) {
-                                if (i == 3) {
-                                    initArgs.push_back(Value::MakeInt(0));
+                                if (i == 1) {
+                                    initArgs.push_back(Value::MakeObject(ctxObj));
+                                } else if (i == 2) {
+                                    initArgs.push_back(Value::MakeObject(attrsObj));
+                                } else if (i == 3) {
+                                    initArgs.push_back(Value::MakeInt(0)); // defStyleAttr
+                                } else if (i == 4) {
+                                    initArgs.push_back(Value::MakeInt(0)); // defStyleRes
                                 } else {
                                     initArgs.push_back(Value::MakeNull());
                                 }
