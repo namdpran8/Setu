@@ -197,6 +197,24 @@ void SkiaCanvas::drawText(const std::wstring& text, float x, float y, const Pain
     
     std::string familyName = "Segoe UI";
     SkFontStyle fontStyle = SkFontStyle::Normal();
+    if (paint.getTypeface()) {
+        familyName = paint.getTypeface()->getFamilyName();
+        switch (paint.getTypeface()->getStyle()) {
+            case Typeface::BOLD:
+                fontStyle = SkFontStyle::Bold();
+                break;
+            case Typeface::ITALIC:
+                fontStyle = SkFontStyle::Italic();
+                break;
+            case Typeface::BOLD_ITALIC:
+                fontStyle = SkFontStyle::BoldItalic();
+                break;
+            case Typeface::NORMAL:
+            default:
+                fontStyle = SkFontStyle::Normal();
+                break;
+        }
+    }
     auto key = std::make_pair(familyName, fontStyle);
     
     sk_sp<SkTypeface> typeface;

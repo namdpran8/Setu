@@ -143,6 +143,13 @@ void TextView::drawableStateChanged() {
     }
 }
 
+void TextView::setTypeface(graphics::TypefacePtr typeface) {
+    if (mTextPaint.getTypeface() == typeface) return;
+    mTextPaint.setTypeface(typeface);
+    mLayout.reset();
+    invalidate();
+}
+
 void TextView::setTextSize(float size) {
     if (mTextPaint.getTextSize() == size) return;
     mTextPaint.setTextSize(size);

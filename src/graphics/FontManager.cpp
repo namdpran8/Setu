@@ -34,17 +34,19 @@ namespace {
 
 // Text sizes come from dimension resources and can be fractional, so quantise
 // to 1/100 px before using them as a cache key.
-uint64_t sizeKey(const Paint& paint) {
-    return (uint64_t)(long long)std::lround(paint.getTextSize() * 100.0);
+std::string formatKey(const Paint& paint) {
+    long long size = std::lround(paint.getTextSize() * 100.0);
+    if (!paint.getTypeface()) return std::to_string(size);
+    return std::to_string(size) + "_" + paint.getTypeface()->getFamilyName() + "_" + std::to_string(paint.getTypeface()->getStyle());
 }
 
-std::unordered_map<uint64_t, ComPtr<IDWriteTextFormat>>& formatCache() {
-    static std::unordered_map<uint64_t, ComPtr<IDWriteTextFormat>> cache;
+std::unordered_map<std::string, ComPtr<IDWriteTextFormat>>& formatCache() {
+    static std::unordered_map<std::string, ComPtr<IDWriteTextFormat>> cache;
     return cache;
 }
 
-std::unordered_map<uint64_t, FontMetrics>& metricsCache() {
-    static std::unordered_map<uint64_t, FontMetrics> cache;
+std::unordered_map<std::string, FontMetrics>& metricsCache() {
+    static std::unordered_map<std::string, FontMetrics> cache;
     return cache;
 }
 
@@ -110,16 +112,52 @@ void FontManager::setFamilyName(const wchar_t* family) {
 IDWriteTextFormat* FontManager::getTextFormat(const Paint& paint) {
     if (!mFactory) return nullptr;
 
-    const uint64_t key = sizeKey(paint);
+    const std::string key = formatKey(paint);
     auto& cache = formatCache();
     auto it = cache.find(key);
     if (it != cache.end()) return it->second.Get();
 
+    std::wstring familyW = mFamilyName;
+    DWRITE_FONT_WEIGHT weight = DWRITE_FONT_WEIGHT_NORMAL;
+    DWRITE_FONT_STYLE style = DWRITE_FONT_STYLE_NORMAL;
+    
+    if (paint.getTypeface()) {
+        std::string family = paint.getTypeface()->getFamilyName();
+        if (!family.empty()) {
+            familyW = std::wstring(family.begin(), family.end());
+        }
+        
+        switch (paint.getTypeface()->getStyle()) {
+            case Typeface::BOLD:
+                weight = DWRITE_FONT_WEIGHT_BOLD;
+                break;
+            case Typeface::ITALIC:
+                style = DWRITE_FONT_STYLE_ITALIC;
+                break;
+            case Typeface::BOLD_ITALIC:
+                weight = DWRITE_FONT_WEIGHT_BOLD;
+                style = DWRITE_FONT_STYLE_ITALIC;
+                break;
+            case Typeface::NORMAL:
+            default:
+                break;
+        }
+    }
+
     ComPtr<IDWriteTextFormat> format;
     HRESULT hr = mFactory->CreateTextFormat(
-        mFamilyName, nullptr,
-        DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+        familyW.c_str(), nullptr,
+        weight, style, DWRITE_FONT_STRETCH_NORMAL,
         paint.getTextSize(), L"en-us", &format);
+        
+    if (FAILED(hr) || !format) {
+        // Fallback to system default if family not found
+        hr = mFactory->CreateTextFormat(
+            mFamilyName, nullptr,
+            weight, style, DWRITE_FONT_STRETCH_NORMAL,
+            paint.getTextSize(), L"en-us", &format);
+    }
+        
     if (FAILED(hr) || !format) {
         Logger::e("FontManager", "CreateTextFormat failed, hr=" + std::to_string((long)hr));
         return nullptr;
@@ -149,7 +187,13 @@ float FontManager::measureText(const std::wstring& text, const Paint& paint) {
         }
     }
 
-    GdiFontScope gdi(mFamilyName, paint.getTextSize());
+    std::wstring familyW = mFamilyName;
+    if (paint.getTypeface() && !paint.getTypeface()->getFamilyName().empty()) {
+        std::string family = paint.getTypeface()->getFamilyName();
+        familyW = std::wstring(family.begin(), family.end());
+    }
+
+    GdiFontScope gdi(familyW.c_str(), paint.getTextSize());
     if (gdi.valid()) {
         SIZE size = {};
         if (GetTextExtentPoint32W(gdi.hdc, text.c_str(), (int)text.length(), &size)) {
@@ -163,7 +207,7 @@ float FontManager::measureText(const std::wstring& text, const Paint& paint) {
 }
 
 FontMetrics FontManager::getFontMetrics(const Paint& paint) {
-    const uint64_t key = sizeKey(paint);
+    const std::string key = formatKey(paint);
     auto& cache = metricsCache();
     auto cached = cache.find(key);
     if (cached != cache.end()) return cached->second;

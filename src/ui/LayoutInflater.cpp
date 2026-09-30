@@ -187,7 +187,82 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         }
     } else {
         view = createViewByTag(tag, parser, resManager, theme);
-        
+
+        // Shared helper: given a resolved native view and the original DEX class
+        // descriptor, look up and execute the Dalvik <init>(Context, AttributeSet[, int])
+        // bytecode so that the class's own constructor body runs against the
+        // already-constructed native proxy object.  Both code paths below use this
+        // lambda so the mechanics stay identical and there is no duplication.
+        auto tryRunDexCtor = [&](const std::string& originalClass) {
+            if (!dexManager || !view) return;
+
+            // Try (Context, AttributeSet) first, fall back to (Context, AttributeSet, int)
+            std::string initSig = originalClass + "-><init>(Landroid/content/Context;Landroid/util/AttributeSet;)V";
+            auto [initBc, initDex] = dexManager->getMethodBytecode(initSig);
+
+            if (initBc.bytecode.empty()) {
+                std::string initSig3 = originalClass + "-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V";
+                auto res3 = dexManager->getMethodBytecode(initSig3);
+                initBc = res3.first;
+                initDex = res3.second;
+            }
+
+            if (initBc.bytecode.empty() || !initDex) {
+                Logger::d("LayoutInflater", "No DEX <init> bytecode found for " + originalClass + " (may be framework-only)");
+                return;
+            }
+
+            Logger::i("LayoutInflater", "Executing DEX <init> for " + originalClass);
+
+            InterpreterObject* viewObj = new InterpreterObject();
+            viewObj->className = originalClass;
+            viewObj->nativeHandle = view.get();
+
+            std::vector<Value> initArgs;
+            initArgs.push_back(Value::MakeObject(viewObj));
+
+            InterpreterObject* ctxObj = new InterpreterObject();
+            ctxObj->className = "Landroid/content/Context;";
+
+            InterpreterObject* attrsObj = new InterpreterObject();
+            attrsObj->className = "Landroid/util/AttributeSet;";
+
+            for (size_t i = 1; i < initBc.ins_size; i++) {
+                if (i == 1) {
+                    initArgs.push_back(Value::MakeObject(ctxObj));
+                } else if (i == 2) {
+                    initArgs.push_back(Value::MakeObject(attrsObj));
+                } else if (i == 3) {
+                    initArgs.push_back(Value::MakeInt(0)); // defStyleAttr
+                } else if (i == 4) {
+                    initArgs.push_back(Value::MakeInt(0)); // defStyleRes
+                } else {
+                    initArgs.push_back(Value::MakeNull());
+                }
+            }
+
+            Interpreter vm;
+            vm.executeMethod(initBc.bytecode, initDex, dexManager, initArgs, initBc.registers_size, initBc.ins_size);
+        };
+
+        // ── PATH A: tag was recognised by createViewByTag() ──────────────────────
+        // If the XML tag is a qualified class name (contains '.'), the class may be
+        // a third-party or library class whose DEX <init> still needs to execute even
+        // though createViewByTag() already handed back a native proxy object.
+        //
+        // THE BUG FIXED HERE: previously "com.sothree.slidinguppanel.SlidingUpPanelLayout"
+        // was hardcoded to return OverlayPanelLayout at line ~150, which caused this
+        // block to be skipped entirely (it was gated on `if (!view)`).  That meant its
+        // Dalvik constructor never ran, leaving fields like its lock object null — the
+        // root cause of the null monitor-enter crash later.
+        if (view && tag.find('.') != std::string::npos) {
+            std::string dexClass = tag;
+            for (char& c : dexClass) { if (c == '.') c = '/'; }
+            dexClass = "L" + dexClass + ";";
+            tryRunDexCtor(dexClass);
+        }
+
+        // ── PATH B: tag was NOT recognised — walk the superclass chain ────────────
         if (!view) {
             if (dexManager) {
                 std::string currentClass = tag;
@@ -199,9 +274,9 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
                 } else {
                     currentClass = "Landroid/widget/" + currentClass + ";";
                 }
-                
+
                 std::string originalClass = currentClass;
-                
+
                 int iterations = 0;
                 while (iterations < 50) {
                     iterations++;
@@ -209,7 +284,7 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
                     if (superDescriptor.empty()) {
                         break;
                     }
-                    
+
                     std::string superTag = superDescriptor;
                     if (superTag.length() > 2 && superTag.front() == 'L' && superTag.back() == ';') {
                         superTag = superTag.substr(1, superTag.length() - 2);
@@ -217,61 +292,19 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
                             if (c == '/') c = '.';
                         }
                     }
-                    
+
                     view = createViewByTag(superTag, parser, resManager, theme);
                     if (view) {
                         Logger::i("LayoutInflater", "Resolved custom view " + tag + " to known ancestor " + superTag);
-                        
-                        std::string initSig2 = originalClass + "-><init>(Landroid/content/Context;Landroid/util/AttributeSet;)V";
-                        auto [initBc, initDex] = dexManager->getMethodBytecode(initSig2);
-                        
-                        if (initBc.bytecode.empty()) {
-                            std::string initSig3 = originalClass + "-><init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V";
-                            auto res3 = dexManager->getMethodBytecode(initSig3);
-                            initBc = res3.first;
-                            initDex = res3.second;
-                        }
-                        
-                        if (!initBc.bytecode.empty() && initDex) {
-                            Logger::i("LayoutInflater", "Executing custom view constructor for " + originalClass);
-                            InterpreterObject* viewObj = new InterpreterObject();
-                            viewObj->className = originalClass;
-                            viewObj->nativeHandle = view.get();
-                            
-                            std::vector<Value> initArgs;
-                            initArgs.push_back(Value::MakeObject(viewObj));
-                            
-                            InterpreterObject* ctxObj = new InterpreterObject();
-                            ctxObj->className = "Landroid/content/Context;";
-                            
-                            InterpreterObject* attrsObj = new InterpreterObject();
-                            attrsObj->className = "Landroid/util/AttributeSet;";
-                            
-                            for (size_t i = 1; i < initBc.ins_size; i++) {
-                                if (i == 1) {
-                                    initArgs.push_back(Value::MakeObject(ctxObj));
-                                } else if (i == 2) {
-                                    initArgs.push_back(Value::MakeObject(attrsObj));
-                                } else if (i == 3) {
-                                    initArgs.push_back(Value::MakeInt(0)); // defStyleAttr
-                                } else if (i == 4) {
-                                    initArgs.push_back(Value::MakeInt(0)); // defStyleRes
-                                } else {
-                                    initArgs.push_back(Value::MakeNull());
-                                }
-                            }
-                            
-                            Interpreter vm;
-                            vm.executeMethod(initBc.bytecode, initDex, dexManager, initArgs, initBc.registers_size, initBc.ins_size);
-                        }
-                        
+                        // Reuse the shared helper — identical mechanics as Path A.
+                        tryRunDexCtor(originalClass);
                         break;
                     }
-                    
+
                     currentClass = superDescriptor;
                 }
             }
-            
+
             if (!view) {
                 Logger::w("LayoutInflater", "Unsupported view tag: " + tag + ", completely unresolved. Using FrameLayout fallback.");
                 view = std::make_shared<setu::view::FrameLayout>();

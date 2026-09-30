@@ -61,11 +61,11 @@ static std::string getAndroidClassName(const setu::view::View* view) {
     std::string orig = view->getOriginalClassName();
     if (!orig.empty()) return orig;
     
-    if (static_cast<const setu::widget::EditText*>(view)) return "Landroid/widget/EditText;";
-    if (static_cast<const setu::widget::Button*>(view)) return "Landroid/widget/Button;";
-    if (static_cast<const setu::widget::TextView*>(view)) return "Landroid/widget/TextView;";
-    if (static_cast<const setu::view::OverlayPanelLayout*>(view)) return "Lcom/sothree/slidinguppanel/SlidingUpPanelLayout;";
-    if (static_cast<const setu::view::ViewGroup*>(view)) return "Landroid/view/ViewGroup;";
+    if (dynamic_cast<const setu::widget::EditText*>(view)) return "Landroid/widget/EditText;";
+    if (dynamic_cast<const setu::widget::Button*>(view)) return "Landroid/widget/Button;";
+    if (dynamic_cast<const setu::widget::TextView*>(view)) return "Landroid/widget/TextView;";
+    if (dynamic_cast<const setu::view::OverlayPanelLayout*>(view)) return "Lcom/sothree/slidinguppanel/SlidingUpPanelLayout;";
+    if (dynamic_cast<const setu::view::ViewGroup*>(view)) return "Landroid/view/ViewGroup;";
     return "Landroid/view/View;";
 }
 
@@ -1066,7 +1066,7 @@ void StubRegistry::registerViewStubs() {
                         WindowManager::setRootView(rootView);
                         
                         InterpreterObject* viewObj = new InterpreterObject();
-                        viewObj->className = "Landroid/view/View;";
+                        viewObj->className = getAndroidClassName(rootView.get());
                         viewObj->nativeHandle = rootView.get();
                         if (outReturn) *outReturn = Value::MakeObject(viewObj);
                     }
@@ -1348,7 +1348,22 @@ void StubRegistry::registerViewStubs() {
         Logger::w("StubRegistry", "[STUB-DEFERRED] TextView.addTextChangedListener: Needs TextWatcher/Spannable infra.");
         return false;
     };
-    stubs["Landroid/view/ViewGroup;->requestLayout()V"] = emptyStub;
+    // In AOSP, ViewGroup does NOT override View.requestLayout(). Instead, its layout
+    // suppression logic (mSuppressLayout, mLayoutCalledWhileSuppressed) is handled inside
+    // layout() and suppressLayout(). Therefore, delegating straight to the native
+    // View::requestLayout() call is the correct behavior for ViewGroup subclasses.
+    // (Previously this was wired to an emptyStub tripwire, which caused
+    //  a crash whenever a ViewGroup-descended object called requestLayout().)
+    stubs["Landroid/view/ViewGroup;->requestLayout()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (!args.empty() && args[0].type == ValueType::OBJECT && args[0].obj) {
+            auto* viewObj = static_cast<InterpreterObject*>(args[0].obj);
+            auto* view = static_cast<setu::view::View*>(viewObj->nativeHandle);
+            if (view) {
+                view->requestLayout();
+            }
+        }
+        return false;
+    };
     stubs["Ljava/lang/ThreadLocal;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         Logger::d("StubRegistry", "[STUB-NOOP] ThreadLocal.<init> is intentionalNoOp.");
         return false;
@@ -1822,7 +1837,70 @@ void StubRegistry::registerViewStubs() {
     };
 
     stubs["Landroid/widget/TextView;->setTypeface(Landroid/graphics/Typeface;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        Logger::w("StubRegistry", "[STUB-DEFERRED] TextView.setTypeface: FontManager exists but lacks Typeface parsing/mapping infra.");
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+            setu::widget::TextView* view = dynamic_cast<setu::widget::TextView*>((setu::view::View*)viewObj->nativeHandle);
+            if (view) {
+                // Extract typeface from args[1]
+                setu::graphics::TypefacePtr nativeTf = nullptr;
+                if (args[1].type == ValueType::OBJECT && args[1].obj) {
+                    InterpreterObject* tfObj = (InterpreterObject*)args[1].obj;
+                    std::string family = "Segoe UI";
+                    setu::graphics::Typeface::Style style = setu::graphics::Typeface::NORMAL;
+                    
+                    auto familyIt = tfObj->fields.find("family");
+                    if (familyIt != tfObj->fields.end() && familyIt->second.type == ValueType::OBJECT) {
+                        InterpreterObject* familyObj = (InterpreterObject*)familyIt->second.obj;
+                        auto strIt = familyObj->fields.find("string_value");
+                        if (strIt != familyObj->fields.end() && strIt->second.type == ValueType::OBJECT) {
+                            family = ((InterpreterObject*)strIt->second.obj)->className;
+                        }
+                    }
+                    
+                    auto styleIt = tfObj->fields.find("style");
+                    if (styleIt != tfObj->fields.end() && styleIt->second.type == ValueType::INT) {
+                        style = (setu::graphics::Typeface::Style)styleIt->second.i;
+                    }
+                    
+                    nativeTf = setu::graphics::Typeface::create(family, style);
+                }
+                view->setTypeface(nativeTf);
+            }
+        }
+        return false;
+    };
+
+    stubs["Landroid/graphics/Typeface;->create(Ljava/lang/String;I)Landroid/graphics/Typeface;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            std::string family = "Segoe UI";
+            int style = 0; // NORMAL
+            
+            if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                InterpreterObject* strObj = (InterpreterObject*)args[0].obj;
+                auto it = strObj->fields.find("string_value");
+                if (it != strObj->fields.end() && it->second.type == ValueType::OBJECT) {
+                    family = ((InterpreterObject*)it->second.obj)->className;
+                }
+            }
+            if (args.size() > 1 && args[1].type == ValueType::INT) {
+                style = args[1].i;
+            }
+            
+            InterpreterObject* tfObj = new InterpreterObject();
+            tfObj->className = "Landroid/graphics/Typeface;";
+            
+            // Store family as a Java String equivalent
+            InterpreterObject* familyStrObj = new InterpreterObject();
+            familyStrObj->className = "Ljava/lang/String;";
+            InterpreterObject* inner = new InterpreterObject();
+            inner->className = family;
+            familyStrObj->fields["string_value"] = Value::MakeObject(inner);
+            
+            tfObj->fields["family"] = Value::MakeObject(familyStrObj);
+            tfObj->fields["style"] = Value::MakeInt(style);
+            
+            *outReturn = Value::MakeObject(tfObj);
+        }
         return false;
     };
     stubs["Landroid/view/View;->setOnKeyListener(Landroid/view/View$OnKeyListener;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {

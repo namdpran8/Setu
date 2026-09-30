@@ -271,7 +271,20 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                         Logger::d("Interpreter", "[0x1E] monitor-exit array v" + std::to_string(aa));
                     }
                 } else {
-                    Logger::w("Interpreter", "monitor-* on null ignored to prevent crash");
+                    // UNEXPECTED: monitor-enter/exit on a null or non-object register.
+                    // This guard prevents a hard crash, but it should NOT fire in normal
+                    // operation.  If you see this log it means a class field that should
+                    // have been initialised by its Dalvik <init> is still null — which
+                    // indicates a constructor-skipping bug (like the one fixed for
+                    // SlidingUpPanelLayout in LayoutInflater.cpp) has re-appeared for
+                    // a different class.  Please investigate and fix the root cause
+                    // rather than relying on this guard as a long-term silencer.
+                    Logger::e("Interpreter",
+                        "UNEXPECTED monitor-enter/exit on null/non-object register v"
+                        + std::to_string(aa)
+                        + " (type=" + std::to_string((int)val.type) + "). "
+                        "A Dalvik <init> likely did not run for this object — see "
+                        "LayoutInflater.cpp tryRunDexCtor for the canonical fix.");
                 }
                 state.pc += 1;
                 break;

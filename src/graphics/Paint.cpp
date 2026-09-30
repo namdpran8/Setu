@@ -22,7 +22,8 @@ Paint::Paint()
       mStrokeWidth(1.0f),
       mTextSize(12.0f),
       mAntiAlias(true),
-      mColorFilter(nullptr) {
+      mColorFilter(nullptr),
+      mTypeface(nullptr) {
 }
 
 void Paint::setColor(uint32_t color) {
@@ -87,6 +88,14 @@ void Paint::setColorFilter(ColorFilterPtr filter) {
 
 ColorFilterPtr Paint::getColorFilter() const {
     return mColorFilter;
+}
+
+void Paint::setTypeface(TypefacePtr typeface) {
+    mTypeface = typeface;
+}
+
+TypefacePtr Paint::getTypeface() const {
+    return mTypeface;
 }
 
 } // namespace graphics

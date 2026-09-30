@@ -75,16 +75,26 @@ Value MultiDexManager::getStaticFieldValue(const std::string& className, const s
     if (className == "Landroid/graphics/Typeface;") {
         static std::unordered_map<std::string, Value> s_typefaces;
         if (s_typefaces.empty()) {
-            auto makeTypeface = []() {
+            auto makeTypeface = [](const std::string& family, int style) {
                 InterpreterObject* obj = new InterpreterObject();
                 obj->className = "Landroid/graphics/Typeface;";
+                
+                InterpreterObject* familyStrObj = new InterpreterObject();
+                familyStrObj->className = "Ljava/lang/String;";
+                InterpreterObject* inner = new InterpreterObject();
+                inner->className = family;
+                familyStrObj->fields["string_value"] = Value::MakeObject(inner);
+                
+                obj->fields["family"] = Value::MakeObject(familyStrObj);
+                obj->fields["style"] = Value::MakeInt(style);
+                
                 return Value::MakeObject(obj);
             };
-            s_typefaces["DEFAULT"] = makeTypeface();
-            s_typefaces["DEFAULT_BOLD"] = makeTypeface();
-            s_typefaces["SANS_SERIF"] = makeTypeface();
-            s_typefaces["SERIF"] = makeTypeface();
-            s_typefaces["MONOSPACE"] = makeTypeface();
+            s_typefaces["DEFAULT"] = makeTypeface("Segoe UI", 0);
+            s_typefaces["DEFAULT_BOLD"] = makeTypeface("Segoe UI", 1);
+            s_typefaces["SANS_SERIF"] = makeTypeface("Segoe UI", 0);
+            s_typefaces["SERIF"] = makeTypeface("Times New Roman", 0);
+            s_typefaces["MONOSPACE"] = makeTypeface("Consolas", 0);
         }
         
         auto it = s_typefaces.find(fieldName);

@@ -33,6 +33,9 @@ public:
     void setTextColor(uint32_t color);
     uint32_t getTextColor() const { return mTextPaint.getColor(); }
 
+    void setTypeface(graphics::TypefacePtr typeface);
+    graphics::TypefacePtr getTypeface() const { return mTextPaint.getTypeface(); }
+
     // android:textColor="@color/some_selector". The colour follows the view's
     // state, which is how a real disabled TextView greys out - the stock
     // framework text colour is a selector with a disabled entry, not a constant.
