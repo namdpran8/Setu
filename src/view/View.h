@@ -103,6 +103,8 @@ public:
     // To be overridden by subclasses
     virtual void onAttachedToWindow() {}
     virtual void onDetachedFromWindow() {}
+    static std::function<bool(View*, int, int)> s_onMeasureCallback;
+    static void setOnMeasureCallback(std::function<bool(View*, int, int)> cb) { s_onMeasureCallback = cb; }
     virtual void onMeasure(int widthMeasureSpec, int heightMeasureSpec);
     virtual void onLayout(bool changed, int l, int t, int r, int b);
     virtual void onDraw(graphics::Canvas& canvas);

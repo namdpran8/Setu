@@ -50,7 +50,7 @@ void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                 useExcessSpace = (lp->height == 0);
                 childHeightSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
             } else {
-                childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
+                childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin + usedSize, lp->height);
             }
         } else {
             childHeightSpec = ViewGroup::getChildMeasureSpec(heightMeasureSpec, mPaddingTop + mPaddingBottom + lp->topMargin + lp->bottomMargin, lp->height);
@@ -59,7 +59,7 @@ void LinearLayout::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                 useExcessSpace = (lp->width == 0);
                 childWidthSpec = View::makeMeasureSpec(0, View::MEASURE_SPEC_UNSPECIFIED);
             } else {
-                childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin, lp->width);
+                childWidthSpec = ViewGroup::getChildMeasureSpec(widthMeasureSpec, mPaddingLeft + mPaddingRight + lp->leftMargin + lp->rightMargin + usedSize, lp->width);
             }
         }
 

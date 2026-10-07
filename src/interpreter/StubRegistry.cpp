@@ -39,6 +39,36 @@ std::unordered_map<int, InterpreterObject*> StubRegistry::clickListeners;
 std::unordered_map<int, InterpreterObject*> StubRegistry::longClickListeners;
 std::vector<ActivityRecord> StubRegistry::s_backStack;
 ActivityRecord StubRegistry::s_currentActivity;
+static std::unordered_map<setu::view::View*, InterpreterObject*> s_viewWrappers;
+
+static std::string getAndroidClassName(const setu::view::View* view);
+
+InterpreterObject* StubRegistry::getOrCreateViewWrapper(setu::view::View* view) {
+    if (!view) return nullptr;
+    auto it = s_viewWrappers.find(view);
+    if (it != s_viewWrappers.end()) return it->second;
+    InterpreterObject* viewObj = new InterpreterObject();
+    viewObj->className = getAndroidClassName(view);
+    viewObj->nativeHandle = view;
+    s_viewWrappers[view] = viewObj;
+    return viewObj;
+}
+
+void StubRegistry::registerViewWrapper(setu::view::View* view, InterpreterObject* obj) {
+    if (view && obj) {
+        s_viewWrappers[view] = obj;
+    }
+}
+
+void StubRegistry::unregisterViewWrapper(setu::view::View* view) {
+    if (view) {
+        auto it = s_viewWrappers.find(view);
+        if (it != s_viewWrappers.end()) {
+            delete it->second; // Free the InterpreterObject wrapper
+            s_viewWrappers.erase(it);
+        }
+    }
+}
 
 static std::wstring utf8_to_utf16(const std::string& utf8) {
     if (utf8.empty()) return std::wstring();
@@ -87,9 +117,7 @@ static bool findRequiredView(const std::vector<Value>& args, Value* outReturn) {
         return true;
     }
 
-    auto* viewObject = new InterpreterObject();
-    viewObject->className = getAndroidClassName(foundView.get());
-    viewObject->nativeHandle = foundView.get();
+    auto* viewObject = StubRegistry::getOrCreateViewWrapper(foundView.get());
     if (outReturn) *outReturn = Value::MakeObject(viewObject);
     return false;
 }
@@ -111,9 +139,7 @@ public:
         auto [bc, dex] = mDexManager->getMethodBytecode(sig);
         if (bc.bytecode.empty()) return nullptr;
 
-        InterpreterObject* parentObj = new InterpreterObject();
-        parentObj->className = "Landroid/view/ViewGroup;";
-        parentObj->nativeHandle = parent;
+        InterpreterObject* parentObj = StubRegistry::getOrCreateViewWrapper(parent);
 
         std::vector<Value> args = {
             Value::MakeObject(mDalvikAdapter),
@@ -126,6 +152,17 @@ public:
         if (ret.type == ValueType::OBJECT && ret.obj) {
             InterpreterObject* holderObj = (InterpreterObject*)ret.obj;
             auto it = holderObj->fields.find("itemView");
+            if (it == holderObj->fields.end()) {
+                for (auto fieldIt = holderObj->fields.begin(); fieldIt != holderObj->fields.end(); ++fieldIt) {
+                    if (fieldIt->second.type == ValueType::OBJECT && fieldIt->second.obj) {
+                        InterpreterObject* candidate = (InterpreterObject*)fieldIt->second.obj;
+                        if (candidate->nativeHandle) {
+                            it = fieldIt;
+                            break;
+                        }
+                    }
+                }
+            }
             if (it != holderObj->fields.end() && it->second.type == ValueType::OBJECT && it->second.obj) {
                 InterpreterObject* itemViewObj = (InterpreterObject*)it->second.obj;
                 if (itemViewObj->nativeHandle) {
@@ -446,9 +483,7 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
                 childView = findViewRecursive(WindowManager::getRootView().get(), id);
                 
                 if (childView) {
-                    InterpreterObject* viewObj = new InterpreterObject();
-                    viewObj->className = getAndroidClassName(childView);
-                    viewObj->nativeHandle = childView;
+                    InterpreterObject* viewObj = StubRegistry::getOrCreateViewWrapper(childView);
                     if (outReturn) *outReturn = Value::MakeObject(viewObj);
                     Logger::d("StubRegistry", "findViewById found matching View!");
                 } else {
@@ -460,12 +495,29 @@ bool StubRegistry::invoke(const std::string& methodSignature, InterpreterState* 
         }
 
         if (methodSignature.find("Landroid/view/ViewGroup;->getChildCount()I") != std::string::npos) {
-            if (outReturn) *outReturn = Value::MakeInt(1);
+            int count = 0;
+            if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj) {
+                InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+                auto viewGroup = dynamic_cast<setu::view::ViewGroup*>((setu::view::View*)viewObj->nativeHandle);
+                if (viewGroup) count = viewGroup->getChildCount();
+            }
+            if (outReturn) *outReturn = Value::MakeInt(count);
             return false;
         }
         
         if (methodSignature.find("Landroid/view/ViewGroup;->getChildAt(I)Landroid/view/View;") != std::string::npos) {
-            if (outReturn) *outReturn = args.size() > 0 ? args[0] : Value::MakeNull();
+            setu::view::View* child = nullptr;
+            if (args.size() > 1 && args[0].type == ValueType::OBJECT && args[0].obj && args[1].type == ValueType::INT) {
+                InterpreterObject* viewObj = (InterpreterObject*)args[0].obj;
+                auto viewGroup = dynamic_cast<setu::view::ViewGroup*>((setu::view::View*)viewObj->nativeHandle);
+                int index = args[1].i;
+                if (viewGroup && index >= 0 && index < viewGroup->getChildCount()) {
+                    child = viewGroup->getChildAt(index).get();
+                }
+            }
+            if (outReturn) {
+                *outReturn = child ? Value::MakeObject(StubRegistry::getOrCreateViewWrapper(child)) : Value::MakeNull();
+            }
             return false;
         }
         
@@ -858,6 +910,7 @@ void StubRegistry::registerViewStubs() {
             view->setOriginalClassName(className);
             s_dynamicViews.push_back(view);
             viewObj->nativeHandle = view.get();
+            StubRegistry::registerViewWrapper(view.get(), viewObj);
             Logger::d("StubRegistry", "Created dynamic view: " + className);
         }
         return false;
@@ -921,6 +974,30 @@ void StubRegistry::registerViewStubs() {
             }
             Logger::i("StubRegistry", "Executed: RecyclerView.setAdapter");
         }
+        return false;
+    };
+
+    stubs["Landroidx/recyclerview/widget/RecyclerView;->setLayoutManager(Landroidx/recyclerview/widget/RecyclerView$LayoutManager;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "Executed: RecyclerView.setLayoutManager");
+        return false;
+    };
+
+    stubs["Landroidx/recyclerview/widget/RecyclerView;->setHasFixedSize(Z)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "Executed: RecyclerView.setHasFixedSize");
+        return false;
+    };
+
+    stubs["Landroidx/recyclerview/widget/RecyclerView$ViewHolder;-><init>(Landroid/view/View;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* holderObj = static_cast<InterpreterObject*>(args[0].obj);
+            holderObj->fields["itemView"] = args[1];
+            Logger::d("StubRegistry", "Executed: RecyclerView$ViewHolder.<init>(View)");
+        }
+        return false;
+    };
+
+    stubs["Landroidx/recyclerview/widget/RecyclerView$Adapter;->notifyDataSetChanged()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        Logger::d("StubRegistry", "Executed: RecyclerView.Adapter.notifyDataSetChanged");
         return false;
     };
 
@@ -1045,8 +1122,16 @@ void StubRegistry::registerViewStubs() {
             Logger::d("StubRegistry", "Executed: ViewCompat.setOnApplyWindowInsetsListener() (No-op)");
             return false;
         };
-        
-    // 2.5 LayoutInflater::inflate
+    // 2.5 LayoutInflater::from and inflate
+    stubs["Landroid/view/LayoutInflater;->from(Landroid/content/Context;)Landroid/view/LayoutInflater;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (outReturn) {
+            InterpreterObject* inflater = new InterpreterObject();
+            inflater->className = "Landroid/view/LayoutInflater;";
+            *outReturn = Value::MakeObject(inflater);
+        }
+        return false;
+    };
+    
     stubs["Landroid/view/LayoutInflater;->inflate(ILandroid/view/ViewGroup;Z)Landroid/view/View;"] = 
         [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
             if (args.size() >= 2 && args[1].type == ValueType::INT) {
@@ -1061,14 +1146,12 @@ void StubRegistry::registerViewStubs() {
                         RECT rect;
                         GetClientRect(WindowManager::getMainWindow(), &rect);
                         int pW = rect.right > 0 ? rect.right : 400;
-                        int pH = rect.bottom > 0 ? rect.bottom : 800;
                         auto rootView = setu::LayoutInflater::inflate(&parser, m_resManager, m_multiDexManager);
-                        WindowManager::setRootView(rootView);
-                        
-                        InterpreterObject* viewObj = new InterpreterObject();
-                        viewObj->className = getAndroidClassName(rootView.get());
-                        viewObj->nativeHandle = rootView.get();
-                        if (outReturn) *outReturn = Value::MakeObject(viewObj);
+                        if (rootView) {
+                            s_dynamicViews.push_back(rootView);
+                            InterpreterObject* viewObj = StubRegistry::getOrCreateViewWrapper(rootView.get());
+                            if (outReturn) *outReturn = Value::MakeObject(viewObj);
+                        }
                     }
                 }
             } else {
@@ -1348,13 +1431,7 @@ void StubRegistry::registerViewStubs() {
         Logger::w("StubRegistry", "[STUB-DEFERRED] TextView.addTextChangedListener: Needs TextWatcher/Spannable infra.");
         return false;
     };
-    // In AOSP, ViewGroup does NOT override View.requestLayout(). Instead, its layout
-    // suppression logic (mSuppressLayout, mLayoutCalledWhileSuppressed) is handled inside
-    // layout() and suppressLayout(). Therefore, delegating straight to the native
-    // View::requestLayout() call is the correct behavior for ViewGroup subclasses.
-    // (Previously this was wired to an emptyStub tripwire, which caused
-    //  a crash whenever a ViewGroup-descended object called requestLayout().)
-    stubs["Landroid/view/ViewGroup;->requestLayout()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+    auto requestLayoutStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (!args.empty() && args[0].type == ValueType::OBJECT && args[0].obj) {
             auto* viewObj = static_cast<InterpreterObject*>(args[0].obj);
             auto* view = static_cast<setu::view::View*>(viewObj->nativeHandle);
@@ -1364,6 +1441,27 @@ void StubRegistry::registerViewStubs() {
         }
         return false;
     };
+    stubs["Landroid/view/View;->requestLayout()V"] = requestLayoutStub;
+
+    auto setMeasuredDimensionStub = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (!args.empty() && args[0].type == ValueType::OBJECT && args[0].obj) {
+            auto* viewObj = static_cast<InterpreterObject*>(args[0].obj);
+            auto* view = static_cast<setu::view::View*>(viewObj->nativeHandle);
+            if (view && args.size() >= 3) {
+                view->setMeasuredDimension(args[1].i, args[2].i);
+            }
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->setMeasuredDimension(II)V"] = setMeasuredDimensionStub;
+
+    // In AOSP, ViewGroup does NOT override View.requestLayout(). Instead, its layout
+    // suppression logic (mSuppressLayout, mLayoutCalledWhileSuppressed) is handled inside
+    // layout() and suppressLayout(). Therefore, delegating straight to the native
+    // View::requestLayout() call is the correct behavior for ViewGroup subclasses.
+    // (Previously this was wired to an emptyStub tripwire, which caused
+    //  a crash whenever a ViewGroup-descended object called requestLayout().)
+    stubs["Landroid/view/ViewGroup;->requestLayout()V"] = requestLayoutStub;
     stubs["Ljava/lang/ThreadLocal;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         Logger::d("StubRegistry", "[STUB-NOOP] ThreadLocal.<init> is intentionalNoOp.");
         return false;
@@ -1382,11 +1480,58 @@ void StubRegistry::registerViewStubs() {
     };
     stubs["Landroid/view/View;->getLayoutParams()Landroid/view/ViewGroup$LayoutParams;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         if (args.size() > 0 && args[0].type == ValueType::OBJECT && args[0].obj && outReturn) {
-            auto it = ((InterpreterObject*)args[0].obj)->fields.find("mLayoutParams");
-            if (it != ((InterpreterObject*)args[0].obj)->fields.end()) {
+            auto* viewObj = (InterpreterObject*)args[0].obj;
+            auto it = viewObj->fields.find("mLayoutParams");
+            if (it != viewObj->fields.end()) {
                 *outReturn = it->second;
             } else {
-                *outReturn = Value::MakeNull();
+                auto* nativeView = (setu::view::View*)viewObj->nativeHandle;
+                if (nativeView && nativeView->getLayoutParams()) {
+                    auto lp = nativeView->getLayoutParams();
+                    InterpreterObject* lpObj = new InterpreterObject();
+                    lpObj->className = "Landroid/view/ViewGroup$LayoutParams;";
+                    lpObj->fields["width"] = Value::MakeInt(lp->width);
+                    lpObj->fields["height"] = Value::MakeInt(lp->height);
+                    viewObj->fields["mLayoutParams"] = Value::MakeObject(lpObj);
+                    *outReturn = Value::MakeObject(lpObj);
+                } else {
+                    *outReturn = Value::MakeNull();
+                }
+            }
+        }
+        return false;
+    };
+    stubs["Landroid/view/View;->setLayoutParams(Landroid/view/ViewGroup$LayoutParams;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            ((InterpreterObject*)args[0].obj)->fields["mLayoutParams"] = args[1];
+            
+            auto nativeView = (setu::view::View*)((InterpreterObject*)args[0].obj)->nativeHandle;
+            if (nativeView && args[1].type == ValueType::OBJECT && args[1].obj) {
+                auto lpObj = (InterpreterObject*)args[1].obj;
+                auto nativeLp = nativeView->getLayoutParams();
+                if (!nativeLp) {
+                    nativeLp = std::make_shared<setu::view::View::LayoutParams>(setu::view::View::WRAP_CONTENT, setu::view::View::WRAP_CONTENT);
+                }
+                
+                auto widthIt = lpObj->fields.find("width");
+                if (widthIt != lpObj->fields.end()) nativeLp->width = widthIt->second.i;
+                
+                auto heightIt = lpObj->fields.find("height");
+                if (heightIt != lpObj->fields.end()) nativeLp->height = heightIt->second.i;
+                
+                auto lmIt = lpObj->fields.find("leftMargin");
+                if (lmIt != lpObj->fields.end()) nativeLp->leftMargin = lmIt->second.i;
+                
+                auto tmIt = lpObj->fields.find("topMargin");
+                if (tmIt != lpObj->fields.end()) nativeLp->topMargin = tmIt->second.i;
+                
+                auto rmIt = lpObj->fields.find("rightMargin");
+                if (rmIt != lpObj->fields.end()) nativeLp->rightMargin = rmIt->second.i;
+                
+                auto bmIt = lpObj->fields.find("bottomMargin");
+                if (bmIt != lpObj->fields.end()) nativeLp->bottomMargin = bmIt->second.i;
+                
+                nativeView->setLayoutParams(nativeLp);
             }
         }
         return false;
@@ -1497,7 +1642,12 @@ void StubRegistry::registerViewStubs() {
         return false;
     };
     stubs["Landroid/content/res/Resources;->getDisplayMetrics()Landroid/util/DisplayMetrics;"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
-        if (outReturn) *outReturn = Value::MakeObject(new InterpreterObject());
+        if (outReturn) {
+            InterpreterObject* metrics = new InterpreterObject();
+            metrics->className = "Landroid/util/DisplayMetrics;";
+            metrics->fields["density"] = Value::MakeFloat(WindowManager::getDensity());
+            *outReturn = Value::MakeObject(metrics);
+        }
         return false;
     };
     stubs["Landroid/view/View;->requestFocus()Z"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {

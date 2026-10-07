@@ -14,6 +14,7 @@
 #include "../os/Handler.h"
 #include "../os/Looper.h"
 #include "ViewGroup.h"
+#include "../interpreter/StubRegistry.h"
 #include <algorithm>
 #include "../graphics/RecordingCanvas.h"
 #include "../graphics/drawable/ColorDrawable.h"
@@ -86,6 +87,7 @@ View::View(ResourceManager* resManager, Theme* theme, android::ResXMLParser* par
 View::View() {}
 
 View::~View() {
+    StubRegistry::unregisterViewWrapper(this);
     // A queued callback captures its drawable raw, so anything still pending when
     // the owner goes away would fire against freed memory on the next tick. The
     // background dies with this View in the normal case, but getBackgroundDrawable()
@@ -376,7 +378,12 @@ void View::dispatchDetachedFromWindow() {
     onDetachedFromWindow();
 }
 
+std::function<bool(View*, int, int)> View::s_onMeasureCallback = nullptr;
+
 void View::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+    if (s_onMeasureCallback && s_onMeasureCallback(this, widthMeasureSpec, heightMeasureSpec)) {
+        return;
+    }
     // Default implementation: just take the provided size if exactly/at most, 
     // or a default minimum size if unspecified.
     int widthMode = getMode(widthMeasureSpec);
