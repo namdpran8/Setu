@@ -379,6 +379,7 @@ void View::dispatchDetachedFromWindow() {
 }
 
 std::function<bool(View*, int, int)> View::s_onMeasureCallback = nullptr;
+std::function<bool(View*, graphics::Canvas&)> View::s_onDrawCallback = nullptr;
 
 void View::onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
     if (s_onMeasureCallback && s_onMeasureCallback(this, widthMeasureSpec, heightMeasureSpec)) {
@@ -402,6 +403,9 @@ void View::onLayout(bool changed, int l, int t, int r, int b) {
 }
 
 void View::onDraw(graphics::Canvas& canvas) {
+    if (s_onDrawCallback && s_onDrawCallback(this, canvas)) {
+        return;
+    }
     // Default implementation does nothing
 }
 

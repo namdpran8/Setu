@@ -420,3 +420,11 @@ report.md
 run_out*.txt
 test_apk_proj/
 test_apk_unzipped/
+/temp_apk_extract
+/testapk2
+*.java
+*.txt
+/analyze2.py
+/analyze_stubs.py
+*.py
+/fix_summary.md

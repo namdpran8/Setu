@@ -54,6 +54,7 @@ void LinearLayoutManager::layoutChildren(RecyclerView* recycler, Adapter* adapte
         }
 
         auto holder = recycler->getViewForPosition(i);
+        if (!holder) continue;
         auto child = holder->itemView;
         recycler->addView(child);
         recycler->addViewHolder(holder);
@@ -192,6 +193,7 @@ std::shared_ptr<ViewHolder> RecyclerView::getViewForPosition(int position) {
     auto holder = mPool->getRecycledView(viewType);
     if (!holder) {
         holder = mAdapter->onCreateViewHolder(this, viewType);
+        if (!holder) return nullptr;
         holder->viewType = viewType;
     }
     mAdapter->onBindViewHolder(holder, position);

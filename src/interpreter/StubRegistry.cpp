@@ -15,6 +15,8 @@
  */
 
 #include "StubRegistry.h"
+#include "../graphics/Canvas.h"
+#include "../graphics/Paint.h"
 #include "../utils/Logger.h"
 #include "../ui/WindowManager.h"
 #include "../ui/LayoutInflater.h"
@@ -40,9 +42,20 @@ std::unordered_map<int, InterpreterObject*> StubRegistry::longClickListeners;
 std::vector<ActivityRecord> StubRegistry::s_backStack;
 ActivityRecord StubRegistry::s_currentActivity;
 static std::unordered_map<setu::view::View*, InterpreterObject*> s_viewWrappers;
+static std::unordered_map<setu::graphics::Canvas*, InterpreterObject*> s_canvasWrappers;
 
 static std::string getAndroidClassName(const setu::view::View* view);
 
+InterpreterObject* StubRegistry::getOrCreateCanvasWrapper(setu::graphics::Canvas* canvas) {
+    if (!canvas) return nullptr;
+    auto it = s_canvasWrappers.find(canvas);
+    if (it != s_canvasWrappers.end()) return it->second;
+    InterpreterObject* canvasObj = new InterpreterObject();
+    canvasObj->className = "Landroid/graphics/Canvas;";
+    canvasObj->nativeHandle = canvas;
+    s_canvasWrappers[canvas] = canvasObj;
+    return canvasObj;
+}
 InterpreterObject* StubRegistry::getOrCreateViewWrapper(setu::view::View* view) {
     if (!view) return nullptr;
     auto it = s_viewWrappers.find(view);
@@ -262,6 +275,7 @@ bool StubRegistry::isStubbed(const std::string& methodSignature) {
     if (cls.find("Landroidx/lifecycle/") == 0) return true;
     if (cls == "Ljava/lang/Enum;") return true;
     if (cls == "Ljava/lang/Integer;") return true;
+    if (cls == "Landroid/graphics/Paint;") return true;
     if (cls == "Landroid/graphics/Rect;") return true;
     if (cls == "Landroid/animation/LayoutTransition;") return true;
     if (cls == "Ljava/lang/IllegalStateException;") return true;
@@ -1376,6 +1390,32 @@ void StubRegistry::registerViewStubs() {
         return false;
     };
     
+    stubs["Landroid/graphics/Paint;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool { return false; };
+    stubs["Landroid/graphics/Paint;->setColor(I)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 2 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* paintObj = static_cast<InterpreterObject*>(args[0].obj);
+            paintObj->fields["color"] = args[1];
+        }
+        return false;
+    };
+    stubs["Landroid/graphics/Canvas;->drawRect(FFFFLandroid/graphics/Paint;)V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
+        if (args.size() >= 6 && args[0].type == ValueType::OBJECT && args[0].obj) {
+            InterpreterObject* canvasObj = static_cast<InterpreterObject*>(args[0].obj);
+            auto* canvas = static_cast<setu::graphics::Canvas*>(canvasObj->nativeHandle);
+            if (canvas && args[5].type == ValueType::OBJECT && args[5].obj) {
+                InterpreterObject* paintObj = static_cast<InterpreterObject*>(args[5].obj);
+                int color = 0xFF000000;
+                auto it = paintObj->fields.find("color");
+                if (it != paintObj->fields.end() && it->second.type == ValueType::INT) {
+                    color = it->second.i;
+                }
+                setu::graphics::Paint paint;
+                paint.setColor(color);
+                canvas->drawRect(args[1].f, args[2].f, args[3].f, args[4].f, paint);
+            }
+        }
+        return false;
+    };
     stubs["Landroid/graphics/Rect;-><init>()V"] = [](InterpreterState* state, const std::vector<Value>& args, Value* outReturn) -> bool {
         Logger::d("StubRegistry", "[STUB-NOOP] Rect.<init> is intentionalNoOp for instantiation.");
         return false;

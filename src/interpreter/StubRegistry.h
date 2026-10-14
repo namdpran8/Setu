@@ -15,6 +15,11 @@
 #include <functional>
 #include "Value.h"
 #include "InterpreterState.h"
+namespace setu {
+namespace graphics {
+    class Canvas;
+}
+}
 namespace setu { class ResourceManager; }
 class MultiDexManager;
 // StubFunc signature: takes InterpreterState, args array, and an output Value pointer for returns.
@@ -22,6 +27,11 @@ class MultiDexManager;
 using StubFunc = std::function<bool(InterpreterState* state, const std::vector<Value>& args, Value* outReturn)>;
 #include <memory>
 
+namespace setu {
+namespace graphics {
+    class Canvas;
+}
+}
 namespace setu { namespace view { class View; } }
 
 struct ActivityRecord {
@@ -40,6 +50,11 @@ public:
     static void registerClickListener(int viewId, const Value& listenerObj);
     static InterpreterObject* getClickListener(int controlId);
     static InterpreterObject* getLongClickListener(int controlId);
+
+    static InterpreterObject* getOrCreateViewWrapper(setu::view::View* view);
+    static InterpreterObject* getOrCreateCanvasWrapper(setu::graphics::Canvas* canvas);
+    static void registerViewWrapper(setu::view::View* view, InterpreterObject* obj);
+    static void unregisterViewWrapper(setu::view::View* view);
 
     // Activity Lifecycle
     static void performBackNavigation();

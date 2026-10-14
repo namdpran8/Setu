@@ -662,8 +662,11 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                   uint8_t b = (ab >> 4) & 0x0F;
                   
                   if (state.registers[b].type != ValueType::ARRAY) {
-                      state.registers[a] = Value::MakeInt(0);
                       Logger::w("Interpreter", "[0x21] array-length failed: v" + std::to_string(b) + " is not an array");
+                      InterpreterObject* npe = new InterpreterObject();
+                      npe->className = "java.lang.NullPointerException";
+                      state.pendingException = npe;
+                      isRunning = false;
                   } else {
                       ArrayObject* arr = static_cast<ArrayObject*>(state.registers[b].obj);
                       state.registers[a] = Value::MakeInt((int32_t)arr->elements.size());
@@ -724,8 +727,11 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                   uint8_t cc = safe8(bytecode, state.pc + 2);
                   
                   if (state.registers[bb].type != ValueType::ARRAY) {
-                      state.registers[aa] = Value::MakeNull();
                       Logger::w("Interpreter", "[0x44..4A] aget-* failed: v" + std::to_string(bb) + " is not an array");
+                      InterpreterObject* npe = new InterpreterObject();
+                      npe->className = "java.lang.NullPointerException";
+                      state.pendingException = npe;
+                      isRunning = false;
                   } else {
                       ArrayObject* arr = static_cast<ArrayObject*>(state.registers[bb].obj);
                       int32_t index = state.registers[cc].i;
@@ -748,6 +754,10 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                   
                   if (state.registers[bb].type != ValueType::ARRAY) {
                       Logger::w("Interpreter", "[0x4B..51] aput-* failed: v" + std::to_string(bb) + " is not an array");
+                      InterpreterObject* npe = new InterpreterObject();
+                      npe->className = "java.lang.NullPointerException";
+                      state.pendingException = npe;
+                      isRunning = false;
                   } else {
                       ArrayObject* arr = static_cast<ArrayObject*>(state.registers[bb].obj);
                       int32_t index = state.registers[cc].i;
@@ -774,16 +784,21 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     InterpreterObject* instance = (InterpreterObject*)objVal.obj;
                     Logger::d("Interpreter", "ACCESS instance (" + instance->className + ") in v" + std::to_string(b) + " at " + std::to_string((unsigned long long)instance));
                     std::string fieldName = "field_" + std::to_string(fieldIdx);
-                    if (instance->fields.count(fieldName)) {
-                        state.registers[a] = instance->fields[fieldName];
+                    auto it = instance->fields.find(fieldName);
+                    if (it != instance->fields.end()) {
+                        state.registers[a] = it->second;
+                    } else if (!actualFieldName.empty() && (it = instance->fields.find(actualFieldName)) != instance->fields.end()) {
+                        state.registers[a] = it->second;
                     } else {
                         state.registers[a] = Value::MakeNull();
                     }
                     Logger::d("Interpreter", "[0x52..58] iget-* v" + std::to_string(a) + ", v" + std::to_string(b) + " -> " + fieldName);
                 } else {
-                    // Hello, is it me you're looking for? - Lionel Richie
                     Logger::w("Interpreter", "[0x52..58] iget-* failed: v" + std::to_string(b) + " is null or not object. Type=" + std::to_string((int)objVal.type));
-                    state.registers[a] = Value::MakeNull();
+                    InterpreterObject* npe = new InterpreterObject();
+                    npe->className = "java.lang.NullPointerException";
+                    state.pendingException = npe;
+                    isRunning = false;
                 }
                 state.pc += 3;
                 break;
@@ -803,9 +818,16 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                     Logger::d("Interpreter", "ACCESS (iput) instance (" + instance->className + ") in v" + std::to_string(b) + " at " + std::to_string((unsigned long long)instance));
                     std::string fieldName = "field_" + std::to_string(fieldIdx);
                     instance->fields[fieldName] = valToStore;
+                    if (!actualFieldName.empty()) {
+                        instance->fields[actualFieldName] = valToStore;
+                    }
                     Logger::d("Interpreter", "PUT iput-* v" + std::to_string(a) + ", v" + std::to_string(b) + " -> " + actualFieldName);
                 } else {
                     Logger::w("Interpreter", "PUT iput-* failed: v" + std::to_string(b) + " is null or not object. Type=" + std::to_string((int)objVal.type));
+                    InterpreterObject* npe = new InterpreterObject();
+                    npe->className = "java.lang.NullPointerException";
+                    state.pendingException = npe;
+                    isRunning = false;
                 }
                 state.pc += 3;
                 break;
@@ -1142,6 +1164,10 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                                     callDepth++;
                                     Interpreter nestedVm;
                                     state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, classLoc.dex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                                    if (nestedVm.pendingException) {
+                                        state.pendingException = nestedVm.pendingException;
+                                        isRunning = false;
+                                    }
                                     callDepth--;
                                 }
                                 executedBytecode = true;
@@ -1199,6 +1225,10 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                                     callDepth++;
                                     Interpreter nestedVm;
                                     state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, ifaceLoc.dex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                                    if (nestedVm.pendingException) {
+                                        state.pendingException = nestedVm.pendingException;
+                                        isRunning = false;
+                                    }
                                     callDepth--;
                                 }
                                 executedBytecode = true;
@@ -1284,6 +1314,10 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
                                     callDepth++;
                                     Interpreter nestedVm;
                                     state.methodReturnVal = nestedVm.executeMethod(bcResult.bytecode, classLoc.dex, multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+                                    if (nestedVm.pendingException) {
+                                        state.pendingException = nestedVm.pendingException;
+                                        isRunning = false;
+                                    }
                                     callDepth--;
                                 }
                                 executedBytecode = true;
@@ -1385,5 +1419,6 @@ Value Interpreter::executeMethod(const std::vector<uint8_t>& bytecode,
     }
     
     Logger::i("Interpreter", "Execution finished.");
+    this->pendingException = state.pendingException;
     return state.methodReturnVal;
 }

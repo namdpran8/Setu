@@ -394,24 +394,81 @@ int main(int argc, char* argv[]) {
     Logger::i("Main", "Testing Interpreter Skeleton on real extracted bytecode...");
     Interpreter vm;
     
-    // We can now ask the MultiDexManager for the method bytecode!
+    InterpreterObject* mainActivityObj = new InterpreterObject();
+    mainActivityObj->className = mainActivityClass;
+    StubRegistry::setInitialActivity(mainActivityObj, mainActivityClass);
+    
+    Logger::i("Main", "Executing <init> for " + mainActivityClass);
+    auto [initBytecodeResult, initDex] = multiDexManager.getMethodBytecode(mainActivityClass + "-><init>()V");
+    if (!initBytecodeResult.bytecode.empty() && initDex) {
+        std::vector<Value> initArgs;
+        initArgs.push_back(Value::MakeObject(mainActivityObj));
+        vm.executeMethod(initBytecodeResult.bytecode, initDex, &multiDexManager, initArgs, initBytecodeResult.registers_size, initBytecodeResult.ins_size);
+        if (vm.pendingException) {
+            crashExit(1, launchArgs.package, "Uncaught interpreter exception in <init>: " + vm.pendingException->className);
+        }
+    } else {
+        Logger::w("Main", "No <init>()V found for " + mainActivityClass);
+    }
+
     auto [realBytecodeResult, currentDex] = multiDexManager.getMethodBytecode(mainActivityClass + "->onCreate(Landroid/os/Bundle;)V");
     
     if (!realBytecodeResult.bytecode.empty() && currentDex) {
-        InterpreterObject* mainActivityObj = new InterpreterObject(mainActivityClass);
-        StubRegistry::setInitialActivity(mainActivityObj, mainActivityClass);
         std::vector<Value> args;
         args.push_back(Value::MakeObject(mainActivityObj));
         args.push_back(Value::MakeNull()); // Bundle (null for now)
         
-        Value res = vm.executeMethod(realBytecodeResult.bytecode, currentDex, &multiDexManager, args, realBytecodeResult.registers_size, realBytecodeResult.ins_size);
-        if (res.type == ValueType::OBJECT && res.obj && static_cast<InterpreterObject*>(res.obj)->className.find("Exception") != std::string::npos) {
-            crashExit(1, launchArgs.package, "Uncaught interpreter exception: " + static_cast<InterpreterObject*>(res.obj)->className + " in " + mainActivityClass + "->onCreate()");
+        vm.executeMethod(realBytecodeResult.bytecode, currentDex, &multiDexManager, args, realBytecodeResult.registers_size, realBytecodeResult.ins_size);
+        if (vm.pendingException) {
+            crashExit(1, launchArgs.package, "Uncaught interpreter exception: " + vm.pendingException->className + " in " + mainActivityClass + "->onCreate()");
         }
     } else {
         Logger::e("Main", "Failed to extract bytecode for " + mainActivityClass + ".onCreate!");
     }
 
+    // Set up onMeasure routing to the interpreter for custom views
+    setu::view::View::setOnMeasureCallback([&vm, &multiDexManager](setu::view::View* view, int wSpec, int hSpec) -> bool {
+        InterpreterObject* obj = StubRegistry::getOrCreateViewWrapper(view);
+        if (!obj || obj->className == "Landroid/view/View;" || obj->className == "Landroid/widget/TextView;" || obj->className == "Landroid/widget/Button;" || obj->className == "Landroid/widget/FrameLayout;" || obj->className == "Landroid/widget/LinearLayout;" || obj->className == "Landroid/widget/RelativeLayout;" || obj->className == "Landroid/view/ViewGroup;") {
+            return false; // Skip framework views
+        }
+        
+        auto [bcResult, dex] = multiDexManager.getMethodBytecode(obj->className + "->onMeasure(II)V");
+        if (bcResult.bytecode.empty() || !dex) return false;
+        
+        std::vector<Value> args;
+        args.push_back(Value::MakeObject(obj));
+        args.push_back(Value::MakeInt(wSpec));
+        args.push_back(Value::MakeInt(hSpec));
+        
+        static int measureDepth = 0;
+        measureDepth++;
+        if (measureDepth < 10) {
+            vm.executeMethod(bcResult.bytecode, dex, &multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+        }
+        measureDepth--;
+        return true;
+    });
+
+    setu::view::View::setOnDrawCallback([&vm, &multiDexManager](setu::view::View* view, setu::graphics::Canvas& canvas) -> bool {
+        InterpreterObject* obj = StubRegistry::getOrCreateViewWrapper(view);
+        if (!obj || obj->className == "Landroid/view/View;" || obj->className == "Landroid/widget/TextView;" || obj->className == "Landroid/widget/Button;" || obj->className == "Landroid/widget/FrameLayout;" || obj->className == "Landroid/widget/LinearLayout;" || obj->className == "Landroid/widget/RelativeLayout;" || obj->className == "Landroid/view/ViewGroup;") {
+            return false; // Skip framework views
+        }
+        auto [bcResult, dex] = multiDexManager.getMethodBytecode(obj->className + "->onDraw(Landroid/graphics/Canvas;)V");
+        if (bcResult.bytecode.empty() || !dex) return false;
+        std::vector<Value> args;
+        args.push_back(Value::MakeObject(obj));
+        InterpreterObject* canvasObj = StubRegistry::getOrCreateCanvasWrapper(&canvas);
+        args.push_back(Value::MakeObject(canvasObj));
+        static int drawDepth = 0;
+        drawDepth++;
+        if (drawDepth < 10) {
+            vm.executeMethod(bcResult.bytecode, dex, &multiDexManager, args, bcResult.registers_size, bcResult.ins_size);
+        }
+        drawDepth--;
+        return true;
+    });
     // Set up click routing to the interpreter
     WindowManager::setClickCallback([&](int controlId) {
         InterpreterObject* listener = StubRegistry::getClickListener(controlId);
@@ -423,9 +480,10 @@ int main(int argc, char* argv[]) {
                 clickArgs.push_back(Value::MakeObject(listener)); // this
                 clickArgs.push_back(Value::MakeNull());           // View parameter
                 
-                Value clickRes = vm.executeMethod(clickBytecodeResult.bytecode, clickDex, &multiDexManager, clickArgs, clickBytecodeResult.registers_size, clickBytecodeResult.ins_size);
-                if (clickRes.type == ValueType::OBJECT && clickRes.obj && static_cast<InterpreterObject*>(clickRes.obj)->className.find("Exception") != std::string::npos) {
-                    crashExit(1, launchArgs.package, "Uncaught interpreter exception: " + static_cast<InterpreterObject*>(clickRes.obj)->className + " in " + listener->className + "->onClick()");
+                vm.pendingException = nullptr; // Clear previous exceptions just in case
+                vm.executeMethod(clickBytecodeResult.bytecode, clickDex, &multiDexManager, clickArgs, clickBytecodeResult.registers_size, clickBytecodeResult.ins_size);
+                if (vm.pendingException) {
+                    crashExit(1, launchArgs.package, "Uncaught interpreter exception: " + vm.pendingException->className + " in " + listener->className + "->onClick()");
                 }
             } else {
                 Logger::w("Main", "onClick method not found for class: " + listener->className);

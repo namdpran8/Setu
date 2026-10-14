@@ -105,6 +105,8 @@ public:
     virtual void onDetachedFromWindow() {}
     static std::function<bool(View*, int, int)> s_onMeasureCallback;
     static void setOnMeasureCallback(std::function<bool(View*, int, int)> cb) { s_onMeasureCallback = cb; }
+    static std::function<bool(View*, graphics::Canvas&)> s_onDrawCallback;
+    static void setOnDrawCallback(std::function<bool(View*, graphics::Canvas&)> cb) { s_onDrawCallback = cb; }
     virtual void onMeasure(int widthMeasureSpec, int heightMeasureSpec);
     virtual void onLayout(bool changed, int l, int t, int r, int b);
     virtual void onDraw(graphics::Canvas& canvas);

@@ -14,6 +14,7 @@
 #include "LayoutInflater.h"
 #include "../utils/Logger.h"
 #include "../interpreter/Interpreter.h"
+#include "../interpreter/StubRegistry.h"
 #include "../interpreter/Value.h"
 #include "../widget/Button.h"
 #include "../widget/ImageView.h"
@@ -196,6 +197,25 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
         auto tryRunDexCtor = [&](const std::string& originalClass) {
             if (!dexManager || !view) return;
 
+            // Skip DEX constructor for views whose native C++ implementation is
+            // complete and self-contained.  Running the real AndroidX <init>
+            // bytecode against a native proxy that already has its own layout
+            // manager, adapter bridge, and child management causes the DEX
+            // constructor to initialize Java-side state (mRecycler, mState,
+            // mChildHelper, mViewFlinger) via method calls that all silently
+            // return null (blanket-whitelisted in isStubbed), leading to
+            // null-deref crashes.
+            if (dynamic_cast<setu::widget::RecyclerView*>(view.get())) {
+                Logger::d("LayoutInflater", "Skipping DEX <init> for " + originalClass + " — native implementation is complete");
+                // Still register the wrapper so setAdapter and other stubs can
+                // find the view by its correct androidx class name.
+                InterpreterObject* viewObj = new InterpreterObject();
+                viewObj->className = originalClass;
+                viewObj->nativeHandle = view.get();
+                StubRegistry::registerViewWrapper(view.get(), viewObj);
+                return;
+            }
+
             // Try (Context, AttributeSet) first, fall back to (Context, AttributeSet, int)
             std::string initSig = originalClass + "-><init>(Landroid/content/Context;Landroid/util/AttributeSet;)V";
             auto [initBc, initDex] = dexManager->getMethodBytecode(initSig);
@@ -217,6 +237,7 @@ std::shared_ptr<setu::view::View> LayoutInflater::inflateRecursive(android::ResX
             InterpreterObject* viewObj = new InterpreterObject();
             viewObj->className = originalClass;
             viewObj->nativeHandle = view.get();
+            StubRegistry::registerViewWrapper(view.get(), viewObj);
 
             std::vector<Value> initArgs;
             initArgs.push_back(Value::MakeObject(viewObj));

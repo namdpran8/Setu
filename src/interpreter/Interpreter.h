@@ -23,6 +23,8 @@ public:
     Interpreter();
     ~Interpreter();
 
+    InterpreterObject* pendingException = nullptr;
+
     // Executes a raw array of Dalvik bytecode instructions
     // dexParser is used to resolve strings and method names for logging/dispatch
     // multiDexManager is used to resolve cross-DEX dependencies (mutable for static field writes)
